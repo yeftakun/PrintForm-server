@@ -163,7 +163,7 @@ function toPublicClient(client) {
   };
 }
 
-const CLIENT_TTL_MS = 20 * 1000;
+const CLIENT_TTL_MS = 2 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 1000;
 
 function isClientOnline(client) {
