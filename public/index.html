@@ -22,6 +22,13 @@
           </label>
 
           <label class="field">
+            <span>Tujuan Client</span>
+            <select name="targetClientId" id="clientSelect" required>
+              <option value="">Memuat daftar client...</option>
+            </select>
+          </label>
+
+          <label class="field">
             <span>Ukuran Kertas</span>
             <select name="paperSize">
               <option value="A4" selected>A4</option>
@@ -49,6 +56,7 @@
             <tr>
               <th>ID</th>
               <th>Dokumen</th>
+              <th>Client</th>
               <th>Ukuran</th>
               <th>Salinan</th>
               <th>Status</th>
@@ -57,10 +65,31 @@
           </thead>
           <tbody id="jobsBody">
             <tr>
-              <td colspan="6" class="muted">Belum ada job.</td>
+              <td colspan="7" class="muted">Belum ada job.</td>
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section class="card">
+        <h2>Client Terhubung (Online)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Status</th>
+              <th>Terakhir Terlihat</th>
+              <th>Printer</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="clientsBody">
+            <tr>
+              <td colspan="5" class="muted">Belum ada client.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div id="clientsStatus" class="status"></div>
       </section>
     </main>
 
@@ -69,12 +98,56 @@
       const uploadStatus = document.getElementById("uploadStatus");
       const jobsBody = document.getElementById("jobsBody");
       const refreshBtn = document.getElementById("refreshBtn");
+      const clientSelect = document.getElementById("clientSelect");
+      const clientsBody = document.getElementById("clientsBody");
+      const clientsStatus = document.getElementById("clientsStatus");
+
+      async function loadClients() {
+        const previousSelection = clientSelect.value;
+        const res = await fetch("/api/clients");
+        const clients = await res.json();
+        if (!Array.isArray(clients) || clients.length === 0) {
+          clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
+          clientsBody.innerHTML = '<tr><td colspan="5" class="muted">Belum ada client online.</td></tr>';
+          return;
+        }
+
+        const options = clients.map(client => {
+          const label = `${client.name} (${client.status})`;
+          return `<option value="${client.id}">${label}</option>`;
+        }).join("");
+
+        clientSelect.innerHTML = options;
+        if (clients.length === 1) {
+          clientSelect.value = clients[0].id;
+        } else {
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Pilih client";
+          placeholder.disabled = true;
+          placeholder.selected = true;
+          clientSelect.prepend(placeholder);
+          if (previousSelection) {
+            clientSelect.value = previousSelection;
+          }
+        }
+
+        clientsBody.innerHTML = clients.map(client => `
+          <tr>
+            <td>${client.name}</td>
+            <td>${client.status}</td>
+            <td>${new Date(client.lastSeen).toLocaleString()}</td>
+            <td>${(client.printers || []).join(", ") || "-"}</td>
+            <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
+          </tr>
+        `).join("");
+      }
 
       async function loadJobs() {
         const res = await fetch("/api/jobs");
         const jobs = await res.json();
         if (!Array.isArray(jobs) || jobs.length === 0) {
-          jobsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada job.</td></tr>';
+          jobsBody.innerHTML = '<tr><td colspan="7" class="muted">Belum ada job.</td></tr>';
           return;
         }
 
@@ -82,6 +155,7 @@
           <tr>
             <td>${job.id}</td>
             <td>${job.originalName}</td>
+            <td>${job.targetClientName || job.targetClientId || "-"}</td>
             <td>${job.printConfig.paperSize}</td>
             <td>${job.printConfig.copies}</td>
             <td>${job.status}</td>
@@ -118,7 +192,39 @@
       });
 
       refreshBtn.addEventListener("click", loadJobs);
+      refreshBtn.addEventListener("click", loadClients);
+      clientsBody.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        const clientId = target.dataset.clientId;
+        const clientName = target.dataset.clientName;
+        if (!clientId) {
+          return;
+        }
+
+        clientsStatus.textContent = `Mengirim ping ke ${clientName || "client"}...`;
+        clientsStatus.className = "status";
+
+        try {
+          const res = await fetch(`/api/clients/${clientId}/ping`, { method: "POST" });
+          if (!res.ok) {
+            clientsStatus.textContent = "Gagal mengirim ping.";
+            clientsStatus.className = "status error";
+            return;
+          }
+          clientsStatus.textContent = `Ping terkirim ke ${clientName || "client"}.`;
+          clientsStatus.className = "status success";
+        } catch (err) {
+          clientsStatus.textContent = "Gagal terhubung ke server.";
+          clientsStatus.className = "status error";
+        }
+      });
+      loadClients();
       loadJobs();
+      setInterval(loadClients, 5000);
     </script>
   </body>
 </html>
