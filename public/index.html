@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrintForm Server</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <h1>PrintForm Cloud Queue</h1>
+        <p>Upload dokumen dan atur konfigurasi cetak.</p>
+      </header>
+
+      <section class="card">
+        <h2>Upload Print Job</h2>
+        <form id="uploadForm">
+          <label class="field">
+            <span>Dokumen</span>
+            <input type="file" name="document" required>
+          </label>
+
+          <label class="field">
+            <span>Ukuran Kertas</span>
+            <select name="paperSize">
+              <option value="A4" selected>A4</option>
+              <option value="A5">A5</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Banyak Salinan</span>
+            <input type="number" name="copies" min="1" max="999" value="1">
+          </label>
+
+          <button type="submit">Kirim Job</button>
+          <div id="uploadStatus" class="status"></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <h2>Daftar Job</h2>
+          <button id="refreshBtn" type="button">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Dokumen</th>
+              <th>Ukuran</th>
+              <th>Salinan</th>
+              <th>Status</th>
+              <th>Waktu</th>
+            </tr>
+          </thead>
+          <tbody id="jobsBody">
+            <tr>
+              <td colspan="6" class="muted">Belum ada job.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script>
+      const uploadForm = document.getElementById("uploadForm");
+      const uploadStatus = document.getElementById("uploadStatus");
+      const jobsBody = document.getElementById("jobsBody");
+      const refreshBtn = document.getElementById("refreshBtn");
+
+      async function loadJobs() {
+        const res = await fetch("/api/jobs");
+        const jobs = await res.json();
+        if (!Array.isArray(jobs) || jobs.length === 0) {
+          jobsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada job.</td></tr>';
+          return;
+        }
+
+        jobsBody.innerHTML = jobs.map(job => `
+          <tr>
+            <td>${job.id}</td>
+            <td>${job.originalName}</td>
+            <td>${job.printConfig.paperSize}</td>
+            <td>${job.printConfig.copies}</td>
+            <td>${job.status}</td>
+            <td>${new Date(job.createdAt).toLocaleString()}</td>
+          </tr>
+        `).join("");
+      }
+
+      uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        uploadStatus.textContent = "Mengirim...";
+        uploadStatus.className = "status";
+
+        const formData = new FormData(uploadForm);
+        try {
+          const res = await fetch("/api/jobs", {
+            method: "POST",
+            body: formData
+          });
+          const body = await res.json();
+          if (!res.ok) {
+            uploadStatus.textContent = body.error || "Gagal mengirim job.";
+            uploadStatus.className = "status error";
+            return;
+          }
+          uploadStatus.textContent = "Job berhasil dikirim.";
+          uploadStatus.className = "status success";
+          uploadForm.reset();
+          await loadJobs();
+        } catch (err) {
+          uploadStatus.textContent = "Gagal terhubung ke server.";
+          uploadStatus.className = "status error";
+        }
+      });
+
+      refreshBtn.addEventListener("click", loadJobs);
+      loadJobs();
+    </script>
+  </body>
+</html>
