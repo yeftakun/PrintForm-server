@@ -13,19 +13,33 @@
         <p>Upload dokumen dan atur konfigurasi cetak.</p>
       </header>
 
-      <section class="card">
+      <section class="card" id="sessionCard">
+        <h2>Session Print</h2>
+        <div id="sessionInactive">
+          <label class="field">
+            <span>Tujuan Client</span>
+            <select id="clientSelect" required>
+              <option value="">Memuat daftar client...</option>
+            </select>
+          </label>
+          <button id="startSessionBtn" type="button">Mulai Session</button>
+          <div id="sessionStatus" class="status"></div>
+        </div>
+        <div id="sessionActive" class="hidden">
+          <p class="status">Session aktif untuk <strong id="sessionClientName"></strong></p>
+          <div class="row">
+            <span id="sessionIdText" class="muted"></span>
+            <button id="endSessionBtn" type="button">Akhiri Session</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card requires-session">
         <h2>Upload Print Job</h2>
         <form id="uploadForm">
           <label class="field">
             <span>Dokumen</span>
             <input type="file" name="document" required>
-          </label>
-
-          <label class="field">
-            <span>Tujuan Client</span>
-            <select name="targetClientId" id="clientSelect" required>
-              <option value="">Memuat daftar client...</option>
-            </select>
           </label>
 
           <label class="field">
@@ -46,7 +60,7 @@
         </form>
       </section>
 
-      <section class="card">
+      <section class="card requires-session">
         <div class="row">
           <h2>Daftar Job</h2>
           <button id="refreshBtn" type="button">Refresh</button>
@@ -99,8 +113,30 @@
       const jobsBody = document.getElementById("jobsBody");
       const refreshBtn = document.getElementById("refreshBtn");
       const clientSelect = document.getElementById("clientSelect");
+      const startSessionBtn = document.getElementById("startSessionBtn");
+      const endSessionBtn = document.getElementById("endSessionBtn");
+      const sessionStatus = document.getElementById("sessionStatus");
+      const sessionClientName = document.getElementById("sessionClientName");
+      const sessionIdText = document.getElementById("sessionIdText");
+      const sessionInactive = document.getElementById("sessionInactive");
+      const sessionActive = document.getElementById("sessionActive");
       const clientsBody = document.getElementById("clientsBody");
       const clientsStatus = document.getElementById("clientsStatus");
+      const requiresSessionSections = document.querySelectorAll(".requires-session");
+      let sessionId = sessionStorage.getItem("printformSessionId") || "";
+      let sessionClient = sessionStorage.getItem("printformSessionClientName") || "";
+
+      function setSessionUi(active) {
+        sessionInactive.classList.toggle("hidden", active);
+        sessionActive.classList.toggle("hidden", !active);
+        requiresSessionSections.forEach(section => {
+          section.classList.toggle("hidden", !active);
+        });
+        if (active) {
+          sessionClientName.textContent = sessionClient || "client";
+          sessionIdText.textContent = sessionId ? `Session ID: ${sessionId}` : "";
+        }
+      }
 
       async function loadClients() {
         const previousSelection = clientSelect.value;
@@ -144,7 +180,12 @@
       }
 
       async function loadJobs() {
-        const res = await fetch("/api/jobs");
+        if (!sessionId) {
+          jobsBody.innerHTML = '<tr><td colspan="7" class="muted">Session belum aktif.</td></tr>';
+          return;
+        }
+
+        const res = await fetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
         const jobs = await res.json();
         if (!Array.isArray(jobs) || jobs.length === 0) {
           jobsBody.innerHTML = '<tr><td colspan="7" class="muted">Belum ada job.</td></tr>';
@@ -170,6 +211,9 @@
         uploadStatus.className = "status";
 
         const formData = new FormData(uploadForm);
+        if (sessionId) {
+          formData.append("sessionId", sessionId);
+        }
         try {
           const res = await fetch("/api/jobs", {
             method: "POST",
@@ -189,6 +233,65 @@
           uploadStatus.textContent = "Gagal terhubung ke server.";
           uploadStatus.className = "status error";
         }
+      });
+
+      startSessionBtn.addEventListener("click", async () => {
+        const clientId = clientSelect.value;
+        if (!clientId) {
+          sessionStatus.textContent = "Pilih client terlebih dahulu.";
+          sessionStatus.className = "status error";
+          return;
+        }
+
+        sessionStatus.textContent = "Membuat session...";
+        sessionStatus.className = "status";
+        try {
+          const res = await fetch("/api/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientId })
+          });
+          const body = await res.json();
+          if (!res.ok) {
+            sessionStatus.textContent = body.error || "Gagal membuat session.";
+            sessionStatus.className = "status error";
+            return;
+          }
+
+          sessionId = body.id;
+          sessionClient = body.clientName || "";
+          sessionStorage.setItem("printformSessionId", sessionId);
+          sessionStorage.setItem("printformSessionClientName", sessionClient);
+          setSessionUi(true);
+          sessionStatus.textContent = "";
+          await loadJobs();
+        } catch (err) {
+          sessionStatus.textContent = "Gagal terhubung ke server.";
+          sessionStatus.className = "status error";
+        }
+      });
+
+      endSessionBtn.addEventListener("click", async () => {
+        if (!sessionId) {
+          return;
+        }
+
+        try {
+          await fetch("/api/sessions/close", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId })
+          });
+        } catch (err) {
+          // Abaikan jika server tidak bisa dihubungi
+        }
+
+        sessionId = "";
+        sessionClient = "";
+        sessionStorage.removeItem("printformSessionId");
+        sessionStorage.removeItem("printformSessionClientName");
+        setSessionUi(false);
+        await loadJobs();
       });
 
       refreshBtn.addEventListener("click", loadJobs);
@@ -222,9 +325,47 @@
           clientsStatus.className = "status error";
         }
       });
+      async function heartbeatSession() {
+        if (!sessionId) {
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/sessions/heartbeat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId })
+          });
+          if (!res.ok) {
+            sessionId = "";
+            sessionClient = "";
+            sessionStorage.removeItem("printformSessionId");
+            sessionStorage.removeItem("printformSessionClientName");
+            setSessionUi(false);
+            await loadJobs();
+          }
+        } catch (err) {
+          // Abaikan jika server tidak bisa dihubungi
+        }
+      }
+
+      window.addEventListener("beforeunload", () => {
+        if (!sessionId || !navigator.sendBeacon) {
+          return;
+        }
+        const payload = JSON.stringify({ sessionId });
+        const blob = new Blob([payload], { type: "application/json" });
+        navigator.sendBeacon("/api/sessions/close", blob);
+      });
+
+      setSessionUi(Boolean(sessionId));
+      if (sessionId) {
+        heartbeatSession();
+      }
       loadClients();
       loadJobs();
       setInterval(loadClients, 5000);
+      setInterval(heartbeatSession, 10000);
     </script>
   </body>
 </html>

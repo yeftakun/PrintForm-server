@@ -12,6 +12,7 @@ const filesDir = path.join(storageDir, "files");
 const jobsFile = path.join(storageDir, "jobs.json");
 const clientsFile = path.join(storageDir, "clients.json");
 const pingsFile = path.join(storageDir, "pings.json");
+const sessionsFile = path.join(storageDir, "sessions.json");
 
 const upload = multer({ dest: filesDir });
 
@@ -38,6 +39,11 @@ async function ensureStorage() {
     await fsp.access(pingsFile, fs.constants.F_OK);
   } catch {
     await fsp.writeFile(pingsFile, JSON.stringify({}));
+  }
+  try {
+    await fsp.access(sessionsFile, fs.constants.F_OK);
+  } catch {
+    await fsp.writeFile(sessionsFile, JSON.stringify([]));
   }
 }
 
@@ -91,6 +97,14 @@ async function writePings(pings) {
   await writeJson(pingsFile, pings);
 }
 
+async function readSessions() {
+  return readJson(sessionsFile, []);
+}
+
+async function writeSessions(sessions) {
+  await writeJson(sessionsFile, sessions);
+}
+
 function normalizePaperSize(value) {
   const v = String(value || "").toUpperCase().trim();
   if (v === "A4" || v === "A5") {
@@ -134,7 +148,8 @@ function toPublicJob(job) {
     status: job.status,
     printConfig: job.printConfig,
     targetClientId: job.targetClientId,
-    targetClientName: job.targetClientName
+    targetClientName: job.targetClientName,
+    sessionId: job.sessionId
   };
 }
 
@@ -149,6 +164,7 @@ function toPublicClient(client) {
 }
 
 const CLIENT_TTL_MS = 20 * 1000;
+const SESSION_TTL_MS = 30 * 1000;
 
 function isClientOnline(client) {
   const lastSeen = new Date(client.lastSeen).getTime();
@@ -171,14 +187,58 @@ function pruneOfflineClients(clients) {
   };
 }
 
+function isSessionActive(session) {
+  const lastSeen = new Date(session.lastSeen).getTime();
+  return Number.isFinite(lastSeen) && Date.now() - lastSeen <= SESSION_TTL_MS;
+}
+
+async function cleanupExpiredSessions() {
+  const sessions = await readSessions();
+  if (sessions.length === 0) {
+    return { removedSessions: 0, removedJobs: 0 };
+  }
+
+  const activeSessions = sessions.filter(isSessionActive);
+  const expiredIds = new Set(sessions.filter(s => !isSessionActive(s)).map(s => s.id));
+  if (expiredIds.size === 0) {
+    return { removedSessions: 0, removedJobs: 0 };
+  }
+
+  const jobs = await readJobs();
+  const remainingJobs = [];
+  const deleteQueue = [];
+
+  for (const job of jobs) {
+    if (expiredIds.has(job.sessionId)) {
+      if (job.storedPath) {
+        deleteQueue.push(job.storedPath);
+      }
+    } else {
+      remainingJobs.push(job);
+    }
+  }
+
+  await Promise.all(
+    deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
+  );
+  await writeJobs(remainingJobs);
+  await writeSessions(activeSessions);
+
+  return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
 app.get("/api/jobs", async (req, res) => {
+  await cleanupExpiredSessions();
   let jobs = await readJobs();
   if (req.query.clientId) {
     jobs = jobs.filter(job => job.targetClientId === req.query.clientId);
+  }
+  if (req.query.sessionId) {
+    jobs = jobs.filter(job => job.sessionId === req.query.sessionId);
   }
   if (req.query.status) {
     jobs = jobs.filter(job => job.status === req.query.status);
@@ -187,6 +247,7 @@ app.get("/api/jobs", async (req, res) => {
 });
 
 app.get("/api/jobs/:id", async (req, res) => {
+  await cleanupExpiredSessions();
   const jobs = await readJobs();
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
@@ -197,6 +258,7 @@ app.get("/api/jobs/:id", async (req, res) => {
 });
 
 app.get("/api/jobs/:id/download", async (req, res) => {
+  await cleanupExpiredSessions();
   const jobs = await readJobs();
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
@@ -213,6 +275,88 @@ app.get("/api/clients", async (req, res) => {
     await writeClients(clients);
   }
   res.json(clients.map(withClientStatus).map(toPublicClient));
+});
+
+app.post("/api/sessions", async (req, res) => {
+  await cleanupExpiredSessions();
+  const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
+  if (!clientId) {
+    res.status(400).json({ error: "clientId is required" });
+    return;
+  }
+
+  const clients = await readClients();
+  const client = clients.find(c => c.id === clientId);
+  if (!client) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+
+  const sessions = await readSessions();
+  const session = {
+    id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    clientId: client.id,
+    clientName: client.name,
+    createdAt: new Date().toISOString(),
+    lastSeen: new Date().toISOString()
+  };
+
+  sessions.unshift(session);
+  await writeSessions(sessions);
+  res.json(session);
+});
+
+app.post("/api/sessions/heartbeat", async (req, res) => {
+  await cleanupExpiredSessions();
+  const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : null;
+  if (!sessionId) {
+    res.status(400).json({ error: "sessionId is required" });
+    return;
+  }
+
+  const sessions = await readSessions();
+  const session = sessions.find(s => s.id === sessionId);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  session.lastSeen = new Date().toISOString();
+  await writeSessions(sessions);
+  res.json({ ok: true });
+});
+
+app.post("/api/sessions/close", async (req, res) => {
+  const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : null;
+  if (!sessionId) {
+    res.status(400).json({ error: "sessionId is required" });
+    return;
+  }
+
+  const sessions = await readSessions();
+  const remainingSessions = sessions.filter(s => s.id !== sessionId);
+
+  const jobs = await readJobs();
+  const remainingJobs = [];
+  const deleteQueue = [];
+
+  for (const job of jobs) {
+    if (job.sessionId === sessionId) {
+      if (job.storedPath) {
+        deleteQueue.push(job.storedPath);
+      }
+    } else {
+      remainingJobs.push(job);
+    }
+  }
+
+  await Promise.all(
+    deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
+  );
+  await writeJobs(remainingJobs);
+  await writeSessions(remainingSessions);
+
+  res.json({ ok: true, removedJobs: jobs.length - remainingJobs.length });
 });
 
 app.post("/api/clients/register", async (req, res) => {
@@ -328,6 +472,7 @@ app.post("/api/clients/unregister", async (req, res) => {
 });
 
 app.patch("/api/jobs/:id", async (req, res) => {
+  await cleanupExpiredSessions();
   const jobs = await readJobs();
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
@@ -354,7 +499,7 @@ app.post("/api/jobs", upload.single("document"), async (req, res) => {
 
   const paperSize = normalizePaperSize(req.body.paperSize);
   const copies = normalizeCopies(req.body.copies);
-  const targetClientId = typeof req.body.targetClientId === "string" ? req.body.targetClientId : null;
+  const sessionId = typeof req.body.sessionId === "string" ? req.body.sessionId : null;
 
   if (!paperSize) {
     res.status(400).json({ error: "paperSize must be A4 or A5" });
@@ -364,15 +509,16 @@ app.post("/api/jobs", upload.single("document"), async (req, res) => {
     res.status(400).json({ error: "copies must be 1-999" });
     return;
   }
-  if (!targetClientId) {
-    res.status(400).json({ error: "targetClientId is required" });
+  if (!sessionId) {
+    res.status(400).json({ error: "sessionId is required" });
     return;
   }
 
-  const clients = await readClients();
-  const targetClient = clients.find(c => c.id === targetClientId);
-  if (!targetClient) {
-    res.status(400).json({ error: "targetClientId not found" });
+  await cleanupExpiredSessions();
+  const sessions = await readSessions();
+  const session = sessions.find(s => s.id === sessionId);
+  if (!session) {
+    res.status(400).json({ error: "sessionId not found" });
     return;
   }
 
@@ -385,8 +531,9 @@ app.post("/api/jobs", upload.single("document"), async (req, res) => {
     size: req.file.size,
     createdAt: new Date().toISOString(),
     status: "ready",
-    targetClientId: targetClient.id,
-    targetClientName: targetClient.name,
+    sessionId: session.id,
+    targetClientId: session.clientId,
+    targetClientName: session.clientName,
     printConfig: {
       paperSize,
       copies
@@ -403,6 +550,12 @@ ensureStorage()
     app.listen(port, () => {
       console.log(`PrintForm server running on http://localhost:${port}`);
     });
+
+    setInterval(() => {
+      cleanupExpiredSessions().catch(err => {
+        console.warn("Cleanup sessions failed:", err.message);
+      });
+    }, 10000);
   })
   .catch(err => {
     console.error("Failed to initialize storage:", err);

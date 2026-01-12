@@ -125,6 +125,10 @@ th {
   text-align: center;
 }
 
+.hidden {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .row {
     flex-direction: column;
