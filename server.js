@@ -150,12 +150,12 @@ function normalizeSelectedPrinter(value, printers) {
   return v.slice(0, 120);
 }
 
-function normalizePrinterStatus(value) {
-  const v = String(value || "").toLowerCase().trim();
-  if (v === "idle" || v === "printing") {
-    return v;
+function normalizeAlias(value) {
+  const v = String(value || "").trim();
+  if (!v) {
+    return null;
   }
-  return null;
+  return v.slice(0, 80);
 }
 
 function toPublicJob(job) {
@@ -165,6 +165,7 @@ function toPublicJob(job) {
     size: job.size,
     createdAt: job.createdAt,
     status: job.status,
+    alias: job.alias || null,
     printConfig: job.printConfig,
     targetClientId: job.targetClientId,
     targetClientName: job.targetClientName,
@@ -178,7 +179,6 @@ function toPublicClient(client) {
     name: client.name,
     printers: client.printers,
     selectedPrinter: client.selectedPrinter || null,
-    printerStatus: client.printerStatus || null,
     lastSeen: client.lastSeen,
     status: client.status
   };
@@ -313,11 +313,13 @@ app.post("/api/sessions", async (req, res) => {
     return;
   }
 
+  const alias = normalizeAlias(req.body?.alias);
   const sessions = await readSessions();
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     clientId: client.id,
     clientName: client.name,
+    alias,
     createdAt: new Date().toISOString(),
     lastSeen: new Date().toISOString()
   };
@@ -389,7 +391,6 @@ app.post("/api/clients/register", async (req, res) => {
 
   const printers = normalizePrinters(req.body?.printers);
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, printers);
-  const printerStatus = normalizePrinterStatus(req.body?.printerStatus);
   const clients = await readClients();
   const incomingId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
 
@@ -401,7 +402,6 @@ app.post("/api/clients/register", async (req, res) => {
       name,
       printers,
       selectedPrinter,
-      printerStatus,
       createdAt: new Date().toISOString(),
       lastSeen: new Date().toISOString()
     };
@@ -410,7 +410,6 @@ app.post("/api/clients/register", async (req, res) => {
     client.name = name;
     client.printers = printers;
     client.selectedPrinter = selectedPrinter;
-    client.printerStatus = printerStatus || client.printerStatus;
     client.lastSeen = new Date().toISOString();
   }
 
@@ -435,12 +434,8 @@ app.post("/api/clients/heartbeat", async (req, res) => {
   }
 
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, client.printers);
-  const printerStatus = normalizePrinterStatus(req.body?.printerStatus);
   if (selectedPrinter) {
     client.selectedPrinter = selectedPrinter;
-  }
-  if (printerStatus) {
-    client.printerStatus = printerStatus;
   }
   client.lastSeen = new Date().toISOString();
   const { clients: cleaned } = pruneOfflineClients(clients);
@@ -567,6 +562,7 @@ app.post("/api/jobs", upload.single("document"), async (req, res) => {
     size: req.file.size,
     createdAt: new Date().toISOString(),
     status: "ready",
+    alias: session.alias || null,
     sessionId: session.id,
     targetClientId: session.clientId,
     targetClientName: session.clientName,

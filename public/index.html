@@ -17,6 +17,14 @@
         <h2>Session Print</h2>
         <div id="sessionInactive">
           <label class="field">
+            <span>Alias Pengirim</span>
+            <input type="text" id="aliasInput" placeholder="Nama pengirim (opsional)">
+          </label>
+          <div class="row">
+            <button id="saveAliasBtn" type="button">Simpan Alias</button>
+            <button id="clearAliasBtn" type="button">Hapus Alias</button>
+          </div>
+          <label class="field">
             <span>Tujuan Client</span>
             <select id="clientSelect" required>
               <option value="">Memuat daftar client...</option>
@@ -27,7 +35,7 @@
         </div>
         <div id="sessionActive" class="hidden">
           <p class="status">Session aktif untuk <strong id="sessionClientName"></strong></p>
-          <p id="sessionPrinterStatus" class="muted"></p>
+          <p id="sessionAliasText" class="muted"></p>
           <div class="row">
             <span id="sessionIdText" class="muted"></span>
             <button id="endSessionBtn" type="button">Akhiri Session</button>
@@ -71,6 +79,7 @@
             <tr>
               <th>ID</th>
               <th>Dokumen</th>
+              <th>Alias</th>
               <th>Client</th>
               <th>Ukuran</th>
               <th>Salinan</th>
@@ -80,7 +89,7 @@
           </thead>
           <tbody id="jobsBody">
             <tr>
-              <td colspan="7" class="muted">Belum ada job.</td>
+              <td colspan="8" class="muted">Belum ada job.</td>
             </tr>
           </tbody>
         </table>
@@ -95,14 +104,13 @@
               <th>Status</th>
               <th>Terakhir Terlihat</th>
               <th>Printer Aktif</th>
-              <th>Status Printer</th>
               <th>Printer</th>
               <th>Aksi</th>
             </tr>
           </thead>
           <tbody id="clientsBody">
             <tr>
-              <td colspan="7" class="muted">Belum ada client.</td>
+              <td colspan="6" class="muted">Belum ada client.</td>
             </tr>
           </tbody>
         </table>
@@ -116,12 +124,15 @@
       const jobsBody = document.getElementById("jobsBody");
       const refreshBtn = document.getElementById("refreshBtn");
       const clientSelect = document.getElementById("clientSelect");
+      const aliasInput = document.getElementById("aliasInput");
+      const saveAliasBtn = document.getElementById("saveAliasBtn");
+      const clearAliasBtn = document.getElementById("clearAliasBtn");
       const startSessionBtn = document.getElementById("startSessionBtn");
       const endSessionBtn = document.getElementById("endSessionBtn");
       const sessionStatus = document.getElementById("sessionStatus");
       const sessionClientName = document.getElementById("sessionClientName");
       const sessionIdText = document.getElementById("sessionIdText");
-      const sessionPrinterStatus = document.getElementById("sessionPrinterStatus");
+      const sessionAliasText = document.getElementById("sessionAliasText");
       const sessionInactive = document.getElementById("sessionInactive");
       const sessionActive = document.getElementById("sessionActive");
       const clientsBody = document.getElementById("clientsBody");
@@ -130,6 +141,10 @@
       let sessionId = sessionStorage.getItem("printformSessionId") || "";
       let sessionClient = sessionStorage.getItem("printformSessionClientName") || "";
       let sessionClientId = sessionStorage.getItem("printformSessionClientId") || "";
+      let sessionAlias = sessionStorage.getItem("printformSessionAlias") || "";
+      let sessionHeartbeatFailures = 0;
+      const aliasStorageKey = "printformAlias";
+      let senderAlias = localStorage.getItem(aliasStorageKey) || "";
 
       function setSessionUi(active) {
         sessionInactive.classList.toggle("hidden", active);
@@ -137,14 +152,44 @@
         requiresSessionSections.forEach(section => {
           section.classList.toggle("hidden", !active);
         });
+        aliasInput.disabled = active;
+        saveAliasBtn.disabled = active;
+        clearAliasBtn.disabled = active;
         if (active) {
           sessionClientName.textContent = sessionClient || "client";
           sessionIdText.textContent = sessionId ? `Session ID: ${sessionId}` : "";
-          if (!sessionPrinterStatus.textContent) {
-            sessionPrinterStatus.textContent = "Status printer: -";
-          }
+          sessionAliasText.textContent = sessionAlias ? `Alias: ${sessionAlias}` : "Alias: -";
         } else {
-          sessionPrinterStatus.textContent = "";
+          sessionAliasText.textContent = "";
+        }
+      }
+
+      function clearSessionState() {
+        sessionId = "";
+        sessionClient = "";
+        sessionClientId = "";
+        sessionAlias = "";
+        sessionHeartbeatFailures = 0;
+        sessionStorage.removeItem("printformSessionId");
+        sessionStorage.removeItem("printformSessionClientName");
+        sessionStorage.removeItem("printformSessionClientId");
+        sessionStorage.removeItem("printformSessionAlias");
+        setSessionUi(false);
+      }
+
+      async function closeSessionRemote() {
+        if (!sessionId) {
+          return;
+        }
+
+        try {
+          await fetch("/api/sessions/close", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId })
+          });
+        } catch (err) {
+          // Abaikan jika server tidak bisa dihubungi
         }
       }
 
@@ -154,17 +199,13 @@
         const clients = await res.json();
         if (!Array.isArray(clients) || clients.length === 0) {
           clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
-          clientsBody.innerHTML = '<tr><td colspan="7" class="muted">Belum ada client online.</td></tr>';
-          if (sessionClientId) {
-            sessionPrinterStatus.textContent = "Status printer: -";
-          }
+          clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada client online.</td></tr>';
           return;
         }
 
         const options = clients.map(client => {
           const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
-          const statusLabel = client.printerStatus ? ` [${client.printerStatus}]` : "";
-          const label = `${client.name} (${client.status})${printerLabel}${statusLabel}`;
+          const label = `${client.name} (${client.status})${printerLabel}`;
           return `<option value="${client.id}">${label}</option>`;
         }).join("");
 
@@ -189,34 +230,22 @@
             <td>${client.status}</td>
             <td>${new Date(client.lastSeen).toLocaleString()}</td>
             <td>${client.selectedPrinter || "-"}</td>
-            <td>${client.printerStatus || "-"}</td>
             <td>${(client.printers || []).join(", ") || "-"}</td>
             <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
           </tr>
         `).join("");
-
-        if (sessionClientId) {
-          const sessionClientInfo = clients.find(client => client.id === sessionClientId);
-          if (sessionClientInfo) {
-            const activePrinter = sessionClientInfo.selectedPrinter || "-";
-            const printerStatus = sessionClientInfo.printerStatus || "-";
-            sessionPrinterStatus.textContent = `Printer: ${activePrinter} | Status: ${printerStatus}`;
-          } else {
-            sessionPrinterStatus.textContent = "Status printer: -";
-          }
-        }
       }
 
       async function loadJobs() {
         if (!sessionId) {
-          jobsBody.innerHTML = '<tr><td colspan="7" class="muted">Session belum aktif.</td></tr>';
+          jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Session belum aktif.</td></tr>';
           return;
         }
 
         const res = await fetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
         const jobs = await res.json();
         if (!Array.isArray(jobs) || jobs.length === 0) {
-          jobsBody.innerHTML = '<tr><td colspan="7" class="muted">Belum ada job.</td></tr>';
+          jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Belum ada job.</td></tr>';
           return;
         }
 
@@ -224,6 +253,7 @@
           <tr>
             <td>${job.id}</td>
             <td>${job.originalName}</td>
+            <td>${job.alias || "-"}</td>
             <td>${job.targetClientName || job.targetClientId || "-"}</td>
             <td>${job.printConfig.paperSize}</td>
             <td>${job.printConfig.copies}</td>
@@ -277,7 +307,7 @@
           const res = await fetch("/api/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clientId })
+            body: JSON.stringify({ clientId, alias: senderAlias })
           });
           const body = await res.json();
           if (!res.ok) {
@@ -289,9 +319,12 @@
           sessionId = body.id;
           sessionClient = body.clientName || "";
           sessionClientId = clientId;
+          sessionAlias = body.alias || senderAlias || "";
+          sessionHeartbeatFailures = 0;
           sessionStorage.setItem("printformSessionId", sessionId);
           sessionStorage.setItem("printformSessionClientName", sessionClient);
           sessionStorage.setItem("printformSessionClientId", sessionClientId);
+          sessionStorage.setItem("printformSessionAlias", sessionAlias);
           setSessionUi(true);
           sessionStatus.textContent = "";
           await loadJobs();
@@ -302,28 +335,28 @@
       });
 
       endSessionBtn.addEventListener("click", async () => {
-        if (!sessionId) {
-          return;
-        }
-
-        try {
-          await fetch("/api/sessions/close", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId })
-          });
-        } catch (err) {
-          // Abaikan jika server tidak bisa dihubungi
-        }
-
-        sessionId = "";
-        sessionClient = "";
-        sessionClientId = "";
-        sessionStorage.removeItem("printformSessionId");
-        sessionStorage.removeItem("printformSessionClientName");
-        sessionStorage.removeItem("printformSessionClientId");
-        setSessionUi(false);
+        await closeSessionRemote();
+        clearSessionState();
         await loadJobs();
+      });
+
+      saveAliasBtn.addEventListener("click", () => {
+        const value = aliasInput.value.trim();
+        senderAlias = value;
+        if (senderAlias) {
+          localStorage.setItem(aliasStorageKey, senderAlias);
+        } else {
+          localStorage.removeItem(aliasStorageKey);
+        }
+        aliasInput.value = senderAlias;
+        setSessionUi(Boolean(sessionId));
+      });
+
+      clearAliasBtn.addEventListener("click", () => {
+        senderAlias = "";
+        aliasInput.value = "";
+        localStorage.removeItem(aliasStorageKey);
+        setSessionUi(Boolean(sessionId));
       });
 
       refreshBtn.addEventListener("click", loadJobs);
@@ -368,16 +401,31 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId })
           });
-          if (!res.ok) {
-            sessionId = "";
-            sessionClient = "";
-            sessionStorage.removeItem("printformSessionId");
-            sessionStorage.removeItem("printformSessionClientName");
-            setSessionUi(false);
+          if (res.ok) {
+            sessionHeartbeatFailures = 0;
+            return;
+          }
+
+          if (res.status === 404) {
+            await closeSessionRemote();
+            clearSessionState();
+            await loadJobs();
+            return;
+          }
+
+          sessionHeartbeatFailures += 1;
+          if (sessionHeartbeatFailures >= 3) {
+            await closeSessionRemote();
+            clearSessionState();
             await loadJobs();
           }
         } catch (err) {
-          // Abaikan jika server tidak bisa dihubungi
+          sessionHeartbeatFailures += 1;
+          if (sessionHeartbeatFailures >= 3) {
+            await closeSessionRemote();
+            clearSessionState();
+            await loadJobs();
+          }
         }
       }
 
@@ -391,6 +439,7 @@
       });
 
       setSessionUi(Boolean(sessionId));
+      aliasInput.value = senderAlias;
       if (sessionId) {
         heartbeatSession();
       }
@@ -398,6 +447,7 @@
       loadJobs();
       setInterval(loadClients, 5000);
       setInterval(heartbeatSession, 10000);
+      setInterval(loadJobs, 3000);
     </script>
   </body>
 </html>
