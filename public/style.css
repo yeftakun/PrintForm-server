@@ -88,6 +88,13 @@ button:hover {
   box-shadow: 0 8px 16px rgba(198, 91, 54, 0.28);
 }
 
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

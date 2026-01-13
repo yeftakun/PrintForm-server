@@ -254,7 +254,10 @@
           return;
         }
 
-        jobsBody.innerHTML = jobs.map(job => `
+        jobsBody.innerHTML = jobs.map(job => {
+          const isReady = job.status === "ready";
+          const cancelDisabled = isReady ? "" : "disabled";
+          return `
           <tr>
             <td>${job.id}</td>
             <td>${job.originalName}</td>
@@ -264,9 +267,12 @@
             <td>${job.printConfig.copies}</td>
             <td>${job.status}</td>
             <td>${new Date(job.createdAt).toLocaleString()}</td>
-            <td><button type="button" data-job-id="${job.id}">Buat lagi</button></td>
-          </tr>
-        `).join("");
+            <td>
+              <button type="button" data-job-id="${job.id}" data-action="clone">Buat lagi</button>
+              <button type="button" data-job-id="${job.id}" data-action="cancel" ${cancelDisabled}>Batal</button>
+            </td>
+          </tr>`;
+        }).join("");
       }
 
       uploadForm.addEventListener("submit", async (event) => {
@@ -374,28 +380,59 @@
         }
 
         const jobId = target.dataset.jobId;
+        const action = target.dataset.action;
         if (!jobId) {
           return;
         }
 
-        jobsStatus.textContent = "Membuat ulang job...";
-        jobsStatus.className = "status";
-        try {
-          const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
-            method: "POST"
-          });
-          const body = await res.json();
-          if (!res.ok) {
-            jobsStatus.textContent = body.error || "Gagal membuat ulang job.";
+        if (action === "clone") {
+          jobsStatus.textContent = "Membuat ulang job...";
+          jobsStatus.className = "status";
+          try {
+            const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
+              method: "POST"
+            });
+            const body = await res.json();
+            if (!res.ok) {
+              jobsStatus.textContent = body.error || "Gagal membuat ulang job.";
+              jobsStatus.className = "status error";
+              return;
+            }
+            jobsStatus.textContent = "Job baru berhasil dibuat.";
+            jobsStatus.className = "status success";
+            await loadJobs();
+          } catch (err) {
+            jobsStatus.textContent = "Gagal terhubung ke server.";
             jobsStatus.className = "status error";
+          }
+          return;
+        }
+
+        if (action === "cancel") {
+          if (target.disabled) {
             return;
           }
-          jobsStatus.textContent = "Job baru berhasil dibuat.";
-          jobsStatus.className = "status success";
-          await loadJobs();
-        } catch (err) {
-          jobsStatus.textContent = "Gagal terhubung ke server.";
-          jobsStatus.className = "status error";
+          jobsStatus.textContent = "Membatalkan job...";
+          jobsStatus.className = "status";
+          try {
+            const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "canceled" })
+            });
+            const body = await res.json();
+            if (!res.ok) {
+              jobsStatus.textContent = body.error || "Gagal membatalkan job.";
+              jobsStatus.className = "status error";
+              return;
+            }
+            jobsStatus.textContent = "Job dibatalkan.";
+            jobsStatus.className = "status success";
+            await loadJobs();
+          } catch (err) {
+            jobsStatus.textContent = "Gagal terhubung ke server.";
+            jobsStatus.className = "status error";
+          }
         }
       });
       clientsBody.addEventListener("click", async (event) => {
