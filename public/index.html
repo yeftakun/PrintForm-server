@@ -254,6 +254,13 @@
           return;
         }
 
+        const formatStatus = (value) => {
+          if (!value) {
+            return "-";
+          }
+          return value.toLowerCase() === "done" ? "Sent" : value;
+        };
+
         jobsBody.innerHTML = jobs.map(job => {
           const isReady = job.status === "ready";
           const cancelDisabled = isReady ? "" : "disabled";
@@ -265,7 +272,7 @@
             <td>${job.targetClientName || job.targetClientId || "-"}</td>
             <td>${job.printConfig.paperSize}</td>
             <td>${job.printConfig.copies}</td>
-            <td>${job.status}</td>
+            <td>${formatStatus(job.status)}</td>
             <td>${new Date(job.createdAt).toLocaleString()}</td>
             <td>
               <button type="button" data-job-id="${job.id}" data-action="clone">Buat lagi</button>
