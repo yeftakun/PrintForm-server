@@ -93,13 +93,14 @@
               <th>Nama</th>
               <th>Status</th>
               <th>Terakhir Terlihat</th>
+              <th>Printer Aktif</th>
               <th>Printer</th>
               <th>Aksi</th>
             </tr>
           </thead>
           <tbody id="clientsBody">
             <tr>
-              <td colspan="5" class="muted">Belum ada client.</td>
+              <td colspan="6" class="muted">Belum ada client.</td>
             </tr>
           </tbody>
         </table>
@@ -144,12 +145,13 @@
         const clients = await res.json();
         if (!Array.isArray(clients) || clients.length === 0) {
           clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
-          clientsBody.innerHTML = '<tr><td colspan="5" class="muted">Belum ada client online.</td></tr>';
+          clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada client online.</td></tr>';
           return;
         }
 
         const options = clients.map(client => {
-          const label = `${client.name} (${client.status})`;
+          const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
+          const label = `${client.name} (${client.status})${printerLabel}`;
           return `<option value="${client.id}">${label}</option>`;
         }).join("");
 
@@ -173,6 +175,7 @@
             <td>${client.name}</td>
             <td>${client.status}</td>
             <td>${new Date(client.lastSeen).toLocaleString()}</td>
+            <td>${client.selectedPrinter || "-"}</td>
             <td>${(client.printers || []).join(", ") || "-"}</td>
             <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
           </tr>

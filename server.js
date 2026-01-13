@@ -139,6 +139,17 @@ function normalizePrinters(value) {
     .slice(0, 50);
 }
 
+function normalizeSelectedPrinter(value, printers) {
+  const v = String(value || "").trim();
+  if (!v) {
+    return null;
+  }
+  if (Array.isArray(printers) && printers.length > 0) {
+    return printers.includes(v) ? v : null;
+  }
+  return v.slice(0, 120);
+}
+
 function toPublicJob(job) {
   return {
     id: job.id,
@@ -158,6 +169,7 @@ function toPublicClient(client) {
     id: client.id,
     name: client.name,
     printers: client.printers,
+    selectedPrinter: client.selectedPrinter || null,
     lastSeen: client.lastSeen,
     status: client.status
   };
@@ -367,6 +379,7 @@ app.post("/api/clients/register", async (req, res) => {
   }
 
   const printers = normalizePrinters(req.body?.printers);
+  const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, printers);
   const clients = await readClients();
   const incomingId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
 
@@ -376,6 +389,7 @@ app.post("/api/clients/register", async (req, res) => {
       id: `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       name,
       printers,
+      selectedPrinter,
       createdAt: new Date().toISOString(),
       lastSeen: new Date().toISOString()
     };
@@ -383,6 +397,7 @@ app.post("/api/clients/register", async (req, res) => {
   } else {
     client.name = name;
     client.printers = printers;
+    client.selectedPrinter = selectedPrinter;
     client.lastSeen = new Date().toISOString();
   }
 
@@ -406,6 +421,10 @@ app.post("/api/clients/heartbeat", async (req, res) => {
     return;
   }
 
+  const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, client.printers);
+  if (selectedPrinter) {
+    client.selectedPrinter = selectedPrinter;
+  }
   client.lastSeen = new Date().toISOString();
   const { clients: cleaned } = pruneOfflineClients(clients);
   await writeClients(cleaned);
