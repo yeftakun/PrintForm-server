@@ -522,6 +522,57 @@ app.patch("/api/jobs/:id", async (req, res) => {
   res.json(toPublicJob(job));
 });
 
+app.post("/api/jobs/:id/clone", async (req, res) => {
+  await cleanupExpiredSessions();
+  const jobs = await readJobs();
+  const sourceJob = jobs.find(j => j.id === req.params.id);
+  if (!sourceJob) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const sessions = await readSessions();
+  const session = sessions.find(s => s.id === sourceJob.sessionId);
+  if (!session || !isSessionActive(session)) {
+    res.status(400).json({ error: "Session is not active" });
+    return;
+  }
+
+  try {
+    await fsp.access(sourceJob.storedPath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "Source file missing" });
+    return;
+  }
+
+  const id = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const storedPath = path.join(filesDir, id);
+  try {
+    await fsp.copyFile(sourceJob.storedPath, storedPath);
+  } catch {
+    res.status(500).json({ error: "Failed to clone file" });
+    return;
+  }
+
+  const clonedJob = {
+    id,
+    originalName: sourceJob.originalName,
+    storedPath,
+    size: sourceJob.size,
+    createdAt: new Date().toISOString(),
+    status: "ready",
+    alias: sourceJob.alias || null,
+    sessionId: session.id,
+    targetClientId: session.clientId,
+    targetClientName: session.clientName,
+    printConfig: sourceJob.printConfig
+  };
+
+  jobs.unshift(clonedJob);
+  await writeJobs(jobs);
+  res.status(201).json(toPublicJob(clonedJob));
+});
+
 app.post("/api/jobs", upload.single("document"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Document is required" });

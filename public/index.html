@@ -74,6 +74,7 @@
           <h2>Daftar Job</h2>
           <button id="refreshBtn" type="button">Refresh</button>
         </div>
+        <div id="jobsStatus" class="status"></div>
         <table>
           <thead>
             <tr>
@@ -85,11 +86,12 @@
               <th>Salinan</th>
               <th>Status</th>
               <th>Waktu</th>
+              <th>Aksi</th>
             </tr>
           </thead>
           <tbody id="jobsBody">
             <tr>
-              <td colspan="8" class="muted">Belum ada job.</td>
+              <td colspan="9" class="muted">Belum ada job.</td>
             </tr>
           </tbody>
         </table>
@@ -122,6 +124,7 @@
       const uploadForm = document.getElementById("uploadForm");
       const uploadStatus = document.getElementById("uploadStatus");
       const jobsBody = document.getElementById("jobsBody");
+      const jobsStatus = document.getElementById("jobsStatus");
       const refreshBtn = document.getElementById("refreshBtn");
       const clientSelect = document.getElementById("clientSelect");
       const aliasInput = document.getElementById("aliasInput");
@@ -238,14 +241,16 @@
 
       async function loadJobs() {
         if (!sessionId) {
-          jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Session belum aktif.</td></tr>';
+          jobsBody.innerHTML = '<tr><td colspan="9" class="muted">Session belum aktif.</td></tr>';
+          jobsStatus.textContent = "";
           return;
         }
 
         const res = await fetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
         const jobs = await res.json();
         if (!Array.isArray(jobs) || jobs.length === 0) {
-          jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Belum ada job.</td></tr>';
+          jobsBody.innerHTML = '<tr><td colspan="9" class="muted">Belum ada job.</td></tr>';
+          jobsStatus.textContent = "";
           return;
         }
 
@@ -259,6 +264,7 @@
             <td>${job.printConfig.copies}</td>
             <td>${job.status}</td>
             <td>${new Date(job.createdAt).toLocaleString()}</td>
+            <td><button type="button" data-job-id="${job.id}">Buat lagi</button></td>
           </tr>
         `).join("");
       }
@@ -361,6 +367,37 @@
 
       refreshBtn.addEventListener("click", loadJobs);
       refreshBtn.addEventListener("click", loadClients);
+      jobsBody.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        const jobId = target.dataset.jobId;
+        if (!jobId) {
+          return;
+        }
+
+        jobsStatus.textContent = "Membuat ulang job...";
+        jobsStatus.className = "status";
+        try {
+          const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
+            method: "POST"
+          });
+          const body = await res.json();
+          if (!res.ok) {
+            jobsStatus.textContent = body.error || "Gagal membuat ulang job.";
+            jobsStatus.className = "status error";
+            return;
+          }
+          jobsStatus.textContent = "Job baru berhasil dibuat.";
+          jobsStatus.className = "status success";
+          await loadJobs();
+        } catch (err) {
+          jobsStatus.textContent = "Gagal terhubung ke server.";
+          jobsStatus.className = "status error";
+        }
+      });
       clientsBody.addEventListener("click", async (event) => {
         const target = event.target;
         if (!(target instanceof HTMLButtonElement)) {
