@@ -27,6 +27,7 @@
         </div>
         <div id="sessionActive" class="hidden">
           <p class="status">Session aktif untuk <strong id="sessionClientName"></strong></p>
+          <p id="sessionPrinterStatus" class="muted"></p>
           <div class="row">
             <span id="sessionIdText" class="muted"></span>
             <button id="endSessionBtn" type="button">Akhiri Session</button>
@@ -94,13 +95,14 @@
               <th>Status</th>
               <th>Terakhir Terlihat</th>
               <th>Printer Aktif</th>
+              <th>Status Printer</th>
               <th>Printer</th>
               <th>Aksi</th>
             </tr>
           </thead>
           <tbody id="clientsBody">
             <tr>
-              <td colspan="6" class="muted">Belum ada client.</td>
+              <td colspan="7" class="muted">Belum ada client.</td>
             </tr>
           </tbody>
         </table>
@@ -119,6 +121,7 @@
       const sessionStatus = document.getElementById("sessionStatus");
       const sessionClientName = document.getElementById("sessionClientName");
       const sessionIdText = document.getElementById("sessionIdText");
+      const sessionPrinterStatus = document.getElementById("sessionPrinterStatus");
       const sessionInactive = document.getElementById("sessionInactive");
       const sessionActive = document.getElementById("sessionActive");
       const clientsBody = document.getElementById("clientsBody");
@@ -126,6 +129,7 @@
       const requiresSessionSections = document.querySelectorAll(".requires-session");
       let sessionId = sessionStorage.getItem("printformSessionId") || "";
       let sessionClient = sessionStorage.getItem("printformSessionClientName") || "";
+      let sessionClientId = sessionStorage.getItem("printformSessionClientId") || "";
 
       function setSessionUi(active) {
         sessionInactive.classList.toggle("hidden", active);
@@ -136,6 +140,11 @@
         if (active) {
           sessionClientName.textContent = sessionClient || "client";
           sessionIdText.textContent = sessionId ? `Session ID: ${sessionId}` : "";
+          if (!sessionPrinterStatus.textContent) {
+            sessionPrinterStatus.textContent = "Status printer: -";
+          }
+        } else {
+          sessionPrinterStatus.textContent = "";
         }
       }
 
@@ -145,13 +154,17 @@
         const clients = await res.json();
         if (!Array.isArray(clients) || clients.length === 0) {
           clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
-          clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada client online.</td></tr>';
+          clientsBody.innerHTML = '<tr><td colspan="7" class="muted">Belum ada client online.</td></tr>';
+          if (sessionClientId) {
+            sessionPrinterStatus.textContent = "Status printer: -";
+          }
           return;
         }
 
         const options = clients.map(client => {
           const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
-          const label = `${client.name} (${client.status})${printerLabel}`;
+          const statusLabel = client.printerStatus ? ` [${client.printerStatus}]` : "";
+          const label = `${client.name} (${client.status})${printerLabel}${statusLabel}`;
           return `<option value="${client.id}">${label}</option>`;
         }).join("");
 
@@ -176,10 +189,22 @@
             <td>${client.status}</td>
             <td>${new Date(client.lastSeen).toLocaleString()}</td>
             <td>${client.selectedPrinter || "-"}</td>
+            <td>${client.printerStatus || "-"}</td>
             <td>${(client.printers || []).join(", ") || "-"}</td>
             <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
           </tr>
         `).join("");
+
+        if (sessionClientId) {
+          const sessionClientInfo = clients.find(client => client.id === sessionClientId);
+          if (sessionClientInfo) {
+            const activePrinter = sessionClientInfo.selectedPrinter || "-";
+            const printerStatus = sessionClientInfo.printerStatus || "-";
+            sessionPrinterStatus.textContent = `Printer: ${activePrinter} | Status: ${printerStatus}`;
+          } else {
+            sessionPrinterStatus.textContent = "Status printer: -";
+          }
+        }
       }
 
       async function loadJobs() {
@@ -263,8 +288,10 @@
 
           sessionId = body.id;
           sessionClient = body.clientName || "";
+          sessionClientId = clientId;
           sessionStorage.setItem("printformSessionId", sessionId);
           sessionStorage.setItem("printformSessionClientName", sessionClient);
+          sessionStorage.setItem("printformSessionClientId", sessionClientId);
           setSessionUi(true);
           sessionStatus.textContent = "";
           await loadJobs();
@@ -291,8 +318,10 @@
 
         sessionId = "";
         sessionClient = "";
+        sessionClientId = "";
         sessionStorage.removeItem("printformSessionId");
         sessionStorage.removeItem("printformSessionClientName");
+        sessionStorage.removeItem("printformSessionClientId");
         setSessionUi(false);
         await loadJobs();
       });
