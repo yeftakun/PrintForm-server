@@ -186,6 +186,8 @@ function toPublicClient(client) {
 
 const CLIENT_TTL_MS = 2 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 1000;
+const ORPHAN_GRACE_MS = 2 * 60 * 1000;
+const FILE_CLEANUP_INTERVAL_MS = 60 * 1000;
 
 function isClientOnline(client) {
   const lastSeen = new Date(client.lastSeen).getTime();
@@ -246,6 +248,53 @@ async function cleanupExpiredSessions() {
   await writeSessions(activeSessions);
 
   return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
+}
+
+async function cleanupOrphanFiles() {
+  const jobs = await readJobs();
+  const jobFiles = new Set(
+    jobs
+      .map(job => job.storedPath)
+      .filter(Boolean)
+      .map(filePath => path.basename(filePath))
+  );
+
+  let entries = [];
+  try {
+    entries = await fsp.readdir(filesDir, { withFileTypes: true });
+  } catch {
+    return { removedFiles: 0 };
+  }
+
+  const now = Date.now();
+  let removedFiles = 0;
+  for (const entry of entries) {
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (entry.name === ".gitkeep") {
+      continue;
+    }
+    if (jobFiles.has(entry.name)) {
+      continue;
+    }
+
+    const fullPath = path.join(filesDir, entry.name);
+    try {
+      const stat = await fsp.stat(fullPath);
+      const ageMs = now - stat.mtimeMs;
+      if (ageMs < ORPHAN_GRACE_MS) {
+        continue;
+      }
+
+      await fsp.unlink(fullPath);
+      removedFiles += 1;
+    } catch {
+      // Abaikan jika file sudah dihapus atau tidak bisa diakses
+    }
+  }
+
+  return { removedFiles };
 }
 
 app.get("/api/health", (req, res) => {
@@ -639,6 +688,12 @@ ensureStorage()
         console.warn("Cleanup sessions failed:", err.message);
       });
     }, 10000);
+
+    setInterval(() => {
+      cleanupOrphanFiles().catch(err => {
+        console.warn("Cleanup orphan files failed:", err.message);
+      });
+    }, FILE_CLEANUP_INTERVAL_MS);
   })
   .catch(err => {
     console.error("Failed to initialize storage:", err);
