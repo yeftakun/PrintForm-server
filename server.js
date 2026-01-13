@@ -395,8 +395,9 @@ app.post("/api/clients/register", async (req, res) => {
 
   let client = incomingId ? clients.find(c => c.id === incomingId) : null;
   if (!client) {
+    const id = incomingId || `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     client = {
-      id: `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id,
       name,
       printers,
       selectedPrinter,
