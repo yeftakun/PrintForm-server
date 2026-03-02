@@ -1,0 +1,30 @@
+function toPublicJob(job) {
+  return {
+    id: job.id,
+    originalName: job.originalName,
+    size: job.size,
+    createdAt: job.createdAt,
+    status: job.status,
+    alias: job.alias || null,
+    printConfig: job.printConfig,
+    targetClientId: job.targetClientId,
+    targetClientName: job.targetClientName,
+    sessionId: job.sessionId
+  };
+}
+
+function toPublicClient(client) {
+  return {
+    id: client.id,
+    name: client.name,
+    printers: client.printers,
+    selectedPrinter: client.selectedPrinter || null,
+    lastSeen: client.lastSeen,
+    status: client.status
+  };
+}
+
+module.exports = {
+  toPublicJob,
+  toPublicClient
+};
