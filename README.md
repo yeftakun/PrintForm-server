@@ -2,6 +2,8 @@
 
 Simple Node.js server for the PrintForm prototype. It hosts the web UI, stores uploaded files, and coordinates print jobs with the .NET client.
 
+[Next move](PLAN.md)
+
 ## Quick start
 
 ```bash
