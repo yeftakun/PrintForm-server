@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("path");
 const { rootDir } = require("./config");
+const { requestLogger } = require("./middleware/requestLogger");
 const healthRouter = require("./routes/health");
 const clientsRouter = require("./routes/clients");
 const sessionsRouter = require("./routes/sessions");
@@ -8,6 +9,7 @@ const jobsRouter = require("./routes/jobs");
 
 function createApp() {
   const app = express();
+  app.use(requestLogger);
   app.use(express.json());
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store");

@@ -5,7 +5,7 @@ TL;DR: Kita urutkan upgrade dari polling + JSON ke arsitektur prod (DB, Redis, W
 **Steps**
 
 1. Baseline refactor: pecah `server.js` jadi folder `src/` dengan modul `config` (TTL, paths, env), `storage/jsonStore` (read/write), `services` (clients, sessions, jobs, pings, files, cleanup), dan `routes` per resource; tambahkan error handler middleware. Pastikan perilaku identik. **(selesai)**
-2. Observability dasar: tambahkan logging terstruktur dan request tracing ringan (req id + latency) di layer Express; healthcheck tetap di `server.js`.
+2. Observability dasar: tambahkan logging terstruktur dan request tracing ringan (req id + latency) di layer Express; healthcheck tetap di `server.js`. **(selesai)**
 3. Persistensi DB: perkenalkan Postgres + ORM (Prisma/Sequelize); buat adaptor `repositories/*` menggantikan JSON store; migrasi schema (clients, sessions, jobs, pings/events); fallback JSON masih ada via feature flag/env.
 4. Redis layer: pakai Redis untuk TTL session/client (ganti isSessionActive/isClientOnline logika file) dan Pub/Sub notifikasi job/status; rate-limit heartbeat/register.
 5. File storage lokal/shared: tetap gunakan filesystem server dengan limit kuota 1GB. Tambah guard kapasitas sebelum menerima upload; jika kapasitas melewati limit, request upload ditolak dan klien mendapat pesan "Antrian server penuh". Tambah task cleanup orphan dan penghitung usage (scan folder files + job metadata). Siapkan opsi mount shared filesystem jika di-hosting.
