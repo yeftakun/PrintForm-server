@@ -70,9 +70,9 @@ async function fetchSnapshot() {
     ),
     pool.query(
       `select id, client_id, status, created_at, last_seen_at
-         from sessions
-         order by created_at desc
-         limit 100`
+        from sessions
+        order by created_at desc
+        limit 100`
     ),
     pool.query(
       `select id, status, session_id, target_client_id, target_client_name, original_name, size_bytes, created_at

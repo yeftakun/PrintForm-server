@@ -63,6 +63,27 @@
         </table>
       </div>
     </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Sessions (latest 100)</h2>
+        <span id="sessions-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Client</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody id="sessions-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -72,6 +93,8 @@
     const jobsBody = document.getElementById('jobs-body');
     const clientsCount = document.getElementById('clients-count');
     const jobsCount = document.getElementById('jobs-count');
+    const sessionsBody = document.getElementById('sessions-body');
+    const sessionsCount = document.getElementById('sessions-count');
 
     const formatter = new Intl.DateTimeFormat('en', { dateStyle: 'short', timeStyle: 'medium' });
     const sizeFmt = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
@@ -123,11 +146,25 @@
       `).join('');
     }
 
+    function renderSessions(list) {
+      sessionsCount.textContent = `${list.length} shown`;
+      sessionsBody.innerHTML = list.map(s => `
+        <tr>
+          <td title="${s.id}">${s.id}</td>
+          <td title="${s.clientId || ''}">${s.clientId || ''}</td>
+          <td><span class="badge ${s.status === 'active' ? 'green' : 'gray'}">${s.status || ''}</span></td>
+          <td>${s.createdAt ? formatter.format(new Date(s.createdAt)) : ''}</td>
+          <td>${s.lastSeenAt ? formatter.format(new Date(s.lastSeenAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
     function handleSnapshot(data) {
       if (!data || !data.summary) return;
       renderCards(data.summary, data.generatedAt);
       renderClients(data.clients || []);
       renderJobs(data.jobs || []);
+      renderSessions(data.sessions || []);
       setStatus('Live', true);
     }
 
