@@ -33,9 +33,10 @@ async function saveClients(clients) {
     }
 
     for (const c of clients) {
+      const printersJson = JSON.stringify(c.printers || []);
       await client.query(
         `INSERT INTO clients (id, name, printers, selected_printer, created_at, last_seen_at, status)
-         VALUES ($1,$2,$3,$4,COALESCE($5, now()),$6,$7)
+         VALUES ($1,$2,$3::jsonb,$4,COALESCE($5, now()),$6,$7)
          ON CONFLICT (id) DO UPDATE SET
            name = EXCLUDED.name,
            printers = EXCLUDED.printers,
@@ -46,7 +47,7 @@ async function saveClients(clients) {
         [
           c.id,
           c.name,
-          c.printers || [],
+          printersJson,
           c.selectedPrinter || null,
           c.createdAt ? new Date(c.createdAt) : null,
           c.lastSeen ? new Date(c.lastSeen) : new Date(),

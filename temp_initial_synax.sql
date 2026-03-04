@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- === Core tables ===
 
 CREATE TABLE IF NOT EXISTS clients (
-	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	id text PRIMARY KEY,
 	name varchar(120) NOT NULL,
 	printers jsonb NOT NULL DEFAULT '[]'::jsonb,
 	selected_printer varchar(120),
@@ -20,8 +20,8 @@ CREATE INDEX IF NOT EXISTS idx_clients_last_seen ON clients (last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_clients_name ON clients (name);
 
 CREATE TABLE IF NOT EXISTS sessions (
-	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	client_id uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+	id text PRIMARY KEY,
+	client_id text NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
 	alias varchar(80),
 	created_at timestamptz NOT NULL DEFAULT now(),
 	last_seen_at timestamptz NOT NULL,
@@ -32,9 +32,9 @@ CREATE INDEX IF NOT EXISTS idx_sessions_client ON sessions (client_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions (last_seen_at);
 
 CREATE TABLE IF NOT EXISTS jobs (
-	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	session_id uuid NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-	target_client_id uuid REFERENCES clients(id),
+	id text PRIMARY KEY,
+	session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	target_client_id text REFERENCES clients(id),
 	target_client_name varchar(120),
 	original_name varchar(255) NOT NULL,
 	stored_path text NOT NULL,
@@ -55,9 +55,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_ready_pending ON jobs (status) WHERE status 
 
 CREATE TABLE IF NOT EXISTS events (
 	id bigserial PRIMARY KEY,
-	client_id uuid REFERENCES clients(id),
-	session_id uuid REFERENCES sessions(id),
-	job_id uuid REFERENCES jobs(id),
+	client_id text REFERENCES clients(id),
+	session_id text REFERENCES sessions(id),
+	job_id text REFERENCES jobs(id),
 	type varchar(32) NOT NULL,
 	payload jsonb NOT NULL,
 	created_at timestamptz NOT NULL DEFAULT now()
@@ -70,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_events_job ON events (job_id);
 -- === Optional / future ===
 
 CREATE TABLE IF NOT EXISTS users (
-	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	id text PRIMARY KEY,
 	email varchar(255) UNIQUE,
 	password_hash text,
 	role varchar(32),
@@ -78,8 +78,8 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (
-	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	client_id uuid REFERENCES clients(id) ON DELETE CASCADE,
+	id text PRIMARY KEY,
+	client_id text REFERENCES clients(id) ON DELETE CASCADE,
 	key_hash text UNIQUE,
 	created_at timestamptz DEFAULT now(),
 	last_used_at timestamptz
@@ -104,9 +104,9 @@ CREATE TABLE IF NOT EXISTS storage_usage (
 );
 
 CREATE TABLE IF NOT EXISTS websocket_subscriptions (
-	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	client_id uuid REFERENCES clients(id),
-	user_id uuid REFERENCES users(id),
+	id text PRIMARY KEY,
+	client_id text REFERENCES clients(id),
+	user_id text REFERENCES users(id),
 	channel varchar(64) NOT NULL,
 	connected_at timestamptz NOT NULL DEFAULT now()
 );

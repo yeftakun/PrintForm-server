@@ -1,4 +1,5 @@
 const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const port = Number(process.env.PORT) || 3000;
 const rootDir = path.join(__dirname, "..");

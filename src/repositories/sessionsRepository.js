@@ -23,7 +23,7 @@ async function getSessions() {
   }));
 }
 
-async function saveSessions(sessions) {
+async function saveSessions(    sessions) {
   if (!useDb) {
     return writeSessions(sessions);
   }

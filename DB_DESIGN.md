@@ -5,7 +5,7 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 ## Core Tables
 
 - **clients**
-	- id (uuid, pk)
+	- id (text, pk)
 	- name (varchar(120), not null)
 	- printers (jsonb array of string, not null default [])
 	- selected_printer (varchar(120), null)
@@ -15,8 +15,8 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 	- indexes: (last_seen_at), (name)
 
 - **sessions**
-	- id (uuid, pk)
-	- client_id (uuid, fk -> clients.id, on delete cascade)
+	- id (text, pk)
+	- client_id (text, fk -> clients.id, on delete cascade)
 	- alias (varchar(80), null)
 	- created_at (timestamptz, not null default now())
 	- last_seen_at (timestamptz, not null)
@@ -24,9 +24,9 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 	- indexes: (client_id), (last_seen_at)
 
 - **jobs**
-	- id (uuid, pk)
-	- session_id (uuid, fk -> sessions.id, on delete cascade)
-	- target_client_id (uuid, fk -> clients.id)
+	- id (text, pk)
+	- session_id (text, fk -> sessions.id, on delete cascade)
+	- target_client_id (text, fk -> clients.id)
 	- target_client_name (varchar(120), snapshot)
 	- original_name (varchar(255), not null)
 	- stored_path (text, not null) -- filesystem path; for future object storage store key/url
@@ -41,9 +41,9 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 
 - **events** (for ping and status changes)
 	- id (bigserial, pk)
-	- client_id (uuid, fk -> clients.id, null)
-	- session_id (uuid, fk -> sessions.id, null)
-	- job_id (uuid, fk -> jobs.id, null)
+	- client_id (text, fk -> clients.id, null)
+	- session_id (text, fk -> sessions.id, null)
+	- job_id (text, fk -> jobs.id, null)
 	- type (varchar(32), not null) -- ping | job_status | heartbeat | quota
 	- payload (jsonb, not null)
 	- created_at (timestamptz, not null default now())
@@ -52,15 +52,15 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 ## Optional / Future Tables
 
 - **users** (for auth/JWT)
-	- id (uuid, pk)
+	- id (text, pk)
 	- email (varchar(255), unique)
 	- password_hash (text)
 	- role (varchar(32))
 	- created_at (timestamptz)
 
 - **api_keys** (for print clients)
-	- id (uuid, pk)
-	- client_id (uuid, fk -> clients.id)
+	- id (text, pk)
+	- client_id (text, fk -> clients.id)
 	- key_hash (text, unique)
 	- created_at (timestamptz)
 	- last_used_at (timestamptz)
@@ -68,10 +68,10 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 - **audit_logs**
 	- id (bigserial, pk)
 	- actor_type (varchar(32)) -- user | client | system
-	- actor_id (uuid, null)
+	- actor_id (text, null)
 	- action (varchar(64)) -- job.status.change, session.close, client.register, quota.block
 	- target_type (varchar(32)) -- job | session | client
-	- target_id (uuid)
+	- target_id (text)
 	- detail (jsonb)
 	- created_at (timestamptz)
 
@@ -82,9 +82,9 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 	- computed_at (timestamptz)
 
 - **websocket_subscriptions** (if needed for presence)
-	- id (uuid, pk)
-	- client_id (uuid, fk -> clients.id, null)
-	- user_id (uuid, fk -> users.id, null)
+	- id (text, pk)
+	- client_id (text, fk -> clients.id, null)
+	- user_id (text, fk -> users.id, null)
 	- channel (varchar(64))
 	- connected_at (timestamptz)
 

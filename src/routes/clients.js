@@ -77,13 +77,13 @@ router.post("/heartbeat", async (req, res) => {
   }
   client.lastSeen = new Date().toISOString();
   const { clients: cleaned } = pruneOfflineClients(clients);
-  await writeClients(cleaned);
+  await saveClients(cleaned);
   console.log("Client heartbeat:", client.id);
   res.json(toPublicClient(withClientStatus(client)));
 });
 
 router.post("/:id/ping", async (req, res) => {
-  const clients = await readClients();
+  const clients = await getClients();
   const client = clients.find(c => c.id === req.params.id);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
@@ -114,7 +114,7 @@ router.get("/:id/ping", async (req, res) => {
 
   client.lastSeen = new Date().toISOString();
   const { clients: cleaned } = pruneOfflineClients(clients);
-  await writeClients(cleaned);
+  await saveClients(cleaned);
 
   const pings = await getPings();
   const items = Array.isArray(pings[client.id]) ? pings[client.id] : [];
