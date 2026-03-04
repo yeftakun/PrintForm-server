@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrintBridge Monitoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>PrintBridge Monitoring</h1>
+      <p class="muted">Realtime read-only dashboard</p>
+    </div>
+    <div id="status-pill" class="pill">Connecting…</div>
+  </header>
+
+  <main>
+    <section class="cards" id="summary-cards"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Clients</h2>
+        <span id="clients-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Selected Printer</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody id="clients-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Jobs (latest 50)</h2>
+        <span id="jobs-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Client</th>
+              <th>Original Name</th>
+              <th>Size</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="jobs-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const statusPill = document.getElementById('status-pill');
+    const cards = document.getElementById('summary-cards');
+    const clientsBody = document.getElementById('clients-body');
+    const jobsBody = document.getElementById('jobs-body');
+    const clientsCount = document.getElementById('clients-count');
+    const jobsCount = document.getElementById('jobs-count');
+
+    const formatter = new Intl.DateTimeFormat('en', { dateStyle: 'short', timeStyle: 'medium' });
+    const sizeFmt = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
+
+    function setStatus(text, ok) {
+      statusPill.textContent = text;
+      statusPill.className = ok ? 'pill ok' : 'pill warn';
+    }
+
+    function renderCards(summary, generatedAt) {
+      const items = [
+        { label: 'Clients Online', value: `${summary.clientsOnline}/${summary.clientsTotal}` },
+        { label: 'Sessions', value: summary.sessionsTotal },
+        { label: 'Jobs', value: summary.jobsTotal },
+        { label: 'Generated', value: formatter.format(new Date(generatedAt)) }
+      ];
+      cards.innerHTML = items.map(item => `
+        <div class="card">
+          <div class="card-label">${item.label}</div>
+          <div class="card-value">${item.value}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderClients(list) {
+      clientsCount.textContent = `${list.length} shown`;
+      clientsBody.innerHTML = list.map(c => `
+        <tr>
+          <td title="${c.id}">${c.id}</td>
+          <td>${c.name || ''}</td>
+          <td><span class="badge ${c.status === 'online' ? 'green' : 'gray'}">${c.status || ''}</span></td>
+          <td>${c.selectedPrinter || ''}</td>
+          <td>${c.lastSeenAt ? formatter.format(new Date(c.lastSeenAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderJobs(list) {
+      jobsCount.textContent = `${list.length} shown`;
+      jobsBody.innerHTML = list.map(j => `
+        <tr>
+          <td title="${j.id}">${j.id}</td>
+          <td>${j.status || ''}</td>
+          <td title="${j.targetClientId || ''}">${j.targetClientName || j.targetClientId || ''}</td>
+          <td>${j.originalName || ''}</td>
+          <td>${j.sizeBytes ? sizeFmt.format(j.sizeBytes / 1024) + ' KB' : ''}</td>
+          <td>${j.createdAt ? formatter.format(new Date(j.createdAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function handleSnapshot(data) {
+      if (!data || !data.summary) return;
+      renderCards(data.summary, data.generatedAt);
+      renderClients(data.clients || []);
+      renderJobs(data.jobs || []);
+      setStatus('Live', true);
+    }
+
+    function startStream() {
+      const es = new EventSource('/api/stream');
+      es.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        handleSnapshot(payload);
+      };
+      es.onerror = () => {
+        setStatus('Reconnecting…', false);
+      };
+    }
+
+    startStream();
+  </script>
+</body>
+</html>
