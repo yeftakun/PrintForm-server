@@ -5,16 +5,12 @@ const {
   filesDir,
   ORPHAN_GRACE_MS
 } = require("../config");
-const {
-  readJobs,
-  writeJobs,
-  readSessions,
-  writeSessions
-} = require("../storage/jsonStore");
+const { getJobs, saveJobs } = require("../repositories/jobsRepository");
+const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { isSessionActive } = require("./status");
 
 async function cleanupExpiredSessions() {
-  const sessions = await readSessions();
+  const sessions = await getSessions();
   if (sessions.length === 0) {
     return { removedSessions: 0, removedJobs: 0 };
   }
@@ -25,7 +21,7 @@ async function cleanupExpiredSessions() {
     return { removedSessions: 0, removedJobs: 0 };
   }
 
-  const jobs = await readJobs();
+  const jobs = await getJobs();
   const remainingJobs = [];
   const deleteQueue = [];
 
@@ -42,14 +38,14 @@ async function cleanupExpiredSessions() {
   await Promise.all(
     deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
   );
-  await writeJobs(remainingJobs);
-  await writeSessions(activeSessions);
+  await saveJobs(remainingJobs);
+  await saveSessions(activeSessions);
 
   return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
 }
 
 async function cleanupOrphanFiles() {
-  const jobs = await readJobs();
+  const jobs = await getJobs();
   const jobFiles = new Set(
     jobs
       .map(job => job.storedPath)

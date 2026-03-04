@@ -16,7 +16,8 @@ function requestLogger(req, res, next) {
       path: req.originalUrl,
       status: res.statusCode,
       durationMs: Number(durationMs.toFixed(2)),
-      contentLength: res.getHeader("content-length") || null
+      contentLength: res.getHeader("content-length") || null,
+      useDb: process.env.USE_DB === "true" || false
     };
     console.log(JSON.stringify(logEntry));
   });

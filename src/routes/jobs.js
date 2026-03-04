@@ -15,11 +15,8 @@ const {
   normalizePaperSize,
   normalizeCopies
 } = require("../utils/normalize");
-const { toPublicJob } = require("../utils/publicMapper");
-const { isSessionActive } = require("../services/status");
-const { cleanupExpiredSessions } = require("../services/cleanup");
-
-const upload = multer({ dest: filesDir });
+  const { getJobs, saveJobs } = require("../repositories/jobsRepository");
+  const { getSessions } = require("../repositories/sessionsRepository");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
@@ -30,7 +27,7 @@ router.get("/", async (req, res) => {
   }
   if (req.query.sessionId) {
     jobs = jobs.filter(job => job.sessionId === req.query.sessionId);
-  }
+    let jobs = await getJobs();
   if (req.query.status) {
     jobs = jobs.filter(job => job.status === req.query.status);
   }
@@ -45,7 +42,7 @@ router.get("/:id", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-  res.json(toPublicJob(job));
+    const jobs = await getJobs();
 });
 
 router.get("/:id/download", async (req, res) => {
@@ -56,7 +53,7 @@ router.get("/:id/download", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-  res.download(job.storedPath, job.originalName);
+    const jobs = await getJobs();
 });
 
 router.post("/:id/clone", async (req, res) => {
@@ -67,14 +64,14 @@ router.post("/:id/clone", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-
+    const jobs = await getJobs();
   const sessions = await readSessions();
   const session = sessions.find(s => s.id === sourceJob.sessionId);
   if (!session || !isSessionActive(session)) {
     res.status(400).json({ error: "Session is not active" });
     return;
   }
-
+    const sessions = await getSessions();
   try {
     await fsp.access(sourceJob.storedPath, fs.constants.F_OK);
   } catch {
@@ -112,13 +109,13 @@ router.post("/:id/clone", async (req, res) => {
 
 router.patch("/:id", async (req, res) => {
   await cleanupExpiredSessions();
-  const jobs = await readJobs();
+    await saveJobs(jobs);
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-
+    const jobs = await getJobs();
   const { status } = req.body || {};
   if (typeof status !== "string" || status.trim().length === 0) {
     res.status(400).json({ error: "Invalid status" });
@@ -132,7 +129,7 @@ router.patch("/:id", async (req, res) => {
 
 router.post("/", upload.single("document"), async (req, res) => {
   if (!req.file) {
-    res.status(400).json({ error: "Document is required" });
+    await saveJobs(jobs);
     return;
   }
 
@@ -160,7 +157,7 @@ router.post("/", upload.single("document"), async (req, res) => {
     res.status(400).json({ error: "sessionId not found" });
     return;
   }
-
+    const sessions = await getSessions();
   const jobs = await readJobs();
   const id = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const job = {
@@ -185,4 +182,7 @@ router.post("/", upload.single("document"), async (req, res) => {
   res.status(201).json(toPublicJob(job));
 });
 
+module.exports = router;
+
+    await saveJobs(jobs);
 module.exports = router;

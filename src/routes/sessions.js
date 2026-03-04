@@ -1,12 +1,8 @@
 const express = require("express");
 const fsp = require("fs").promises;
-const {
-  readSessions,
-  writeSessions,
-  readClients,
-  readJobs,
-  writeJobs
-} = require("../storage/jsonStore");
+const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
+const { getClients } = require("../repositories/clientsRepository");
+const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { normalizeAlias } = require("../utils/normalize");
 const { cleanupExpiredSessions } = require("../services/cleanup");
 
@@ -20,7 +16,7 @@ router.post("/", async (req, res) => {
     return;
   }
 
-  const clients = await readClients();
+  const clients = await getClients();
   const client = clients.find(c => c.id === clientId);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
@@ -28,7 +24,7 @@ router.post("/", async (req, res) => {
   }
 
   const alias = normalizeAlias(req.body?.alias);
-  const sessions = await readSessions();
+  const sessions = await getSessions();
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     clientId: client.id,
@@ -39,7 +35,7 @@ router.post("/", async (req, res) => {
   };
 
   sessions.unshift(session);
-  await writeSessions(sessions);
+  await saveSessions(sessions);
   res.json(session);
 });
 
@@ -51,7 +47,7 @@ router.post("/heartbeat", async (req, res) => {
     return;
   }
 
-  const sessions = await readSessions();
+  const sessions = await getSessions();
   const session = sessions.find(s => s.id === sessionId);
   if (!session) {
     res.status(404).json({ error: "Session not found" });
@@ -59,7 +55,7 @@ router.post("/heartbeat", async (req, res) => {
   }
 
   session.lastSeen = new Date().toISOString();
-  await writeSessions(sessions);
+  await saveSessions(sessions);
   res.json({ ok: true });
 });
 
@@ -70,10 +66,10 @@ router.post("/close", async (req, res) => {
     return;
   }
 
-  const sessions = await readSessions();
+  const sessions = await getSessions();
   const remainingSessions = sessions.filter(s => s.id !== sessionId);
 
-  const jobs = await readJobs();
+  const jobs = await getJobs();
   const remainingJobs = [];
   const deleteQueue = [];
 
@@ -90,8 +86,8 @@ router.post("/close", async (req, res) => {
   await Promise.all(
     deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
   );
-  await writeJobs(remainingJobs);
-  await writeSessions(remainingSessions);
+  await saveJobs(remainingJobs);
+  await saveSessions(remainingSessions);
 
   res.json({ ok: true, removedJobs: jobs.length - remainingJobs.length });
 });

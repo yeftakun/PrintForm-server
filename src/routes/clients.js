@@ -1,10 +1,6 @@
 const express = require("express");
-const {
-  readClients,
-  writeClients,
-  readPings,
-  writePings
-} = require("../storage/jsonStore");
+const { getClients, saveClients } = require("../repositories/clientsRepository");
+const { getPings, savePings } = require("../repositories/pingsRepository");
 const {
   normalizeName,
   normalizePrinters,
@@ -16,10 +12,10 @@ const { pruneOfflineClients, withClientStatus } = require("../services/status");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-  const existing = await readClients();
+  const existing = await getClients();
   const { clients, removed } = pruneOfflineClients(existing);
   if (removed > 0) {
-    await writeClients(clients);
+    await saveClients(clients);
   }
   res.json(clients.map(withClientStatus).map(toPublicClient));
 });
@@ -33,7 +29,7 @@ router.post("/register", async (req, res) => {
 
   const printers = normalizePrinters(req.body?.printers);
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, printers);
-  const clients = await readClients();
+  const clients = await getClients();
   const incomingId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
 
   let client = incomingId ? clients.find(c => c.id === incomingId) : null;
@@ -56,7 +52,7 @@ router.post("/register", async (req, res) => {
   }
 
   const { clients: cleaned } = pruneOfflineClients(clients);
-  await writeClients(cleaned);
+  await saveClients(cleaned);
   console.log("Client register:", client.id, client.name);
   res.json(toPublicClient(withClientStatus(client)));
 });
@@ -68,7 +64,7 @@ router.post("/heartbeat", async (req, res) => {
     return;
   }
 
-  const clients = await readClients();
+  const clients = await getClients();
   const client = clients.find(c => c.id === clientId);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
@@ -94,7 +90,7 @@ router.post("/:id/ping", async (req, res) => {
     return;
   }
 
-  const pings = await readPings();
+  const pings = await getPings();
   if (!Array.isArray(pings[client.id])) {
     pings[client.id] = [];
   }
@@ -104,12 +100,12 @@ router.post("/:id/ping", async (req, res) => {
     at: new Date().toISOString()
   });
 
-  await writePings(pings);
+  await savePings(pings);
   res.json({ ok: true });
 });
 
 router.get("/:id/ping", async (req, res) => {
-  const clients = await readClients();
+  const clients = await getClients();
   const client = clients.find(c => c.id === req.params.id);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
@@ -120,10 +116,10 @@ router.get("/:id/ping", async (req, res) => {
   const { clients: cleaned } = pruneOfflineClients(clients);
   await writeClients(cleaned);
 
-  const pings = await readPings();
+  const pings = await getPings();
   const items = Array.isArray(pings[client.id]) ? pings[client.id] : [];
   pings[client.id] = [];
-  await writePings(pings);
+  await savePings(pings);
   console.log("Client ping poll:", client.id, "items:", items.length);
   res.json({ items });
 });
@@ -135,11 +131,11 @@ router.post("/unregister", async (req, res) => {
     return;
   }
 
-  const clients = await readClients();
+  const clients = await getClients();
   const next = clients.filter(c => c.id !== clientId);
   const removed = clients.length - next.length;
   if (removed > 0) {
-    await writeClients(next);
+    await saveClients(next);
   }
   res.json({ ok: true, removed });
 });
