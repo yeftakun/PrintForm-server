@@ -11,6 +11,7 @@ async function getPings() {
   );
   const map = {};
   for (const row of res.rows) {
+    if (!row.client_id) continue;
     if (!map[row.client_id]) {
       map[row.client_id] = [];
     }
@@ -27,6 +28,7 @@ async function savePings(pings) {
     await client.query("DELETE FROM events WHERE type = 'ping'");
     const entries = Object.entries(pings || {});
     for (const [clientId, items] of entries) {
+      if (!clientId || typeof clientId !== "string") continue;
       if (!Array.isArray(items)) continue;
       for (const item of items) {
         await client.query(
