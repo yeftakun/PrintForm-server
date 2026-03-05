@@ -11,6 +11,7 @@ const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, saveClients, deleteClientsByIds } = require("../repositories/clientsRepository");
 const { isSessionActive } = require("./status");
+const { query } = require("../db");
 
 async function cleanupExpiredSessions() {
   const sessions = await getSessions();
@@ -96,38 +97,50 @@ async function cleanupOrphanFiles() {
 
 async function cleanupStaleClients() {
   const clients = await getClients();
-  if (!clients.length) return { removedClients: 0 };
+  if (!clients.length) return { removedClients: 0, removedSessions: 0, removedJobs: 0 };
 
   const sessions = await getSessions();
   const jobs = await getJobs();
 
-  const referenced = new Set();
-  for (const s of sessions) {
-    if (s.clientId) referenced.add(s.clientId);
-  }
-  for (const j of jobs) {
-    if (j.targetClientId) referenced.add(j.targetClientId);
-  }
-
   const threshold = Date.now() - CLIENT_RETENTION_MS;
   const stale = clients.filter(c => {
     const seen = new Date(c.lastSeen).getTime();
-    return Number.isFinite(seen) && seen < threshold && !referenced.has(c.id);
+    return Number.isFinite(seen) && seen < threshold;
   });
 
   if (stale.length === 0) {
-    return { removedClients: 0 };
+    return { removedClients: 0, removedSessions: 0, removedJobs: 0 };
   }
+
+  const staleIds = new Set(stale.map(c => c.id));
+
+  const staleSessionIds = sessions.filter(s => staleIds.has(s.clientId)).map(s => s.id);
+  const staleJobIds = new Set(
+    jobs
+      .filter(j => staleSessionIds.includes(j.sessionId))
+      .map(j => j.id)
+  );
 
   if (useDb) {
-    await deleteClientsByIds(stale.map(c => c.id));
+    if (staleSessionIds.length > 0) {
+      // jobs tied to sessions will cascade on session delete
+      await query("DELETE FROM sessions WHERE id = ANY($1)", [staleSessionIds]);
+    }
+    await deleteClientsByIds([...staleIds]);
   } else {
-    const staleSet = new Set(stale.map(c => c.id));
-    const remaining = clients.filter(c => !staleSet.has(c.id));
-    await saveClients(remaining);
+    const keepClients = clients.filter(c => !staleIds.has(c.id));
+    const keepSessions = sessions.filter(s => !staleIds.has(s.clientId));
+    const keepJobs = jobs.filter(j => !staleSessionIds.includes(j.sessionId));
+    await saveClients(keepClients);
+    await saveSessions(keepSessions);
+    await saveJobs(keepJobs);
   }
 
-  return { removedClients: stale.length };
+  return {
+    removedClients: staleIds.size,
+    removedSessions: staleSessionIds.length,
+    removedJobs: staleJobIds.size
+  };
 }
 
 module.exports = {
