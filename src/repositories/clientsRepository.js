@@ -26,12 +26,6 @@ async function saveClients(clients) {
   }
   const ids = clients.map(c => c.id);
   return withTransaction(async client => {
-    if (ids.length > 0) {
-      await client.query("DELETE FROM clients WHERE id <> ALL($1)", [ids]);
-    } else {
-      await client.query("DELETE FROM clients");
-    }
-
     for (const c of clients) {
       const printersJson = JSON.stringify(c.printers || []);
       await client.query(
@@ -58,7 +52,19 @@ async function saveClients(clients) {
   });
 }
 
+async function deleteClientsByIds(ids = []) {
+  if (!useDb) {
+    return 0; // handled in caller for JSON mode
+  }
+  if (!ids || ids.length === 0) {
+    return 0;
+  }
+  const res = await query("DELETE FROM clients WHERE id = ANY($1)", [ids]);
+  return res.rowCount || 0;
+}
+
 module.exports = {
   getClients,
-  saveClients
+  saveClients,
+  deleteClientsByIds
 };

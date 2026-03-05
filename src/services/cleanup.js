@@ -3,10 +3,13 @@ const path = require("path");
 const fsp = fs.promises;
 const {
   filesDir,
-  ORPHAN_GRACE_MS
+  ORPHAN_GRACE_MS,
+  CLIENT_RETENTION_MS,
+  useDb
 } = require("../config");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
+const { getClients, saveClients, deleteClientsByIds } = require("../repositories/clientsRepository");
 const { isSessionActive } = require("./status");
 
 async function cleanupExpiredSessions() {
@@ -91,7 +94,44 @@ async function cleanupOrphanFiles() {
   return { removedFiles };
 }
 
+async function cleanupStaleClients() {
+  const clients = await getClients();
+  if (!clients.length) return { removedClients: 0 };
+
+  const sessions = await getSessions();
+  const jobs = await getJobs();
+
+  const referenced = new Set();
+  for (const s of sessions) {
+    if (s.clientId) referenced.add(s.clientId);
+  }
+  for (const j of jobs) {
+    if (j.targetClientId) referenced.add(j.targetClientId);
+  }
+
+  const threshold = Date.now() - CLIENT_RETENTION_MS;
+  const stale = clients.filter(c => {
+    const seen = new Date(c.lastSeen).getTime();
+    return Number.isFinite(seen) && seen < threshold && !referenced.has(c.id);
+  });
+
+  if (stale.length === 0) {
+    return { removedClients: 0 };
+  }
+
+  if (useDb) {
+    await deleteClientsByIds(stale.map(c => c.id));
+  } else {
+    const staleSet = new Set(stale.map(c => c.id));
+    const remaining = clients.filter(c => !staleSet.has(c.id));
+    await saveClients(remaining);
+  }
+
+  return { removedClients: stale.length };
+}
+
 module.exports = {
   cleanupExpiredSessions,
-  cleanupOrphanFiles
+  cleanupOrphanFiles,
+  cleanupStaleClients
 };

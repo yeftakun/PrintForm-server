@@ -1,9 +1,10 @@
 const { createApp } = require("./src/app");
 const { ensureStorage } = require("./src/storage/jsonStore");
-const { port, FILE_CLEANUP_INTERVAL_MS } = require("./src/config");
+const { port, FILE_CLEANUP_INTERVAL_MS, RETENTION_CLEANUP_INTERVAL_MS } = require("./src/config");
 const {
   cleanupExpiredSessions,
-  cleanupOrphanFiles
+  cleanupOrphanFiles,
+  cleanupStaleClients
 } = require("./src/services/cleanup");
 
 ensureStorage()
@@ -25,6 +26,12 @@ ensureStorage()
         console.warn("Cleanup orphan files failed:", err.message);
       });
     }, FILE_CLEANUP_INTERVAL_MS);
+
+    setInterval(() => {
+      cleanupStaleClients().catch(err => {
+        console.warn("Cleanup stale clients failed:", err.message);
+      });
+    }, RETENTION_CLEANUP_INTERVAL_MS);
   })
   .catch(err => {
     console.error("Failed to initialize storage:", err);
