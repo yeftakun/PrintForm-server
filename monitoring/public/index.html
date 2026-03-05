@@ -84,6 +84,118 @@
         </table>
       </div>
     </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Events (latest 50)</h2>
+        <span id="events-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Type</th>
+              <th>Client</th>
+              <th>Session</th>
+              <th>Job</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="events-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Audit Logs (latest 50)</h2>
+        <span id="audit-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>API Keys (latest 50)</h2>
+        <span id="apikeys-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Client</th>
+              <th>Created</th>
+              <th>Last Used</th>
+            </tr>
+          </thead>
+          <tbody id="apikeys-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Users (latest 50)</h2>
+        <span id="users-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Websocket Subscriptions (latest 50)</h2>
+        <span id="ws-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Client</th>
+              <th>User</th>
+              <th>Channel</th>
+              <th>Connected</th>
+            </tr>
+          </thead>
+          <tbody id="ws-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Storage Usage</h2>
+        <span id="storage-meta" class="muted"></span>
+      </div>
+      <div class="cards" id="storage-cards"></div>
+    </section>
   </main>
 
   <script>
@@ -95,6 +207,18 @@
     const jobsCount = document.getElementById('jobs-count');
     const sessionsBody = document.getElementById('sessions-body');
     const sessionsCount = document.getElementById('sessions-count');
+    const eventsBody = document.getElementById('events-body');
+    const eventsCount = document.getElementById('events-count');
+    const auditBody = document.getElementById('audit-body');
+    const auditCount = document.getElementById('audit-count');
+    const apiKeysBody = document.getElementById('apikeys-body');
+    const apiKeysCount = document.getElementById('apikeys-count');
+    const usersBody = document.getElementById('users-body');
+    const usersCount = document.getElementById('users-count');
+    const wsBody = document.getElementById('ws-body');
+    const wsCount = document.getElementById('ws-count');
+    const storageCards = document.getElementById('storage-cards');
+    const storageMeta = document.getElementById('storage-meta');
 
     const formatter = new Intl.DateTimeFormat('en', { dateStyle: 'short', timeStyle: 'medium' });
     const sizeFmt = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
@@ -159,12 +283,101 @@
       `).join('');
     }
 
+    function renderEvents(list) {
+      eventsCount.textContent = `${list.length} shown`;
+      eventsBody.innerHTML = list.map(e => `
+        <tr>
+          <td title="${e.id}">${e.id}</td>
+          <td>${e.type || ''}</td>
+          <td title="${e.clientId || ''}">${e.clientId || ''}</td>
+          <td title="${e.sessionId || ''}">${e.sessionId || ''}</td>
+          <td title="${e.jobId || ''}">${e.jobId || ''}</td>
+          <td>${e.createdAt ? formatter.format(new Date(e.createdAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAudit(list) {
+      auditCount.textContent = `${list.length} shown`;
+      auditBody.innerHTML = list.map(a => `
+        <tr>
+          <td title="${a.id}">${a.id}</td>
+          <td>${a.actorType || ''}${a.actorId ? ` (${a.actorId})` : ''}</td>
+          <td>${a.action || ''}</td>
+          <td>${a.targetType || ''}${a.targetId ? ` (${a.targetId})` : ''}</td>
+          <td>${a.createdAt ? formatter.format(new Date(a.createdAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderApiKeys(list) {
+      apiKeysCount.textContent = `${list.length} shown`;
+      apiKeysBody.innerHTML = list.map(k => `
+        <tr>
+          <td title="${k.id}">${k.id}</td>
+          <td title="${k.clientId || ''}">${k.clientId || ''}</td>
+          <td>${k.createdAt ? formatter.format(new Date(k.createdAt)) : ''}</td>
+          <td>${k.lastUsedAt ? formatter.format(new Date(k.lastUsedAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderUsers(list) {
+      usersCount.textContent = `${list.length} shown`;
+      usersBody.innerHTML = list.map(u => `
+        <tr>
+          <td title="${u.id}">${u.id}</td>
+          <td>${u.email || ''}</td>
+          <td>${u.role || ''}</td>
+          <td>${u.createdAt ? formatter.format(new Date(u.createdAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderWs(list) {
+      wsCount.textContent = `${list.length} shown`;
+      wsBody.innerHTML = list.map(w => `
+        <tr>
+          <td title="${w.id}">${w.id}</td>
+          <td title="${w.clientId || ''}">${w.clientId || ''}</td>
+          <td title="${w.userId || ''}">${w.userId || ''}</td>
+          <td>${w.channel || ''}</td>
+          <td>${w.connectedAt ? formatter.format(new Date(w.connectedAt)) : ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderStorage(storage) {
+      if (!storage) {
+        storageMeta.textContent = 'no data yet';
+        storageCards.innerHTML = '';
+        return;
+      }
+      storageMeta.textContent = `computed at ${formatter.format(new Date(storage.computedAt))}`;
+      const items = [
+        { label: 'Total Bytes', value: sizeFmt.format(storage.totalBytes / 1024 / 1024) + ' MB' },
+        { label: 'File Count', value: storage.fileCount }
+      ];
+      storageCards.innerHTML = items.map(item => `
+        <div class="card">
+          <div class="card-label">${item.label}</div>
+          <div class="card-value">${item.value}</div>
+        </div>
+      `).join('');
+    }
+
     function handleSnapshot(data) {
       if (!data || !data.summary) return;
       renderCards(data.summary, data.generatedAt);
       renderClients(data.clients || []);
       renderJobs(data.jobs || []);
       renderSessions(data.sessions || []);
+      renderEvents(data.events || []);
+      renderAudit(data.auditLogs || []);
+      renderApiKeys(data.apiKeys || []);
+      renderUsers(data.users || []);
+      renderWs(data.websocketSubs || []);
+      renderStorage(data.summary?.storage || null);
       setStatus('Live', true);
     }
 

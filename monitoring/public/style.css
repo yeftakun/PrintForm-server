@@ -109,7 +109,7 @@ main {
 
 .table-wrapper {
   overflow: auto;
-  max-height: 360px;
+  max-height: 320px;
 }
 
 table {
@@ -145,6 +145,9 @@ tr:hover td {
 
 .badge.green { background: #16a34a; color: #04210f; }
 .badge.gray { background: #475569; color: #e2e8f0; }
+.badge.blue { background: #2563eb; color: #e2e8f0; }
+.badge.amber { background: #f59e0b; color: #0b1222; }
+.badge.purple { background: #7c3aed; color: #f8fafc; }
 
 @media (max-width: 720px) {
   th:nth-child(1), td:nth-child(1),

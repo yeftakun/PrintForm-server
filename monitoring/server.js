@@ -61,7 +61,17 @@ app.get("/api/stream", async (req, res) => {
 });
 
 async function fetchSnapshot() {
-  const [{ rows: clientRows }, { rows: sessionRows }, { rows: jobRows }] = await Promise.all([
+  const [
+    { rows: clientRows },
+    { rows: sessionRows },
+    { rows: jobRows },
+    { rows: eventRows },
+    { rows: auditRows },
+    { rows: apiKeyRows },
+    { rows: userRows },
+    { rows: wsRows },
+    { rows: storageRows }
+  ] = await Promise.all([
     pool.query(
       `select id, name, status, selected_printer, last_seen_at
          from clients
@@ -79,6 +89,42 @@ async function fetchSnapshot() {
          from jobs
          order by created_at desc
          limit 50`
+    ),
+    pool.query(
+      `select id, type, client_id, session_id, job_id, created_at
+         from events
+         order by created_at desc
+         limit 50`
+    ),
+    pool.query(
+      `select id, actor_type, actor_id, action, target_type, target_id, created_at
+         from audit_logs
+         order by created_at desc
+         limit 50`
+    ),
+    pool.query(
+      `select id, client_id, created_at, last_used_at
+         from api_keys
+         order by created_at desc
+         limit 50`
+    ),
+    pool.query(
+      `select id, email, role, created_at
+         from users
+         order by created_at desc
+         limit 50`
+    ),
+    pool.query(
+      `select id, client_id, user_id, channel, connected_at
+         from websocket_subscriptions
+         order by connected_at desc
+         limit 50`
+    ),
+    pool.query(
+      `select total_bytes, file_count, computed_at
+         from storage_usage
+         order by computed_at desc
+         limit 1`
     )
   ]);
 
@@ -97,6 +143,8 @@ async function fetchSnapshot() {
     return acc;
   }, {});
 
+  const storage = storageRows[0] || null;
+
   return {
     id: crypto.randomUUID?.() || String(now),
     generatedAt: new Date().toISOString(),
@@ -105,8 +153,11 @@ async function fetchSnapshot() {
       clientsOnline: onlineClients,
       sessionsTotal: sessionRows.length,
       jobsTotal: jobRows.length,
+      eventsTotal: eventRows.length,
+      auditTotal: auditRows.length,
       jobStatus: jobStatusCounts,
-      sessionStatus: sessionStatusCounts
+      sessionStatus: sessionStatusCounts,
+      storage
     },
     clients: clientRows.map(row => ({
       id: row.id,
@@ -131,6 +182,42 @@ async function fetchSnapshot() {
       originalName: row.original_name,
       sizeBytes: Number(row.size_bytes),
       createdAt: row.created_at
+    })),
+    events: eventRows.map(row => ({
+      id: row.id,
+      type: row.type,
+      clientId: row.client_id,
+      sessionId: row.session_id,
+      jobId: row.job_id,
+      createdAt: row.created_at
+    })),
+    auditLogs: auditRows.map(row => ({
+      id: row.id,
+      actorType: row.actor_type,
+      actorId: row.actor_id,
+      action: row.action,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      createdAt: row.created_at
+    })),
+    apiKeys: apiKeyRows.map(row => ({
+      id: row.id,
+      clientId: row.client_id,
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at
+    })),
+    users: userRows.map(row => ({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      createdAt: row.created_at
+    })),
+    websocketSubs: wsRows.map(row => ({
+      id: row.id,
+      clientId: row.client_id,
+      userId: row.user_id,
+      channel: row.channel,
+      connectedAt: row.connected_at
     }))
   };
 }
