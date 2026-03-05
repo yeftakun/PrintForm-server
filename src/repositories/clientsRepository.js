@@ -26,6 +26,12 @@ async function saveClients(clients) {
   }
   const ids = clients.map(c => c.id);
   return withTransaction(async client => {
+    if (ids.length > 0) {
+      await client.query("DELETE FROM clients WHERE id <> ALL($1)", [ids]);
+    } else {
+      await client.query("DELETE FROM clients");
+    }
+
     for (const c of clients) {
       const printersJson = JSON.stringify(c.printers || []);
       await client.query(

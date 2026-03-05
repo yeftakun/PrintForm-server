@@ -26,7 +26,7 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 - **jobs**
 	- id (text, pk)
 	- session_id (text, fk -> sessions.id, on delete cascade)
-	- target_client_id (text, fk -> clients.id)
+	- target_client_id (text, fk -> clients.id, on delete set null)
 	- target_client_name (varchar(120), snapshot)
 	- original_name (varchar(255), not null)
 	- stored_path (text, not null) -- filesystem path; for future object storage store key/url
@@ -41,9 +41,9 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 
 - **events** (for ping and status changes)
 	- id (bigserial, pk)
-	- client_id (text, fk -> clients.id, null)
-	- session_id (text, fk -> sessions.id, null)
-	- job_id (text, fk -> jobs.id, null)
+	- client_id (text, fk -> clients.id, null, on delete set null)
+	- session_id (text, fk -> sessions.id, null, on delete set null)
+	- job_id (text, fk -> jobs.id, null, on delete set null)
 	- type (varchar(32), not null) -- ping | job_status | heartbeat | quota
 	- payload (jsonb, not null)
 	- created_at (timestamptz, not null default now())
@@ -83,8 +83,8 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 
 - **websocket_subscriptions** (if needed for presence)
 	- id (text, pk)
-	- client_id (text, fk -> clients.id, null)
-	- user_id (text, fk -> users.id, null)
+	- client_id (text, fk -> clients.id, null, on delete set null)
+	- user_id (text, fk -> users.id, null, on delete set null)
 	- channel (varchar(64))
 	- connected_at (timestamptz)
 

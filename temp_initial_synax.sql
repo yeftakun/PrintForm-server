@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions (last_seen_at);
 CREATE TABLE IF NOT EXISTS jobs (
 	id text PRIMARY KEY,
 	session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-	target_client_id text REFERENCES clients(id),
+	target_client_id text REFERENCES clients(id) ON DELETE SET NULL,
 	target_client_name varchar(120),
 	original_name varchar(255) NOT NULL,
 	stored_path text NOT NULL,
@@ -55,9 +55,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_ready_pending ON jobs (status) WHERE status 
 
 CREATE TABLE IF NOT EXISTS events (
 	id bigserial PRIMARY KEY,
-	client_id text REFERENCES clients(id),
-	session_id text REFERENCES sessions(id),
-	job_id text REFERENCES jobs(id),
+	client_id text REFERENCES clients(id) ON DELETE SET NULL,
+	session_id text REFERENCES sessions(id) ON DELETE SET NULL,
+	job_id text REFERENCES jobs(id) ON DELETE SET NULL,
 	type varchar(32) NOT NULL,
 	payload jsonb NOT NULL,
 	created_at timestamptz NOT NULL DEFAULT now()
@@ -105,8 +105,8 @@ CREATE TABLE IF NOT EXISTS storage_usage (
 
 CREATE TABLE IF NOT EXISTS websocket_subscriptions (
 	id text PRIMARY KEY,
-	client_id text REFERENCES clients(id),
-	user_id text REFERENCES users(id),
+	client_id text REFERENCES clients(id) ON DELETE SET NULL,
+	user_id text REFERENCES users(id) ON DELETE SET NULL,
 	channel varchar(64) NOT NULL,
 	connected_at timestamptz NOT NULL DEFAULT now()
 );
