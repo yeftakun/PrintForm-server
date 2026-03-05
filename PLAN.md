@@ -1,28 +1,33 @@
 # Plan: Migrasi Bertahap ke Stack Prod & Modularisasi
 
-TL;DR: Kita urutkan upgrade dari polling + JSON ke arsitektur prod (DB, Redis, WebSocket, object storage) sambil memecah `server.js` menjadi modul per domain (clients, sessions, jobs, files, ping, cleanup). Fokus: tetap jalan di tiap tahap, dengan rollback mudah.
+TL;DR: Upgrade dari polling + JSON ke arsitektur prod (DB, Redis, WebSocket, object storage) sambil modularisasi. Fokus: tetap jalan di tiap tahap dengan rollback mudah.
 
-**Steps**
+## Steps
 
-1. Baseline refactor: pecah `server.js` jadi folder `src/` dengan modul `config` (TTL, paths, env), `storage/jsonStore` (read/write), `services` (clients, sessions, jobs, pings, files, cleanup), dan `routes` per resource; tambahkan error handler middleware. Pastikan perilaku identik. **(selesai)**
-2. Observability dasar: tambahkan logging terstruktur dan request tracing ringan (req id + latency) di layer Express; healthcheck tetap di `server.js`. **(selesai)**
-3. Persistensi DB: perkenalkan Postgres + driver (pg); adaptor `repositories/*` menggantikan JSON store; migrasi schema (clients, sessions, jobs, pings/events) tersedia; fallback JSON masih ada via feature flag/env. **(selesai)**
-4. Redis layer: pakai Redis untuk TTL session/client (ganti isSessionActive/isClientOnline logika file) dan Pub/Sub notifikasi job/status; rate-limit heartbeat/register.
-5. File storage lokal/shared: tetap gunakan filesystem server dengan limit kuota 1GB. Tambah guard kapasitas sebelum menerima upload; jika kapasitas melewati limit, request upload ditolak dan klien mendapat pesan "Antrian server penuh". Tambah task cleanup orphan dan penghitung usage (scan folder files + job metadata). Siapkan opsi mount shared filesystem jika di-hosting.
-6. Realtime: tambahkan WebSocket/SignalR endpoint; push events (client online/offline, job created/updated, kapasitas penuh). Web UI dan client .NET pindah dari polling ke subscribe; REST tetap sebagai fallback.
-7. Security: tambah auth (JWT/API key) untuk web & print client; validate upload size/MIME; audit log perubahan status (Ready→Send) di service jobs.
-8. Background worker: gunakan queue (BullMQ/RabbitMQ) untuk clone, cleanup, fan-out notifikasi; matikan setInterval di proses web, pindah ke worker. Worker juga bisa menjalankan periodic usage scan untuk kuota 1GB.
-9. Frontend update: adapt `index.html` untuk WebSocket + notifikasi kapasitas penuh; tampilkan pesan "Antrian server penuh" saat limit tercapai; upload tetap multipart ke server lokal.
-10. Deployment: containerize, reverse proxy (TLS, gzip, upload buffering), horizontal scaling dengan shared Redis/DB; untuk file, gunakan volume/shared FS; tambahkan dashboards (metrics/logs) termasuk metrik penggunaan storage.
+1. Baseline refactor — pecah `server.js` ke `src/` (config, storage/jsonStore, services, routes, cleanup); tambah error handler. **Selesai.**
+2. Observability — logging terstruktur + req id + latency; healthcheck tetap. **Selesai.**
+3. Persistensi DB — Postgres + `pg`, repositories ganti JSON store; schema/migrasi tersedia; feature flag JSON fallback. **Selesai.**
+4. Redis layer — Redis untuk TTL session/client (ganti isSessionActive/isClientOnline), Pub/Sub notifikasi job/status, rate-limit heartbeat/register.
+5. File storage lokal/shared — kuota 1GB; guard kapasitas sebelum upload; cleanup orphan; penghitung usage; siap untuk shared/mounted FS.
+6. Realtime — WebSocket/SignalR; push events (client online/offline, job created/updated, kapasitas penuh); Web UI + client .NET subscribe; REST fallback.
+7. Security — auth (JWT/API key) untuk web & print client; validasi upload size/MIME; audit log status change.
+8. Background worker — queue (BullMQ/RabbitMQ) untuk cleanup/clone/notifikasi; pindah setInterval ke worker; periodic usage scan.
+9. Frontend update — `index.html` adapt WebSocket + notifikasi kapasitas penuh; tampilkan pesan kuota; upload tetap multipart.
+10. Deployment — containerize; reverse proxy (TLS, gzip, buffering); horizontal scale dengan shared Redis/DB; volume/shared FS; dashboards metrics/logs termasuk storage.
 
-**Verification**
+## Pre-Redis Stabilization (dijalankan sebelum Step 4)
+- Klien reuse ID stabil (persist di sisi klien), register/heartbeat selalu kirim `clientId`; server upsert by `id`.
+- Status online/offline *derived* dari `last_seen_at` + TTL; tidak hard-delete klien hanya karena offline (kecuali ada alasan eksplisit).
+- FK schema longgar: `ON DELETE SET NULL` untuk referensi klien (jobs target_client_id, events client/session/job, websocket_subscriptions), sehingga prune tidak blok.
+- Monitoring sudah mencakup semua tabel; highlight last_seen_at stale vs fresh.
+- Jalankan migrasi/normalisasi data (migrate JSON→DB jika perlu), cek konsistensi counts.
 
-- Uji regresi manual: daftar client/job, start/end session, upload, clone, status update, download.
-- Uji integrasi untuk services (clients/sessions/jobs) dengan adaptor JSON dan DB.
-- Load test kecil untuk upload + event fan-out; verifikasi TTL cleanup via Redis.
-- E2E: web UI + client .NET terhadap WebSocket dan REST fallback.
+## Verification
+- Manual: register/heartbeat; job create; session lifecycle; client restart reuse ID; status derived sesuai TTL; monitoring mencerminkan perubahan realtime.
+- DB checks: FK “set null” aktif; tidak ada constraint violation; data historis klien tetap ada.
+- Toggle USE_DB: JSON fallback tetap jalan.
 
-**Decisions**
-
-- Modularisasi diperlukan: **server.js** sudah memuat config, storage, domain, routes, cleanup; dipecah per domain/service.
-- Tahap bertahap: mulai dari refactor tanpa ubah perilaku, lalu DB, Redis, file storage, realtime, security, worker.
+## Decisions
+- Simpan riwayat klien (no delete); status online/offline dihitung dari `last_seen_at` + TTL.
+- FK: `ON DELETE SET NULL` agar prune aman bila diperlukan.
+- Identitas klien: wajib reuse `clientId` stabil; kelak diikat ke akun/API key.
