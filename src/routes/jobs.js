@@ -10,11 +10,12 @@ const { normalizePaperSize, normalizeCopies } = require("../utils/normalize");
 const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
 const { cleanupExpiredSessions } = require("../services/cleanup");
+const { asyncHandler } = require("../utils/asyncHandler");
 
 const upload = multer({ dest: filesDir });
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   let jobs = await getJobs();
   if (req.query.clientId) {
@@ -27,9 +28,9 @@ router.get("/", async (req, res) => {
     jobs = jobs.filter(job => job.status === req.query.status);
   }
   res.json(jobs.map(toPublicJob));
-});
+}));
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const jobs = await getJobs();
   const job = jobs.find(j => j.id === req.params.id);
@@ -38,9 +39,9 @@ router.get("/:id", async (req, res) => {
     return;
   }
   res.json(toPublicJob(job));
-});
+}));
 
-router.get("/:id/download", async (req, res) => {
+router.get("/:id/download", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const jobs = await getJobs();
   const job = jobs.find(j => j.id === req.params.id);
@@ -49,9 +50,9 @@ router.get("/:id/download", async (req, res) => {
     return;
   }
   res.download(job.storedPath, job.originalName);
-});
+}));
 
-router.post("/:id/clone", async (req, res) => {
+router.post("/:id/clone", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const jobs = await getJobs();
   const sourceJob = jobs.find(j => j.id === req.params.id);
@@ -100,9 +101,9 @@ router.post("/:id/clone", async (req, res) => {
   jobs.unshift(clonedJob);
   await saveJobs(jobs);
   res.status(201).json(toPublicJob(clonedJob));
-});
+}));
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const jobs = await getJobs();
   const job = jobs.find(j => j.id === req.params.id);
@@ -120,9 +121,9 @@ router.patch("/:id", async (req, res) => {
   job.status = status.trim();
   await saveJobs(jobs);
   res.json(toPublicJob(job));
-});
+}));
 
-router.post("/", upload.single("document"), async (req, res) => {
+router.post("/", upload.single("document"), asyncHandler(async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Document is required" });
     return;
@@ -175,6 +176,6 @@ router.post("/", upload.single("document"), async (req, res) => {
   jobs.unshift(job);
   await saveJobs(jobs);
   res.status(201).json(toPublicJob(job));
-});
+}));
 
 module.exports = router;

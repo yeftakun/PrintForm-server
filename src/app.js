@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const { rootDir } = require("./config");
 const { requestLogger } = require("./middleware/requestLogger");
+const { errorHandler } = require("./middleware/errorHandler");
 const healthRouter = require("./routes/health");
 const clientsRouter = require("./routes/clients");
 const sessionsRouter = require("./routes/sessions");
@@ -21,6 +22,8 @@ function createApp() {
   app.use("/api/clients", clientsRouter);
   app.use("/api/sessions", sessionsRouter);
   app.use("/api/jobs", jobsRouter);
+
+  app.use(errorHandler);
 
   return app;
 }

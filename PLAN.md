@@ -17,17 +17,17 @@ TL;DR: Upgrade dari polling + JSON ke arsitektur prod (DB, Redis, WebSocket, obj
 
 ## Pre-Redis Stabilization (dijalankan sebelum Step 4)
 - Klien reuse ID stabil (persist di sisi klien), register/heartbeat selalu kirim `clientId`; server upsert by `id`.
-- Status online/offline *derived* dari `last_seen_at` + TTL; tidak hard-delete klien hanya karena offline (kecuali ada alasan eksplisit).
+- Status online/offline *derived* dari `last_seen_at` + TTL; tidak hard-delete langsung saat offline, pembersihan dilakukan via soft purge berbasis retensi.
 - FK schema longgar: `ON DELETE SET NULL` untuk referensi klien (jobs target_client_id, events client/session/job, websocket_subscriptions), sehingga prune tidak blok.
 - Monitoring sudah mencakup semua tabel; highlight last_seen_at stale vs fresh.
 - Jalankan migrasi/normalisasi data (migrate JSON→DB jika perlu), cek konsistensi counts.
 
 ## Verification
 - Manual: register/heartbeat; job create; session lifecycle; client restart reuse ID; status derived sesuai TTL; monitoring mencerminkan perubahan realtime.
-- DB checks: FK “set null” aktif; tidak ada constraint violation; data historis klien tetap ada.
+- DB checks: FK “set null” aktif; tidak ada constraint violation; data stale terhapus sesuai `CLIENT_RETENTION_DAYS`/interval cleanup.
 - Toggle USE_DB: JSON fallback tetap jalan.
 
 ## Decisions
-- Simpan riwayat klien (no delete); status online/offline dihitung dari `last_seen_at` + TTL.
+- Simpan riwayat klien sementara; status online/offline dihitung dari `last_seen_at` + TTL, lalu soft purge berdasarkan retensi.
 - FK: `ON DELETE SET NULL` agar prune aman bila diperlukan.
 - Identitas klien: wajib reuse `clientId` stabil; kelak diikat ke akun/API key.

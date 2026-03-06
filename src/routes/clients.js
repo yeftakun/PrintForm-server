@@ -8,19 +8,20 @@ const {
 } = require("../utils/normalize");
 const { toPublicClient } = require("../utils/publicMapper");
 const { pruneOfflineClients, withClientStatus } = require("../services/status");
+const { asyncHandler } = require("../utils/asyncHandler");
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", asyncHandler(async (req, res) => {
   const existing = await getClients();
   const { clients, removed } = pruneOfflineClients(existing);
   if (removed > 0) {
     await saveClients(clients);
   }
   res.json(clients.map(withClientStatus).map(toPublicClient));
-});
+}));
 
-router.post("/register", async (req, res) => {
+router.post("/register", asyncHandler(async (req, res) => {
   const name = normalizeName(req.body?.name);
   if (!name) {
     res.status(400).json({ error: "name is required" });
@@ -55,9 +56,9 @@ router.post("/register", async (req, res) => {
   await saveClients(cleaned);
   console.log("Client register:", client.id, client.name);
   res.json(toPublicClient(withClientStatus(client)));
-});
+}));
 
-router.post("/heartbeat", async (req, res) => {
+router.post("/heartbeat", asyncHandler(async (req, res) => {
   const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
   if (!clientId) {
     res.status(400).json({ error: "clientId is required" });
@@ -80,9 +81,9 @@ router.post("/heartbeat", async (req, res) => {
   await saveClients(cleaned);
   console.log("Client heartbeat:", client.id);
   res.json(toPublicClient(withClientStatus(client)));
-});
+}));
 
-router.post("/:id/ping", async (req, res) => {
+router.post("/:id/ping", asyncHandler(async (req, res) => {
   const clients = await getClients();
   const client = clients.find(c => c.id === req.params.id);
   if (!client) {
@@ -102,9 +103,9 @@ router.post("/:id/ping", async (req, res) => {
 
   await savePings(pings);
   res.json({ ok: true });
-});
+}));
 
-router.get("/:id/ping", async (req, res) => {
+router.get("/:id/ping", asyncHandler(async (req, res) => {
   const clients = await getClients();
   const client = clients.find(c => c.id === req.params.id);
   if (!client) {
@@ -122,9 +123,9 @@ router.get("/:id/ping", async (req, res) => {
   await savePings(pings);
   console.log("Client ping poll:", client.id, "items:", items.length);
   res.json({ items });
-});
+}));
 
-router.post("/unregister", async (req, res) => {
+router.post("/unregister", asyncHandler(async (req, res) => {
   const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
   if (!clientId) {
     res.status(400).json({ error: "clientId is required" });
@@ -138,6 +139,6 @@ router.post("/unregister", async (req, res) => {
     await saveClients(next);
   }
   res.json({ ok: true, removed });
-});
+}));
 
 module.exports = router;

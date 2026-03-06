@@ -5,10 +5,11 @@ const { getClients } = require("../repositories/clientsRepository");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { normalizeAlias } = require("../utils/normalize");
 const { cleanupExpiredSessions } = require("../services/cleanup");
+const { asyncHandler } = require("../utils/asyncHandler");
 
 const router = express.Router();
 
-router.post("/", async (req, res) => {
+router.post("/", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
   if (!clientId) {
@@ -37,9 +38,9 @@ router.post("/", async (req, res) => {
   sessions.unshift(session);
   await saveSessions(sessions);
   res.json(session);
-});
+}));
 
-router.post("/heartbeat", async (req, res) => {
+router.post("/heartbeat", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : null;
   if (!sessionId) {
@@ -57,9 +58,9 @@ router.post("/heartbeat", async (req, res) => {
   session.lastSeen = new Date().toISOString();
   await saveSessions(sessions);
   res.json({ ok: true });
-});
+}));
 
-router.post("/close", async (req, res) => {
+router.post("/close", asyncHandler(async (req, res) => {
   const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : null;
   if (!sessionId) {
     res.status(400).json({ error: "sessionId is required" });
@@ -90,6 +91,6 @@ router.post("/close", async (req, res) => {
   await saveSessions(remainingSessions);
 
   res.json({ ok: true, removedJobs: jobs.length - remainingJobs.length });
-});
+}));
 
 module.exports = router;
