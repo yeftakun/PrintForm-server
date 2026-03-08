@@ -16,14 +16,6 @@ function withClientStatus(client) {
   };
 }
 
-function pruneOfflineClients(clients) {
-  const keep = clients.filter(isClientOnline);
-  return {
-    clients: keep,
-    removed: clients.length - keep.length
-  };
-}
-
 function isSessionActive(session) {
   const lastSeen = new Date(session.lastSeen).getTime();
   return Number.isFinite(lastSeen) && Date.now() - lastSeen <= SESSION_TTL_MS;
@@ -32,6 +24,5 @@ function isSessionActive(session) {
 module.exports = {
   isClientOnline,
   withClientStatus,
-  pruneOfflineClients,
   isSessionActive
 };

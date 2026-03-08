@@ -57,9 +57,23 @@ Client actions only work on the latest server status (the client re-checks befor
 ## Client features (summary)
 
 - Registers to the server and sends heartbeat/ping poll.
+- `clientId` is mandatory and must be a valid GUID/UUID format.
 - Job list with Print / Reject (Reject only on `ready`).
 - If printer is offline, job becomes `pending` (not sent to spooler).
 - Prints locally on the client machine; server never prints.
+
+## Presence and rate-limit
+
+- Online/offline status is derived from `last_seen_at`/`lastSeen` and `CLIENT_TTL_MS`.
+- Offline clients are not deleted immediately; stale data cleanup uses retention settings.
+- In-memory rate-limit is enabled for client endpoints:
+  - `POST /api/clients/register`
+  - `POST /api/clients/heartbeat`
+- Tuning env vars:
+  - `CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS`
+  - `CLIENT_REGISTER_RATE_LIMIT_MAX`
+  - `CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS`
+  - `CLIENT_HEARTBEAT_RATE_LIMIT_MAX`
 
 ## API summary
 

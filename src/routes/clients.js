@@ -2,68 +2,117 @@ const express = require("express");
 const { getClients, saveClients } = require("../repositories/clientsRepository");
 const { getPings, savePings } = require("../repositories/pingsRepository");
 const {
+  CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
+  CLIENT_REGISTER_RATE_LIMIT_MAX,
+  CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS,
+  CLIENT_HEARTBEAT_RATE_LIMIT_MAX
+} = require("../config");
+const {
   normalizeName,
   normalizePrinters,
   normalizeSelectedPrinter
 } = require("../utils/normalize");
+const { normalizeClientId, isValidClientId } = require("../utils/clientId");
 const { toPublicClient } = require("../utils/publicMapper");
-const { pruneOfflineClients, withClientStatus } = require("../services/status");
+const { withClientStatus } = require("../services/status");
 const { asyncHandler } = require("../utils/asyncHandler");
+const { createInMemoryRateLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
 
-router.get("/", asyncHandler(async (req, res) => {
-  const existing = await getClients();
-  const { clients, removed } = pruneOfflineClients(existing);
-  if (removed > 0) {
-    await saveClients(clients);
+function getRequesterIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim().length > 0) {
+    return forwarded.split(",")[0].trim();
   }
+  return req.ip || "unknown";
+}
+
+function parseRequiredClientId(raw) {
+  const clientId = normalizeClientId(raw);
+  if (!clientId) {
+    return { error: "clientId is required" };
+  }
+  if (!isValidClientId(clientId)) {
+    return { error: "clientId must be a valid GUID/UUID" };
+  }
+  return { clientId };
+}
+
+const registerRateLimiter = createInMemoryRateLimiter({
+  windowMs: CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
+  maxRequests: CLIENT_REGISTER_RATE_LIMIT_MAX,
+  keyFn: req => {
+    const clientId = normalizeClientId(req.body?.clientId);
+    return clientId ? `register:${clientId}` : `register-ip:${getRequesterIp(req)}`;
+  },
+  errorMessage: "Too many register requests"
+});
+
+const heartbeatRateLimiter = createInMemoryRateLimiter({
+  windowMs: CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS,
+  maxRequests: CLIENT_HEARTBEAT_RATE_LIMIT_MAX,
+  keyFn: req => {
+    const clientId = normalizeClientId(req.body?.clientId);
+    return clientId ? `heartbeat:${clientId}` : `heartbeat-ip:${getRequesterIp(req)}`;
+  },
+  errorMessage: "Too many heartbeat requests"
+});
+
+router.get("/", asyncHandler(async (req, res) => {
+  const clients = await getClients();
   res.json(clients.map(withClientStatus).map(toPublicClient));
 }));
 
-router.post("/register", asyncHandler(async (req, res) => {
+router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   const name = normalizeName(req.body?.name);
   if (!name) {
     res.status(400).json({ error: "name is required" });
     return;
   }
 
+  const parsedClientId = parseRequiredClientId(req.body?.clientId);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
+    return;
+  }
+  const { clientId } = parsedClientId;
+
   const printers = normalizePrinters(req.body?.printers);
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, printers);
   const clients = await getClients();
-  const incomingId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
+  const nowIso = new Date().toISOString();
 
-  let client = incomingId ? clients.find(c => c.id === incomingId) : null;
+  let client = clients.find(c => c.id === clientId);
   if (!client) {
-    const id = incomingId || `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     client = {
-      id,
+      id: clientId,
       name,
       printers,
       selectedPrinter,
-      createdAt: new Date().toISOString(),
-      lastSeen: new Date().toISOString()
+      createdAt: nowIso,
+      lastSeen: nowIso
     };
     clients.unshift(client);
   } else {
     client.name = name;
     client.printers = printers;
     client.selectedPrinter = selectedPrinter;
-    client.lastSeen = new Date().toISOString();
+    client.lastSeen = nowIso;
   }
 
-  const { clients: cleaned } = pruneOfflineClients(clients);
-  await saveClients(cleaned);
+  await saveClients(clients);
   console.log("Client register:", client.id, client.name);
   res.json(toPublicClient(withClientStatus(client)));
 }));
 
-router.post("/heartbeat", asyncHandler(async (req, res) => {
-  const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
-  if (!clientId) {
-    res.status(400).json({ error: "clientId is required" });
+router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) => {
+  const parsedClientId = parseRequiredClientId(req.body?.clientId);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
     return;
   }
+  const { clientId } = parsedClientId;
 
   const clients = await getClients();
   const client = clients.find(c => c.id === clientId);
@@ -77,15 +126,20 @@ router.post("/heartbeat", asyncHandler(async (req, res) => {
     client.selectedPrinter = selectedPrinter;
   }
   client.lastSeen = new Date().toISOString();
-  const { clients: cleaned } = pruneOfflineClients(clients);
-  await saveClients(cleaned);
+  await saveClients(clients);
   console.log("Client heartbeat:", client.id);
   res.json(toPublicClient(withClientStatus(client)));
 }));
 
 router.post("/:id/ping", asyncHandler(async (req, res) => {
+  const parsedClientId = parseRequiredClientId(req.params.id);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
+    return;
+  }
+
   const clients = await getClients();
-  const client = clients.find(c => c.id === req.params.id);
+  const client = clients.find(c => c.id === parsedClientId.clientId);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
     return;
@@ -106,16 +160,21 @@ router.post("/:id/ping", asyncHandler(async (req, res) => {
 }));
 
 router.get("/:id/ping", asyncHandler(async (req, res) => {
+  const parsedClientId = parseRequiredClientId(req.params.id);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
+    return;
+  }
+
   const clients = await getClients();
-  const client = clients.find(c => c.id === req.params.id);
+  const client = clients.find(c => c.id === parsedClientId.clientId);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
     return;
   }
 
   client.lastSeen = new Date().toISOString();
-  const { clients: cleaned } = pruneOfflineClients(clients);
-  await saveClients(cleaned);
+  await saveClients(clients);
 
   const pings = await getPings();
   const items = Array.isArray(pings[client.id]) ? pings[client.id] : [];
@@ -126,11 +185,12 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
 }));
 
 router.post("/unregister", asyncHandler(async (req, res) => {
-  const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
-  if (!clientId) {
-    res.status(400).json({ error: "clientId is required" });
+  const parsedClientId = parseRequiredClientId(req.body?.clientId);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
     return;
   }
+  const { clientId } = parsedClientId;
 
   const clients = await getClients();
   const next = clients.filter(c => c.id !== clientId);
