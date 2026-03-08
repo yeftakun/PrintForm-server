@@ -1,39 +1,56 @@
-# Plan: Migrasi Bertahap ke Stack Prod & Modularisasi
+# Plan: Migrasi Bertahap ke Stack Prod & Modularisasi (Revisi Scope TA)
 
-TL;DR: Upgrade dari polling + JSON ke arsitektur prod (DB, Redis, WebSocket, object storage) sambil modularisasi. Fokus: tetap jalan di tiap tahap dengan rollback mudah.
+TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: **PostgreSQL + WebSocket + internal scheduler + single-node deployment**. Hindari over-engineering (Redis/RabbitMQ/HA multi-node) pada fase ini.
+
+## Scope Guard
+
+### Wajib dikerjakan
+- PostgreSQL sebagai penyimpanan utama.
+- Realtime notifikasi memakai WebSocket/SignalR-equivalent.
+- Cleanup file/sesi/client berjalan otomatis via scheduler internal.
+- Secure upload + validasi MIME/size + quota storage.
+- Deploy single-node dengan Docker + Nginx (TLS).
+
+### Di luar scope saat ini (dibatalkan)
+- Redis dependency untuk presence/pubsub/rate-limit.
+- External message broker (RabbitMQ/BullMQ).
+- Horizontal scaling, load balancer, shared FS lintas node.
 
 ## Steps
 
 1. Baseline refactor — pecah `server.js` ke `src/` (config, storage/jsonStore, services, routes, cleanup); tambah error handler. **Selesai.**
 2. Observability — logging terstruktur + req id + latency; healthcheck tetap. **Selesai.**
-3. Persistensi DB — Postgres + `pg`, repositories ganti JSON store; schema/migrasi tersedia; feature flag JSON fallback. **Selesai.**
-4. Redis layer — Redis untuk TTL session/client (presence), Pub/Sub notifikasi job/status, rate-limit heartbeat/register, serta migrasi antrean ping ephemeral dari `events` ke Redis; siapkan fallback saat Redis down agar endpoint kritikal tetap hidup.
-5. File storage lokal/shared — kuota 1GB; guard kapasitas sebelum upload; cleanup orphan; penghitung usage; siap untuk shared/mounted FS.
-6. Realtime — WebSocket/SignalR; push events (client online/offline, job created/updated, kapasitas penuh); Web UI + client .NET subscribe; REST fallback.
-7. Security — auth (JWT/API key) untuk web & print client; validasi upload size/MIME; audit log status change.
-8. Background worker — queue (BullMQ/RabbitMQ) untuk cleanup/clone/notifikasi; pindah setInterval ke worker; periodic usage scan.
-9. Frontend update — `index.html` adapt WebSocket + notifikasi kapasitas penuh; tampilkan pesan kuota; upload tetap multipart.
-10. Deployment — containerize; reverse proxy (TLS, gzip, buffering); horizontal scale dengan shared Redis/DB; volume/shared FS; dashboards metrics/logs termasuk storage.
+3. Persistensi DB — Postgres + `pg`, repositories ganti JSON store; schema/migrasi tersedia; fallback JSON hanya untuk sanity check. **Selesai.**
+4. Presence & rate-limit tanpa Redis — status online/offline tetap *derived* dari `last_seen_at` + TTL; rate-limit register/heartbeat dengan in-memory limiter sederhana (scope single-node).
+5. File storage & privacy controls — enforce kuota 1GB, validasi MIME/size, cleanup orphan, pencatatan usage, dan mekanisme penghapusan aman pasca-cetak.
+6. Realtime channel — implement WebSocket endpoint untuk push event (job masuk, status job berubah, client online/offline) ke Web UI dan .NET client.
+7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download.
+8. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik.
+9. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback).
+10. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
 
-## Pre-Redis Stabilization (dijalankan sebelum Step 4)
-- Klien reuse ID stabil (persist di sisi klien), register/heartbeat selalu kirim `clientId`; server upsert by `id`.
-- Server validasi format `clientId` GUID/UUID; request invalid dikembalikan `400`.
+## Pra-Realtime Stabilization
+
+- Klien reuse ID stabil (GUID persist di sisi klien), register/heartbeat selalu kirim `clientId`; server upsert by `id`.
+- Validasi `clientId` GUID/UUID di server; request invalid dikembalikan `400`.
 - Hilangkan fallback generate ID random di endpoint register agar identitas benar-benar stabil.
-- Status online/offline *derived* dari `last_seen_at` + TTL; tidak hard-delete langsung saat offline, pembersihan dilakukan via soft purge berbasis retensi.
-- FK schema longgar: `ON DELETE SET NULL` untuk referensi klien (jobs target_client_id, events client/session/job, websocket_subscriptions), sehingga prune tidak blok.
-- Monitoring sudah mencakup semua tabel; highlight last_seen_at stale vs fresh.
-- Jalankan migrasi/normalisasi data (migrate JSON→DB jika perlu), cek konsistensi counts.
+- Status online/offline tetap *derived* dari `last_seen_at` + TTL; soft purge retention untuk data stale.
+- FK `ON DELETE SET NULL` untuk relasi yang perlu agar cleanup tidak memblokir transaksi.
+- Monitoring tetap baca DB untuk validasi kondisi operasional.
 
 ## Verification
-- Manual: register/heartbeat; job create; session lifecycle; client restart reuse ID; status derived sesuai TTL; monitoring mencerminkan perubahan realtime.
-- Reconnect check: client dengan GUID yang sama harus update row existing (bukan insert row baru).
-- DB checks: FK “set null” aktif; tidak ada constraint violation; data stale terhapus sesuai `CLIENT_RETENTION_DAYS`/interval cleanup.
-- Race check: kirim ping lalu matikan client sebelum poll; restart server tidak boleh crash karena leftover ping.
-- FK behavior check: purge/delete client tidak boleh memicu error FK (events/jobs/subscriptions mengikuti aturan `SET NULL`/cascade yang ditentukan).
-- USE_DB=true adalah jalur utama; USE_DB=false hanya sanity check fallback.
+
+- Manual flow end-to-end: register/heartbeat, create session, upload, print/reject, update status, cleanup pasca-cetak.
+- Reconnect check: client GUID sama harus update row existing (bukan insert row baru).
+- Status check: online/offline harus konsisten dengan TTL (`last_seen_at`), bukan status statis di DB.
+- Race check: ping/job event saat client putus cepat tidak boleh bikin server crash saat restart.
+- Cleanup check: file orphan, session expired, dan stale client berjalan sesuai interval.
+- Security check: endpoint sensitif menolak request tanpa kredensial valid.
 
 ## Decisions
-- Simpan riwayat klien sementara; status online/offline dihitung dari `last_seen_at` + TTL, lalu soft purge berdasarkan retensi.
-- Sumber kebenaran status adalah perhitungan `last_seen_at` + TTL; kolom `status` di DB diperlakukan sebagai cache/opsional.
-- FK: `ON DELETE SET NULL` agar prune aman bila diperlukan.
-- Identitas klien: wajib reuse `clientId` stabil; kelak diikat ke akun/API key.
+
+- Arsitektur target fase TA: **single-node, non-HA**.
+- PostgreSQL adalah source utama data; JSON fallback hanya untuk pengujian lokal.
+- Realtime tetap prioritas tinggi, tetapi tanpa Redis dependency.
+- Background processing cukup internal scheduler, bukan message broker.
+- Identitas klien wajib GUID stabil; nanti bisa diikat ke akun/API key.
