@@ -6,6 +6,7 @@ const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { normalizeAlias } = require("../utils/normalize");
 const { cleanupExpiredSessions } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
+const { notifyJobsRemoved, publishRealtimeEvent } = require("../services/realtime");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const router = express.Router();
@@ -74,9 +75,11 @@ router.post("/close", asyncHandler(async (req, res) => {
   const jobs = await getJobs();
   const remainingJobs = [];
   const deleteQueue = [];
+  const removedJobIds = [];
 
   for (const job of jobs) {
     if (job.sessionId === sessionId) {
+      removedJobIds.push(job.id);
       if (job.storedPath) {
         deleteQueue.push(job.storedPath);
       }
@@ -91,6 +94,19 @@ router.post("/close", asyncHandler(async (req, res) => {
   await saveJobs(remainingJobs);
   await saveSessions(remainingSessions);
   await refreshStorageUsageSnapshot(remainingJobs);
+
+  if (removedJobIds.length > 0) {
+    notifyJobsRemoved(removedJobIds, "session-close");
+  }
+
+  publishRealtimeEvent({
+    type: "session.closed",
+    channel: "sessions",
+    payload: {
+      sessionId,
+      removedJobs: removedJobIds.length
+    }
+  });
 
   res.json({ ok: true, removedJobs: jobs.length - remainingJobs.length });
 }));

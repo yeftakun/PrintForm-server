@@ -12,6 +12,7 @@ const { getSessions, saveSessions } = require("../repositories/sessionsRepositor
 const { getClients, saveClients, deleteClientsByIds } = require("../repositories/clientsRepository");
 const { isSessionActive } = require("./status");
 const { refreshStorageUsageSnapshot } = require("./storageUsage");
+const { notifyJobsRemoved, notifyClientRemoved, publishRealtimeEvent } = require("./realtime");
 const { query } = require("../db");
 
 async function cleanupExpiredSessions() {
@@ -29,9 +30,11 @@ async function cleanupExpiredSessions() {
   const jobs = await getJobs();
   const remainingJobs = [];
   const deleteQueue = [];
+  const removedJobIds = [];
 
   for (const job of jobs) {
     if (expiredIds.has(job.sessionId)) {
+      removedJobIds.push(job.id);
       if (job.storedPath) {
         deleteQueue.push(job.storedPath);
       }
@@ -46,6 +49,19 @@ async function cleanupExpiredSessions() {
   await saveJobs(remainingJobs);
   await saveSessions(activeSessions);
   await refreshStorageUsageSnapshot(remainingJobs);
+
+  if (removedJobIds.length > 0) {
+    notifyJobsRemoved(removedJobIds, "session-expired");
+  }
+  if (expiredIds.size > 0) {
+    publishRealtimeEvent({
+      type: "sessions.expired",
+      channel: "sessions",
+      payload: {
+        sessionIds: [...expiredIds]
+      }
+    });
+  }
 
   return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
 }
@@ -139,6 +155,10 @@ async function cleanupStaleClients() {
     await saveSessions(keepSessions);
     await saveJobs(keepJobs);
     await refreshStorageUsageSnapshot(keepJobs);
+  }
+
+  for (const clientId of staleIds) {
+    notifyClientRemoved(clientId, "retention-cleanup");
   }
 
   return {

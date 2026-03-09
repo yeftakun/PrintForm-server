@@ -17,6 +17,7 @@ const { toPublicClient } = require("../utils/publicMapper");
 const { withClientStatus } = require("../services/status");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { createInMemoryRateLimiter } = require("../middleware/rateLimiter");
+const { notifyClientUpserted, notifyClientRemoved } = require("../services/realtime");
 
 const router = express.Router();
 
@@ -82,6 +83,7 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, printers);
   const clients = await getClients();
   const nowIso = new Date().toISOString();
+  const isNewClient = !clients.some(c => c.id === clientId);
 
   let client = clients.find(c => c.id === clientId);
   if (!client) {
@@ -102,6 +104,10 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   }
 
   await saveClients(clients);
+  notifyClientUpserted(
+    toPublicClient(withClientStatus(client)),
+    isNewClient ? "register-created" : "register-updated"
+  );
   console.log("Client register:", client.id, client.name);
   res.json(toPublicClient(withClientStatus(client)));
 }));
@@ -127,6 +133,10 @@ router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) =>
   }
   client.lastSeen = new Date().toISOString();
   await saveClients(clients);
+  notifyClientUpserted(
+    toPublicClient(withClientStatus(client)),
+    "heartbeat"
+  );
   console.log("Client heartbeat:", client.id);
   res.json(toPublicClient(withClientStatus(client)));
 }));
@@ -197,6 +207,7 @@ router.post("/unregister", asyncHandler(async (req, res) => {
   const removed = clients.length - next.length;
   if (removed > 0) {
     await saveClients(next);
+    notifyClientRemoved(clientId, "unregister");
   }
   res.json({ ok: true, removed });
 }));

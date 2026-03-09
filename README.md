@@ -108,6 +108,39 @@ Tuning env vars for upload and storage:
   - `POST /api/jobs/:id/clone`
   - `PATCH /api/jobs/:id` (status updates)
 
+## Realtime WebSocket
+
+- WebSocket path: `ws://<host>:<port>/ws` (configurable via `REALTIME_PATH`).
+- Health endpoint now includes realtime state at `GET /api/health`.
+- Default subscription channel is `*` (receive all events).
+- Client can update subscription by sending JSON:
+  - `{"action":"subscribe","channels":["jobs","clients"]}`
+- Channels currently used:
+  - `clients`
+  - `jobs`
+  - `sessions`
+  - `system`
+
+Main emitted events:
+
+- `realtime.connected`
+- `clients.snapshot`
+- `client.upserted`
+- `client.status.changed`
+- `client.removed`
+- `job.created`
+- `job.status.changed`
+- `job.file.removed`
+- `jobs.removed`
+- `session.closed`
+- `sessions.expired`
+
+Related realtime env vars:
+
+- `REALTIME_PATH`
+- `REALTIME_PRESENCE_SYNC_INTERVAL_MS`
+- `REALTIME_PING_INTERVAL_MS`
+
 ## Notes
 
 - No authentication or encryption is implemented. This is a local prototype.

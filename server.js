@@ -1,3 +1,4 @@
+const http = require("http");
 const { createApp } = require("./src/app");
 const { ensureStorage } = require("./src/storage/jsonStore");
 const { port, FILE_CLEANUP_INTERVAL_MS, RETENTION_CLEANUP_INTERVAL_MS } = require("./src/config");
@@ -8,10 +9,14 @@ const {
 } = require("./src/services/cleanup");
 const { getJobs } = require("./src/repositories/jobsRepository");
 const { refreshStorageUsageSnapshot } = require("./src/services/storageUsage");
+const { initializeRealtime, shutdownRealtime } = require("./src/services/realtime");
 
 ensureStorage()
   .then(() => {
     const app = createApp();
+    const server = http.createServer(app);
+
+    initializeRealtime(server);
 
     getJobs()
       .then(jobs => refreshStorageUsageSnapshot(jobs))
@@ -19,9 +24,19 @@ ensureStorage()
         console.warn("Storage usage snapshot init failed:", err.message);
       });
 
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`PrintForm server running on http://localhost:${port}`);
     });
+
+    const shutdownHandler = () => {
+      shutdownRealtime();
+      server.close(() => {
+        process.exit(0);
+      });
+    };
+
+    process.once("SIGINT", shutdownHandler);
+    process.once("SIGTERM", shutdownHandler);
 
     setInterval(() => {
       cleanupExpiredSessions().catch(err => {

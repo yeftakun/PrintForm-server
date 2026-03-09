@@ -17,6 +17,11 @@ const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
 const { cleanupExpiredSessions } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot, getQuotaProjection } = require("../services/storageUsage");
+const {
+  notifyJobCreated,
+  notifyJobStatusChanged,
+  publishRealtimeEvent
+} = require("../services/realtime");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const ALLOWED_MIME_TYPES = new Set(
@@ -217,7 +222,9 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     jobs.unshift(clonedJob);
     await saveJobs(jobs);
     await refreshStorageUsageSnapshot(jobs);
-    res.status(201).json(toPublicJob(clonedJob));
+    const publicClonedJob = toPublicJob(clonedJob);
+    notifyJobCreated(publicClonedJob, "clone");
+    res.status(201).json(publicClonedJob);
   } catch (err) {
     await removeFileSafe(storedPath);
     throw err;
@@ -245,6 +252,8 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     return;
   }
 
+  const previousStatus = job.status;
+
   const shouldDeleteDocument =
     AUTO_DELETE_TERMINAL_JOB_FILES &&
     TERMINAL_JOB_STATUSES.has(normalizedStatus) &&
@@ -252,12 +261,23 @@ router.patch("/:id", asyncHandler(async (req, res) => {
 
   if (shouldDeleteDocument) {
     await removeFileSafe(job.storedPath);
+    publishRealtimeEvent({
+      type: "job.file.removed",
+      channel: "jobs",
+      payload: {
+        jobId: job.id,
+        status: normalizedStatus,
+        source: "terminal-status"
+      }
+    });
   }
 
   job.status = normalizedStatus;
   await saveJobs(jobs);
   await refreshStorageUsageSnapshot(jobs);
-  res.json(toPublicJob(job));
+  const publicJob = toPublicJob(job);
+  notifyJobStatusChanged(publicJob, previousStatus);
+  res.json(publicJob);
 }));
 
 router.post("/", uploadDocument, asyncHandler(async (req, res) => {
@@ -332,7 +352,9 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     jobs.unshift(job);
     await saveJobs(jobs);
     await refreshStorageUsageSnapshot(jobs);
-    res.status(201).json(toPublicJob(job));
+    const publicJob = toPublicJob(job);
+    notifyJobCreated(publicJob, "upload");
+    res.status(201).json(publicJob);
   } catch (err) {
     await removeFileSafe(req.file.path);
     throw err;
