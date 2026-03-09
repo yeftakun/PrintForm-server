@@ -17,6 +17,10 @@ const app = express();
 
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/favicon.ico", (req, res) => {
+  res.status(204).end();
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
@@ -143,7 +147,13 @@ async function fetchSnapshot() {
     return acc;
   }, {});
 
-  const storage = storageRows[0] || null;
+  const storage = storageRows[0]
+    ? {
+        totalBytes: Number(storageRows[0].total_bytes ?? storageRows[0].totalBytes ?? 0),
+        fileCount: Number(storageRows[0].file_count ?? storageRows[0].fileCount ?? 0),
+        computedAt: storageRows[0].computed_at ?? storageRows[0].computedAt ?? null
+      }
+    : null;
 
   return {
     id: crypto.randomUUID?.() || String(now),

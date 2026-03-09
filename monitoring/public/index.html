@@ -223,6 +223,17 @@
     const formatter = new Intl.DateTimeFormat('en', { dateStyle: 'short', timeStyle: 'medium' });
     const sizeFmt = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
+    function formatDateSafe(value) {
+      if (!value) {
+        return '-';
+      }
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return '-';
+      }
+      return formatter.format(parsed);
+    }
+
     function setStatus(text, ok) {
       statusPill.textContent = text;
       statusPill.className = ok ? 'pill ok' : 'pill warn';
@@ -353,10 +364,17 @@
         storageCards.innerHTML = '';
         return;
       }
-      storageMeta.textContent = `computed at ${formatter.format(new Date(storage.computedAt))}`;
+
+      const computedAt = storage.computedAt || storage.computed_at;
+      const totalBytesRaw = storage.totalBytes ?? storage.total_bytes ?? 0;
+      const fileCountRaw = storage.fileCount ?? storage.file_count ?? 0;
+      const totalBytes = Number(totalBytesRaw) || 0;
+      const fileCount = Number(fileCountRaw) || 0;
+
+      storageMeta.textContent = `computed at ${formatDateSafe(computedAt)}`;
       const items = [
-        { label: 'Total Bytes', value: sizeFmt.format(storage.totalBytes / 1024 / 1024) + ' MB' },
-        { label: 'File Count', value: storage.fileCount }
+        { label: 'Total Bytes', value: sizeFmt.format(totalBytes / 1024 / 1024) + ' MB' },
+        { label: 'File Count', value: fileCount }
       ];
       storageCards.innerHTML = items.map(item => `
         <div class="card">
