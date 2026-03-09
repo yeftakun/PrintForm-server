@@ -5,6 +5,7 @@ const { getClients } = require("../repositories/clientsRepository");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { normalizeAlias } = require("../utils/normalize");
 const { cleanupExpiredSessions } = require("../services/cleanup");
+const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const router = express.Router();
@@ -89,6 +90,7 @@ router.post("/close", asyncHandler(async (req, res) => {
   );
   await saveJobs(remainingJobs);
   await saveSessions(remainingSessions);
+  await refreshStorageUsageSnapshot(remainingJobs);
 
   res.json({ ok: true, removedJobs: jobs.length - remainingJobs.length });
 }));
