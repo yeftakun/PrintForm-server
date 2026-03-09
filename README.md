@@ -36,7 +36,11 @@ Client actions only work on the latest server status (the client re-checks befor
 ## Storage and privacy
 
 - Uploaded files are stored in `storage/files/` with random names (no extension).
-- Original filenames are stored in `storage/jobs.json` as `originalName`.
+- Original filenames are stored as `originalName` in job records (JSON/DB repository).
+- Upload validation enforces MIME/extension allowlist and max file size.
+- Server enforces storage quota (`FILE_QUOTA_BYTES`, default 1GB) for upload and clone operations.
+- Storage usage snapshot is tracked in `storage_usage` table (when DB mode is enabled).
+- Terminal job statuses (`done`, `failed`, `rejected`, `canceled`) can trigger safe file deletion (`AUTO_DELETE_TERMINAL_JOB_FILES=true`).
 - Sessions, jobs, clients, and ping queues are stored as JSON:
   - `storage/sessions.json`
   - `storage/jobs.json`
@@ -44,6 +48,14 @@ Client actions only work on the latest server status (the client re-checks befor
   - `storage/pings.json`
 - Session cleanup removes jobs and files if a session expires or is closed.
 - Orphan cleanup runs every 60 seconds and deletes files not referenced by any job (older than 2 minutes).
+
+Tuning env vars for upload and storage:
+
+- `MAX_UPLOAD_BYTES`
+- `ALLOWED_UPLOAD_MIME_TYPES`
+- `ALLOWED_UPLOAD_EXTENSIONS`
+- `FILE_QUOTA_BYTES`
+- `AUTO_DELETE_TERMINAL_JOB_FILES`
 
 ## Web UI features
 

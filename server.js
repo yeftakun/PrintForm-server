@@ -6,10 +6,18 @@ const {
   cleanupOrphanFiles,
   cleanupStaleClients
 } = require("./src/services/cleanup");
+const { getJobs } = require("./src/repositories/jobsRepository");
+const { refreshStorageUsageSnapshot } = require("./src/services/storageUsage");
 
 ensureStorage()
   .then(() => {
     const app = createApp();
+
+    getJobs()
+      .then(jobs => refreshStorageUsageSnapshot(jobs))
+      .catch(err => {
+        console.warn("Storage usage snapshot init failed:", err.message);
+      });
 
     app.listen(port, () => {
       console.log(`PrintForm server running on http://localhost:${port}`);

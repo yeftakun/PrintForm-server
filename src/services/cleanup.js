@@ -11,6 +11,7 @@ const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, saveClients, deleteClientsByIds } = require("../repositories/clientsRepository");
 const { isSessionActive } = require("./status");
+const { refreshStorageUsageSnapshot } = require("./storageUsage");
 const { query } = require("../db");
 
 async function cleanupExpiredSessions() {
@@ -44,6 +45,7 @@ async function cleanupExpiredSessions() {
   );
   await saveJobs(remainingJobs);
   await saveSessions(activeSessions);
+  await refreshStorageUsageSnapshot(remainingJobs);
 
   return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
 }
@@ -127,6 +129,8 @@ async function cleanupStaleClients() {
       await query("DELETE FROM sessions WHERE id = ANY($1)", [staleSessionIds]);
     }
     await deleteClientsByIds([...staleIds]);
+    const currentJobs = await getJobs();
+    await refreshStorageUsageSnapshot(currentJobs);
   } else {
     const keepClients = clients.filter(c => !staleIds.has(c.id));
     const keepSessions = sessions.filter(s => !staleIds.has(s.clientId));
@@ -134,6 +138,7 @@ async function cleanupStaleClients() {
     await saveClients(keepClients);
     await saveSessions(keepSessions);
     await saveJobs(keepJobs);
+    await refreshStorageUsageSnapshot(keepJobs);
   }
 
   return {

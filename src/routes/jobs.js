@@ -3,16 +3,113 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
-const { filesDir } = require("../config");
+const {
+  filesDir,
+  MAX_UPLOAD_BYTES,
+  ALLOWED_UPLOAD_MIME_TYPES,
+  ALLOWED_UPLOAD_EXTENSIONS,
+  AUTO_DELETE_TERMINAL_JOB_FILES
+} = require("../config");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions } = require("../repositories/sessionsRepository");
 const { normalizePaperSize, normalizeCopies } = require("../utils/normalize");
 const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
 const { cleanupExpiredSessions } = require("../services/cleanup");
+const { refreshStorageUsageSnapshot, getQuotaProjection } = require("../services/storageUsage");
 const { asyncHandler } = require("../utils/asyncHandler");
 
-const upload = multer({ dest: filesDir });
+const ALLOWED_MIME_TYPES = new Set(
+  (ALLOWED_UPLOAD_MIME_TYPES || []).map(value => String(value || "").toLowerCase())
+);
+const ALLOWED_EXTENSIONS = new Set(
+  (ALLOWED_UPLOAD_EXTENSIONS || []).map(value => {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (!normalized) {
+      return "";
+    }
+    return normalized.startsWith(".") ? normalized : `.${normalized}`;
+  }).filter(Boolean)
+);
+
+const ALLOWED_JOB_STATUSES = new Set([
+  "ready",
+  "printing",
+  "done",
+  "pending",
+  "failed",
+  "rejected",
+  "canceled",
+  "send"
+]);
+
+const TERMINAL_JOB_STATUSES = new Set([
+  "done",
+  "failed",
+  "rejected",
+  "canceled"
+]);
+
+function isAllowedUploadFile(file) {
+  const mimeType = String(file?.mimetype || "").trim().toLowerCase();
+  if (mimeType && ALLOWED_MIME_TYPES.has(mimeType)) {
+    return true;
+  }
+
+  const extension = path.extname(String(file?.originalname || "")).trim().toLowerCase();
+  return Boolean(extension && ALLOWED_EXTENSIONS.has(extension));
+}
+
+async function removeFileSafe(filePath) {
+  if (!filePath) {
+    return;
+  }
+  await fsp.unlink(filePath).catch(() => null);
+}
+
+const upload = multer({
+  dest: filesDir,
+  limits: {
+    fileSize: MAX_UPLOAD_BYTES
+  },
+  fileFilter: (req, file, callback) => {
+    if (isAllowedUploadFile(file)) {
+      callback(null, true);
+      return;
+    }
+
+    const error = new Error("File type is not allowed");
+    error.statusCode = 400;
+    error.code = "UPLOAD_TYPE_NOT_ALLOWED";
+    callback(error);
+  }
+});
+
+function uploadDocument(req, res, next) {
+  upload.single("document")(req, res, err => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ error: `File too large. Max ${MAX_UPLOAD_BYTES} bytes` });
+        return;
+      }
+      res.status(400).json({ error: err.message || "Upload failed" });
+      return;
+    }
+
+    if (err.code === "UPLOAD_TYPE_NOT_ALLOWED") {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+
+    next(err);
+  });
+}
+
 const router = express.Router();
 
 router.get("/", asyncHandler(async (req, res) => {
@@ -49,6 +146,14 @@ router.get("/:id/download", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
+
+  try {
+    await fsp.access(job.storedPath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "Document file is not available" });
+    return;
+  }
+
   res.download(job.storedPath, job.originalName);
 }));
 
@@ -75,6 +180,16 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     return;
   }
 
+  const sourceStat = await fsp.stat(sourceJob.storedPath);
+  const sourceSize = Number(sourceJob.size) > 0 ? Number(sourceJob.size) : sourceStat.size;
+
+  const usageBeforeClone = await refreshStorageUsageSnapshot(jobs);
+  const cloneQuotaProjection = getQuotaProjection(usageBeforeClone, sourceSize);
+  if (cloneQuotaProjection.quotaExceeded) {
+    res.status(413).json({ error: "Server storage quota exceeded" });
+    return;
+  }
+
   const id = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const storedPath = path.join(filesDir, id);
   try {
@@ -88,7 +203,7 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     id,
     originalName: sourceJob.originalName,
     storedPath,
-    size: sourceJob.size,
+    size: sourceSize,
     createdAt: new Date().toISOString(),
     status: "ready",
     alias: sourceJob.alias || null,
@@ -98,9 +213,15 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     printConfig: sourceJob.printConfig
   };
 
-  jobs.unshift(clonedJob);
-  await saveJobs(jobs);
-  res.status(201).json(toPublicJob(clonedJob));
+  try {
+    jobs.unshift(clonedJob);
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
+    res.status(201).json(toPublicJob(clonedJob));
+  } catch (err) {
+    await removeFileSafe(storedPath);
+    throw err;
+  }
 }));
 
 router.patch("/:id", asyncHandler(async (req, res) => {
@@ -118,12 +239,28 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     return;
   }
 
-  job.status = status.trim();
+  const normalizedStatus = status.trim().toLowerCase();
+  if (!ALLOWED_JOB_STATUSES.has(normalizedStatus)) {
+    res.status(400).json({ error: "Unsupported status" });
+    return;
+  }
+
+  const shouldDeleteDocument =
+    AUTO_DELETE_TERMINAL_JOB_FILES &&
+    TERMINAL_JOB_STATUSES.has(normalizedStatus) &&
+    job.storedPath;
+
+  if (shouldDeleteDocument) {
+    await removeFileSafe(job.storedPath);
+  }
+
+  job.status = normalizedStatus;
   await saveJobs(jobs);
+  await refreshStorageUsageSnapshot(jobs);
   res.json(toPublicJob(job));
 }));
 
-router.post("/", upload.single("document"), asyncHandler(async (req, res) => {
+router.post("/", uploadDocument, asyncHandler(async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Document is required" });
     return;
@@ -134,14 +271,17 @@ router.post("/", upload.single("document"), asyncHandler(async (req, res) => {
   const sessionId = typeof req.body.sessionId === "string" ? req.body.sessionId : null;
 
   if (!paperSize) {
+    await removeFileSafe(req.file.path);
     res.status(400).json({ error: "paperSize must be A4 or A5" });
     return;
   }
   if (!copies) {
+    await removeFileSafe(req.file.path);
     res.status(400).json({ error: "copies must be 1-999" });
     return;
   }
   if (!sessionId) {
+    await removeFileSafe(req.file.path);
     res.status(400).json({ error: "sessionId is required" });
     return;
   }
@@ -150,11 +290,26 @@ router.post("/", upload.single("document"), asyncHandler(async (req, res) => {
   const sessions = await getSessions();
   const session = sessions.find(s => s.id === sessionId);
   if (!session) {
+    await removeFileSafe(req.file.path);
     res.status(400).json({ error: "sessionId not found" });
     return;
   }
 
+  if (!isSessionActive(session)) {
+    await removeFileSafe(req.file.path);
+    res.status(400).json({ error: "Session is not active" });
+    return;
+  }
+
   const jobs = await getJobs();
+  const usageBeforeUpload = await refreshStorageUsageSnapshot(jobs);
+  const uploadQuotaProjection = getQuotaProjection(usageBeforeUpload, req.file.size);
+  if (uploadQuotaProjection.quotaExceeded) {
+    await removeFileSafe(req.file.path);
+    res.status(413).json({ error: "Server storage quota exceeded" });
+    return;
+  }
+
   const id = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const job = {
     id,
@@ -173,9 +328,15 @@ router.post("/", upload.single("document"), asyncHandler(async (req, res) => {
     }
   };
 
-  jobs.unshift(job);
-  await saveJobs(jobs);
-  res.status(201).json(toPublicJob(job));
+  try {
+    jobs.unshift(job);
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
+    res.status(201).json(toPublicJob(job));
+  } catch (err) {
+    await removeFileSafe(req.file.path);
+    throw err;
+  }
 }));
 
 module.exports = router;

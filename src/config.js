@@ -1,6 +1,17 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
+function parseCsvList(value, fallback) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+  const items = value
+    .split(",")
+    .map(item => item.trim().toLowerCase())
+    .filter(Boolean);
+  return items.length > 0 ? items : fallback;
+}
+
 const port = Number(process.env.PORT) || 3000;
 const rootDir = path.join(__dirname, "..");
 const useDb = process.env.USE_DB === "true";
@@ -18,6 +29,25 @@ const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS) || 30 * 1000;
 const ORPHAN_GRACE_MS = Number(process.env.ORPHAN_GRACE_MS) || 2 * 60 * 1000;
 const FILE_CLEANUP_INTERVAL_MS = Number(process.env.FILE_CLEANUP_INTERVAL_MS) || 60 * 1000;
 const FILE_QUOTA_BYTES = Number(process.env.FILE_QUOTA_BYTES) || 1_073_741_824; // default 1GB
+const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES) || 25 * 1024 * 1024; // default 25MB
+const ALLOWED_UPLOAD_MIME_TYPES = parseCsvList(process.env.ALLOWED_UPLOAD_MIME_TYPES, [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "text/plain",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+]);
+const ALLOWED_UPLOAD_EXTENSIONS = parseCsvList(process.env.ALLOWED_UPLOAD_EXTENSIONS, [
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".txt",
+  ".doc",
+  ".docx"
+]);
+const AUTO_DELETE_TERMINAL_JOB_FILES = process.env.AUTO_DELETE_TERMINAL_JOB_FILES !== "false";
 const CLIENT_RETENTION_DAYS = Number(process.env.CLIENT_RETENTION_DAYS) || 30;
 
 // Test set
@@ -48,6 +78,10 @@ module.exports = {
   ORPHAN_GRACE_MS,
   FILE_CLEANUP_INTERVAL_MS,
   FILE_QUOTA_BYTES,
+  MAX_UPLOAD_BYTES,
+  ALLOWED_UPLOAD_MIME_TYPES,
+  ALLOWED_UPLOAD_EXTENSIONS,
+  AUTO_DELETE_TERMINAL_JOB_FILES,
   CLIENT_RETENTION_DAYS,
   CLIENT_RETENTION_MS,
   RETENTION_CLEANUP_INTERVAL_MS,
