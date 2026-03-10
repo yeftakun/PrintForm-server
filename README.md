@@ -14,6 +14,47 @@ npm start
 
 Open `http://localhost:3000`.
 
+## .env Reference
+
+### Core
+
+- `PORT`: HTTP port untuk PrintForm server.
+- `USE_DB`: `true` untuk Postgres repository, `false` untuk JSON storage.
+- `DATABASE_URL`: connection string Postgres, wajib jika `USE_DB=true`.
+- `MONITORING_PORT`: port app monitoring (optional, dipakai `monitoring/server.js`).
+
+### Storage and upload
+
+- `STORAGE_DIR`: root folder storage lokal.
+- `MAX_UPLOAD_BYTES`: batas ukuran upload per file (bytes).
+- `FILE_QUOTA_BYTES`: batas total kuota file aktif (bytes).
+- `AUTO_DELETE_TERMINAL_JOB_FILES`: hapus file fisik saat job terminal.
+- `ALLOWED_UPLOAD_MIME_TYPES`: allowlist MIME upload (CSV).
+- `ALLOWED_UPLOAD_EXTENSIONS`: allowlist extension upload (CSV).
+
+### Presence, session, and realtime
+
+- `CLIENT_TTL_MS`: TTL status client online/offline (ms).
+- `SESSION_TTL_MS`: TTL session aktif (ms).
+- `REALTIME_PATH`: path websocket realtime.
+- `REALTIME_PRESENCE_SYNC_INTERVAL_MS`: interval sinkronisasi presence loop (ms).
+- `REALTIME_PING_INTERVAL_MS`: interval ping keepalive websocket (ms).
+- `REALTIME_CLIENT_OFFLINE_GRACE_MS`: grace disconnect WS sebelum client dipaksa offline (ms).
+
+### Cleanup and retention
+
+- `ORPHAN_GRACE_MS`: usia minimum file orphan agar boleh dihapus (ms).
+- `FILE_CLEANUP_INTERVAL_MS`: interval scanner cleanup orphan file (ms).
+- `CLIENT_RETENTION_DAYS`: retensi stale client (hari).
+- `RETENTION_CLEANUP_INTERVAL_MS`: interval cleanup retensi stale data (ms).
+
+### Rate limit
+
+- `CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS`: window rate-limit register (ms).
+- `CLIENT_REGISTER_RATE_LIMIT_MAX`: max request register per window.
+- `CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS`: window rate-limit heartbeat (ms).
+- `CLIENT_HEARTBEAT_RATE_LIMIT_MAX`: max request heartbeat per window.
+
 ## Flow overview
 
 1. Web user selects a target .NET client and creates a session (optional alias for sender).
