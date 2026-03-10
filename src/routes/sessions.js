@@ -1,15 +1,92 @@
 const express = require("express");
 const fsp = require("fs").promises;
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
-const { getClients } = require("../repositories/clientsRepository");
+const { getClients, updateClientPresence } = require("../repositories/clientsRepository");
+const { getPings, savePings } = require("../repositories/pingsRepository");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
+const {
+  SESSION_CREATE_CONFIRM_TIMEOUT_MS,
+  SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS
+} = require("../config");
 const { normalizeAlias } = require("../utils/normalize");
+const { isClientOnline, withClientStatus } = require("../services/status");
+const { toPublicClient } = require("../utils/publicMapper");
 const { cleanupExpiredSessions } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
-const { notifyJobsRemoved, publishRealtimeEvent } = require("../services/realtime");
+const {
+  notifyJobsRemoved,
+  notifyClientUpserted,
+  publishRealtimeEvent,
+  isClientRealtimeConnected
+} = require("../services/realtime");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const router = express.Router();
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getLastSeenMs(client) {
+  const lastSeenMs = new Date(client?.lastSeen).getTime();
+  return Number.isFinite(lastSeenMs) ? lastSeenMs : 0;
+}
+
+function isClientAvailableForNewSession(client) {
+  return Boolean(client && isClientRealtimeConnected(client.id));
+}
+
+async function enqueueConfirmationPing(clientId) {
+  const pings = await getPings();
+  if (!Array.isArray(pings[clientId])) {
+    pings[clientId] = [];
+  }
+
+  pings[clientId].push({
+    id: `session_ping_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    at: new Date().toISOString(),
+    source: "session-create-confirm"
+  });
+
+  await savePings(pings);
+}
+
+async function waitForClientConfirmation(client) {
+  const timeoutMs = Math.max(0, SESSION_CREATE_CONFIRM_TIMEOUT_MS);
+  const pollIntervalMs = Math.max(100, SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS);
+  const startedAt = Date.now();
+  const baselineLastSeenMs = getLastSeenMs(client);
+
+  await enqueueConfirmationPing(client.id);
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await delay(pollIntervalMs);
+
+    const clients = await getClients();
+    const latestClient = clients.find(item => item.id === client.id);
+    if (!latestClient) {
+      return { ok: false, client: null, reason: "client-missing" };
+    }
+
+    if (isClientRealtimeConnected(latestClient.id)) {
+      return { ok: true, client: latestClient, reason: "realtime-confirmed" };
+    }
+
+    const latestSeenMs = getLastSeenMs(latestClient);
+    const hasNewActivitySignal = latestSeenMs > baselineLastSeenMs;
+    if (hasNewActivitySignal && isClientOnline(latestClient)) {
+      return {
+        ok: true,
+        client: latestClient,
+        reason: "ping-confirmed"
+      };
+    }
+  }
+
+  const latestClients = await getClients();
+  const latestClient = latestClients.find(item => item.id === client.id) || client;
+  return { ok: false, client: latestClient, reason: "confirmation-timeout" };
+}
 
 router.post("/", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
@@ -26,12 +103,43 @@ router.post("/", asyncHandler(async (req, res) => {
     return;
   }
 
+  let sessionTargetClient = client;
+  let availabilitySource = "initial";
+
+  if (!isClientAvailableForNewSession(client)) {
+    const confirmation = await waitForClientConfirmation(client);
+    if (!confirmation.ok) {
+      const updatedClient = await updateClientPresence(client.id, { status: "offline" });
+      if (updatedClient) {
+        notifyClientUpserted(
+          toPublicClient(withClientStatus(updatedClient)),
+          "session-create-rejected-offline"
+        );
+      }
+
+      res.status(409).json({
+        error: "Client sedang offline/tidak responsif. Session tidak bisa dibuat.",
+        code: "CLIENT_UNAVAILABLE",
+        clientId: client.id,
+        reason: confirmation.reason
+      });
+      return;
+    }
+
+    if (confirmation.client) {
+      sessionTargetClient = confirmation.client;
+    }
+    availabilitySource = confirmation.reason;
+  } else {
+    availabilitySource = "realtime-connected";
+  }
+
   const alias = normalizeAlias(req.body?.alias);
   const sessions = await getSessions();
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    clientId: client.id,
-    clientName: client.name,
+    clientId: sessionTargetClient.id,
+    clientName: sessionTargetClient.name,
     alias,
     createdAt: new Date().toISOString(),
     lastSeen: new Date().toISOString()
@@ -39,7 +147,10 @@ router.post("/", asyncHandler(async (req, res) => {
 
   sessions.unshift(session);
   await saveSessions(sessions);
-  res.json(session);
+  res.json({
+    ...session,
+    availabilitySource
+  });
 }));
 
 router.post("/heartbeat", asyncHandler(async (req, res) => {

@@ -36,6 +36,8 @@ Open `http://localhost:3000`.
 
 - `CLIENT_TTL_MS`: TTL status client online/offline (ms).
 - `SESSION_TTL_MS`: TTL session aktif (ms).
+- `SESSION_CREATE_CONFIRM_TIMEOUT_MS`: window pending confirmation create session (ms).
+- `SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS`: interval polling selama pending confirmation (ms).
 - `REALTIME_PATH`: path websocket realtime.
 - `REALTIME_PRESENCE_SYNC_INTERVAL_MS`: interval sinkronisasi presence loop (ms).
 - `REALTIME_PING_INTERVAL_MS`: interval ping keepalive websocket (ms).
@@ -101,6 +103,8 @@ Tuning env vars for upload and storage:
 ## Web UI features
 
 - Create session for a selected client (with optional sender alias).
+- Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
+- Jika websocket client tidak sedang connected, server wajib menjalankan pending confirmation aktif (ping check) sebelum membuat session.
 - Upload jobs (A4/A5, copies).
 - Job list with:
   - "Buat lagi" (clone job with same file/config).

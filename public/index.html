@@ -396,6 +396,9 @@
           if (!res.ok) {
             sessionStatus.textContent = body.error || "Gagal membuat session.";
             sessionStatus.className = "status error";
+            if (body.code === "CLIENT_UNAVAILABLE") {
+              scheduleLoadClients(0);
+            }
             return;
           }
 
