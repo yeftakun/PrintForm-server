@@ -11,6 +11,7 @@
       <header class="header">
         <h1>PrintForm Cloud Queue</h1>
         <p>Upload dokumen dan atur konfigurasi cetak.</p>
+        <p id="realtimeStatus" class="muted">Realtime: menghubungkan...</p>
       </header>
 
       <section class="card" id="sessionCard">
@@ -138,6 +139,7 @@
       const sessionAliasText = document.getElementById("sessionAliasText");
       const sessionInactive = document.getElementById("sessionInactive");
       const sessionActive = document.getElementById("sessionActive");
+      const realtimeStatus = document.getElementById("realtimeStatus");
       const clientsBody = document.getElementById("clientsBody");
       const clientsStatus = document.getElementById("clientsStatus");
       const requiresSessionSections = document.querySelectorAll(".requires-session");
@@ -148,6 +150,50 @@
       let sessionHeartbeatFailures = 0;
       const aliasStorageKey = "printformAlias";
       let senderAlias = localStorage.getItem(aliasStorageKey) || "";
+      let realtimeSocket = null;
+      let realtimeReconnectTimer = null;
+      let realtimeReconnectAttempt = 0;
+      let loadClientsTimer = null;
+      let loadJobsTimer = null;
+      let realtimeManualClose = false;
+
+      function isRealtimeConnected() {
+        return Boolean(realtimeSocket && realtimeSocket.readyState === WebSocket.OPEN);
+      }
+
+      function setRealtimeStatus(text, isError = false) {
+        if (!realtimeStatus) {
+          return;
+        }
+
+        realtimeStatus.textContent = text;
+        realtimeStatus.className = isError ? "status error" : "muted";
+      }
+
+      function scheduleLoadClients(delayMs = 200) {
+        if (loadClientsTimer) {
+          clearTimeout(loadClientsTimer);
+        }
+        loadClientsTimer = setTimeout(() => {
+          loadClients().catch(() => {
+            // ignore; fallback interval will retry.
+          });
+        }, delayMs);
+      }
+
+      function scheduleLoadJobs(delayMs = 200) {
+        if (!sessionId) {
+          return;
+        }
+        if (loadJobsTimer) {
+          clearTimeout(loadJobsTimer);
+        }
+        loadJobsTimer = setTimeout(() => {
+          loadJobs().catch(() => {
+            // ignore; fallback interval will retry.
+          });
+        }, delayMs);
+      }
 
       function setSessionUi(active) {
         sessionInactive.classList.toggle("hidden", active);
@@ -198,45 +244,54 @@
 
       async function loadClients() {
         const previousSelection = clientSelect.value;
-        const res = await fetch("/api/clients");
-        const clients = await res.json();
-        if (!Array.isArray(clients) || clients.length === 0) {
-          clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
-          clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada client online.</td></tr>';
-          return;
-        }
-
-        const options = clients.map(client => {
-          const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
-          const label = `${client.name} (${client.status})${printerLabel}`;
-          return `<option value="${client.id}">${label}</option>`;
-        }).join("");
-
-        clientSelect.innerHTML = options;
-        if (clients.length === 1) {
-          clientSelect.value = clients[0].id;
-        } else {
-          const placeholder = document.createElement("option");
-          placeholder.value = "";
-          placeholder.textContent = "Pilih client";
-          placeholder.disabled = true;
-          placeholder.selected = true;
-          clientSelect.prepend(placeholder);
-          if (previousSelection) {
-            clientSelect.value = previousSelection;
+        try {
+          const res = await fetch("/api/clients");
+          if (!res.ok) {
+            throw new Error("failed to fetch clients");
           }
-        }
 
-        clientsBody.innerHTML = clients.map(client => `
-          <tr>
-            <td>${client.name}</td>
-            <td>${client.status}</td>
-            <td>${new Date(client.lastSeen).toLocaleString()}</td>
-            <td>${client.selectedPrinter || "-"}</td>
-            <td>${(client.printers || []).join(", ") || "-"}</td>
-            <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
-          </tr>
-        `).join("");
+          const clients = await res.json();
+          if (!Array.isArray(clients) || clients.length === 0) {
+            clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
+            clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada client online.</td></tr>';
+            return;
+          }
+
+          const options = clients.map(client => {
+            const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
+            const label = `${client.name} (${client.status})${printerLabel}`;
+            return `<option value="${client.id}">${label}</option>`;
+          }).join("");
+
+          clientSelect.innerHTML = options;
+          if (clients.length === 1) {
+            clientSelect.value = clients[0].id;
+          } else {
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "Pilih client";
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            clientSelect.prepend(placeholder);
+            if (previousSelection) {
+              clientSelect.value = previousSelection;
+            }
+          }
+
+          clientsBody.innerHTML = clients.map(client => `
+            <tr>
+              <td>${client.name}</td>
+              <td>${client.status}</td>
+              <td>${new Date(client.lastSeen).toLocaleString()}</td>
+              <td>${client.selectedPrinter || "-"}</td>
+              <td>${(client.printers || []).join(", ") || "-"}</td>
+              <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
+            </tr>
+          `).join("");
+        } catch {
+          clientsStatus.textContent = "Gagal memuat daftar client.";
+          clientsStatus.className = "status error";
+        }
       }
 
       async function loadJobs() {
@@ -246,40 +301,49 @@
           return;
         }
 
-        const res = await fetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
-        const jobs = await res.json();
-        if (!Array.isArray(jobs) || jobs.length === 0) {
-          jobsBody.innerHTML = '<tr><td colspan="9" class="muted">Belum ada job.</td></tr>';
-          jobsStatus.textContent = "";
-          return;
-        }
-
-        const formatStatus = (value) => {
-          if (!value) {
-            return "-";
+        try {
+          const res = await fetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
+          if (!res.ok) {
+            throw new Error("failed to fetch jobs");
           }
-          return value.toLowerCase() === "done" ? "Sent" : value;
-        };
 
-        jobsBody.innerHTML = jobs.map(job => {
-          const isReady = job.status === "ready";
-          const cancelDisabled = isReady ? "" : "disabled";
-          return `
-          <tr>
-            <td>${job.id}</td>
-            <td>${job.originalName}</td>
-            <td>${job.alias || "-"}</td>
-            <td>${job.targetClientName || job.targetClientId || "-"}</td>
-            <td>${job.printConfig.paperSize}</td>
-            <td>${job.printConfig.copies}</td>
-            <td>${formatStatus(job.status)}</td>
-            <td>${new Date(job.createdAt).toLocaleString()}</td>
-            <td>
-              <button type="button" data-job-id="${job.id}" data-action="clone">Buat lagi</button>
-              <button type="button" data-job-id="${job.id}" data-action="cancel" ${cancelDisabled}>Batal</button>
-            </td>
-          </tr>`;
-        }).join("");
+          const jobs = await res.json();
+          if (!Array.isArray(jobs) || jobs.length === 0) {
+            jobsBody.innerHTML = '<tr><td colspan="9" class="muted">Belum ada job.</td></tr>';
+            jobsStatus.textContent = "";
+            return;
+          }
+
+          const formatStatus = (value) => {
+            if (!value) {
+              return "-";
+            }
+            return value.toLowerCase() === "done" ? "Sent" : value;
+          };
+
+          jobsBody.innerHTML = jobs.map(job => {
+            const isReady = job.status === "ready";
+            const cancelDisabled = isReady ? "" : "disabled";
+            return `
+            <tr>
+              <td>${job.id}</td>
+              <td>${job.originalName}</td>
+              <td>${job.alias || "-"}</td>
+              <td>${job.targetClientName || job.targetClientId || "-"}</td>
+              <td>${job.printConfig.paperSize}</td>
+              <td>${job.printConfig.copies}</td>
+              <td>${formatStatus(job.status)}</td>
+              <td>${new Date(job.createdAt).toLocaleString()}</td>
+              <td>
+                <button type="button" data-job-id="${job.id}" data-action="clone">Buat lagi</button>
+                <button type="button" data-job-id="${job.id}" data-action="cancel" ${cancelDisabled}>Batal</button>
+              </td>
+            </tr>`;
+          }).join("");
+        } catch {
+          jobsStatus.textContent = "Gagal memuat daftar job.";
+          jobsStatus.className = "status error";
+        }
       }
 
       uploadForm.addEventListener("submit", async (event) => {
@@ -510,7 +574,192 @@
         }
       }
 
+      function scheduleRealtimeReconnect() {
+        if (realtimeReconnectTimer) {
+          return;
+        }
+
+        const delayMs = Math.min(15000, 1000 * (2 ** Math.min(realtimeReconnectAttempt, 4)));
+        realtimeReconnectAttempt += 1;
+        setRealtimeStatus(`Realtime: reconnect dalam ${Math.ceil(delayMs / 1000)} detik...`, true);
+
+        realtimeReconnectTimer = setTimeout(() => {
+          realtimeReconnectTimer = null;
+          connectRealtime();
+        }, delayMs);
+      }
+
+      async function getRealtimeUrl() {
+        let realtimePath = "/ws";
+        try {
+          const res = await fetch("/api/health", { cache: "no-store" });
+          if (res.ok) {
+            const health = await res.json();
+            if (typeof health?.realtime?.path === "string" && health.realtime.path.trim().length > 0) {
+              realtimePath = health.realtime.path.trim();
+            }
+          }
+        } catch {
+          // fallback ke default /ws
+        }
+
+        if (!realtimePath.startsWith("/")) {
+          realtimePath = `/${realtimePath}`;
+        }
+
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${window.location.host}${realtimePath}`;
+      }
+
+      function shouldRefreshJobsFromEvent(message) {
+        if (!sessionId) {
+          return false;
+        }
+
+        const payload = message?.payload || {};
+        if (message.type === "session.closed") {
+          return payload.sessionId === sessionId;
+        }
+
+        if (message.type === "sessions.expired") {
+          return Array.isArray(payload.sessionIds) && payload.sessionIds.includes(sessionId);
+        }
+
+        if (payload.job && payload.job.sessionId) {
+          return payload.job.sessionId === sessionId;
+        }
+
+        if (Array.isArray(payload.jobIds)) {
+          return true;
+        }
+
+        return true;
+      }
+
+      function handleRealtimeMessage(rawMessage) {
+        let message = null;
+        try {
+          message = JSON.parse(rawMessage);
+        } catch {
+          return;
+        }
+
+        const type = message?.type;
+        if (!type) {
+          return;
+        }
+
+        switch (type) {
+          case "realtime.connected":
+          case "realtime.subscribed":
+            setRealtimeStatus("Realtime: tersambung");
+            return;
+          case "clients.snapshot":
+          case "client.upserted":
+          case "client.status.changed":
+          case "client.removed":
+            scheduleLoadClients(120);
+            return;
+          case "job.created":
+          case "job.status.changed":
+          case "job.file.removed":
+          case "jobs.removed":
+            if (shouldRefreshJobsFromEvent(message)) {
+              scheduleLoadJobs(120);
+            }
+            return;
+          case "session.closed":
+            if (shouldRefreshJobsFromEvent(message)) {
+              clearSessionState();
+              sessionStatus.textContent = "Session ditutup dari sisi server.";
+              sessionStatus.className = "status";
+              loadJobs().catch(() => {
+                // ignore transient error; fallback will retry if needed.
+              });
+            }
+            return;
+          case "sessions.expired":
+            if (shouldRefreshJobsFromEvent(message)) {
+              clearSessionState();
+              sessionStatus.textContent = "Session expired dari sisi server.";
+              sessionStatus.className = "status";
+              loadJobs().catch(() => {
+                // ignore transient error; fallback will retry if needed.
+              });
+            }
+            return;
+        }
+      }
+
+      async function connectRealtime() {
+        if (realtimeReconnectTimer) {
+          clearTimeout(realtimeReconnectTimer);
+          realtimeReconnectTimer = null;
+        }
+
+        if (realtimeSocket) {
+          try {
+            realtimeSocket.__manualClose = true;
+            realtimeSocket.close();
+          } catch {
+            // ignore close error
+          }
+          realtimeSocket = null;
+        }
+
+        const wsUrl = await getRealtimeUrl();
+        setRealtimeStatus("Realtime: menghubungkan...");
+
+        let socket = null;
+        try {
+          socket = new WebSocket(wsUrl);
+        } catch {
+          setRealtimeStatus("Realtime: gagal membuka koneksi (fallback polling aktif)", true);
+          scheduleRealtimeReconnect();
+          return;
+        }
+
+        socket.__manualClose = false;
+        realtimeSocket = socket;
+
+        socket.addEventListener("open", () => {
+          realtimeReconnectAttempt = 0;
+          setRealtimeStatus("Realtime: tersambung");
+          socket.send(JSON.stringify({ action: "subscribe", channels: ["jobs", "clients", "sessions"] }));
+          scheduleLoadClients(0);
+          scheduleLoadJobs(0);
+        });
+
+        socket.addEventListener("message", event => {
+          handleRealtimeMessage(event.data);
+        });
+
+        socket.addEventListener("error", () => {
+          setRealtimeStatus("Realtime: error (fallback polling aktif)", true);
+        });
+
+        socket.addEventListener("close", () => {
+          if (realtimeSocket === socket) {
+            realtimeSocket = null;
+          }
+          if (socket.__manualClose || realtimeManualClose) {
+            return;
+          }
+          scheduleRealtimeReconnect();
+        });
+      }
+
       window.addEventListener("beforeunload", () => {
+        realtimeManualClose = true;
+        if (realtimeSocket) {
+          try {
+            realtimeSocket.__manualClose = true;
+            realtimeSocket.close();
+          } catch {
+            // ignore close error
+          }
+        }
+
         if (!sessionId || !navigator.sendBeacon) {
           return;
         }
@@ -526,9 +775,18 @@
       }
       loadClients();
       loadJobs();
-      setInterval(loadClients, 5000);
+      connectRealtime();
+      setInterval(() => {
+        if (!isRealtimeConnected()) {
+          loadClients();
+        }
+      }, 10000);
       setInterval(heartbeatSession, 10000);
-      setInterval(loadJobs, 3000);
+      setInterval(() => {
+        if (!isRealtimeConnected()) {
+          loadJobs();
+        }
+      }, 5000);
     </script>
   </body>
 </html>

@@ -64,7 +64,8 @@ Tuning env vars for upload and storage:
 - Job list with:
   - "Buat lagi" (clone job with same file/config).
   - "Batal" (cancel job, only when status is `ready`).
-- Real-time-ish updates via polling (jobs every ~3s, clients every ~5s).
+- Web UI utama memakai WebSocket subscribe (`jobs`, `clients`, `sessions`) untuk update realtime.
+- Polling tetap ada sebagai fallback ketika koneksi WebSocket terputus.
 
 ## Client features (summary)
 
