@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1uERs5KRBkhelhbHOMwx4MMps76Uqvf1G9BINSLt9PqWdR10oIta34ykyeruQck
+\restrict DWKbz3tuK3KHOcCKcYkXLeqHfrxYWj2brxD17ySBkyT5frNfpei1cuCBO36AJQb
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -73,10 +73,10 @@ ALTER TABLE public.api_keys OWNER TO postgres;
 CREATE TABLE public.audit_logs (
     id bigint NOT NULL,
     actor_type character varying(32),
-    actor_id uuid,
+    actor_id text,
     action character varying(64),
     target_type character varying(32),
-    target_id uuid,
+    target_id text,
     detail jsonb,
     created_at timestamp with time zone DEFAULT now()
 );
@@ -116,7 +116,8 @@ CREATE TABLE public.clients (
     selected_printer character varying(120),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_seen_at timestamp with time zone NOT NULL,
-    status character varying(16) DEFAULT 'offline'::character varying NOT NULL
+    status character varying(16) DEFAULT 'offline'::character varying NOT NULL,
+    owner_user_id text
 );
 
 
@@ -184,6 +185,25 @@ CREATE TABLE public.jobs (
 ALTER TABLE public.jobs OWNER TO postgres;
 
 --
+-- Name: refresh_tokens; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.refresh_tokens (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    token_hash text NOT NULL,
+    user_agent text,
+    ip_address text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    replaced_by_token_id text
+);
+
+
+ALTER TABLE public.refresh_tokens OWNER TO postgres;
+
+--
 -- Name: sessions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -222,7 +242,8 @@ CREATE TABLE public.users (
     email character varying(255),
     password_hash text,
     role character varying(32),
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    username character varying(64)
 );
 
 
@@ -277,8 +298,8 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 -- Data for Name: clients; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status) FROM stdin;
-1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["Sipil (HP LaserJet MFP E72530)", "OneNote (Desktop)", "Microsoft Print to PDF", "HP LaserJet Professional P1102", "Fax", "Canon MG2500 series Printer", "Canon G1030 series"]	Microsoft Print to PDF	2026-03-10 11:18:49.555+08	2026-03-10 11:22:50.946+08	offline
+COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status, owner_user_id) FROM stdin;
+1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["Sipil (HP LaserJet MFP E72530)", "OneNote (Desktop)", "Microsoft Print to PDF", "HP LaserJet Professional P1102", "Fax", "Canon MG2500 series Printer", "Canon G1030 series"]	Canon G1030 series	2026-03-10 11:18:49.555+08	2026-03-10 22:09:27.734+08	offline	\N
 \.
 
 
@@ -299,6 +320,14 @@ COPY public.jobs (id, session_id, target_client_id, target_client_name, original
 
 
 --
+-- Data for Name: refresh_tokens; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.refresh_tokens (id, user_id, token_hash, user_agent, ip_address, created_at, expires_at, revoked_at, replaced_by_token_id) FROM stdin;
+\.
+
+
+--
 -- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -311,7 +340,7 @@ COPY public.sessions (id, client_id, alias, created_at, last_seen_at, status) FR
 --
 
 COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
-t	0	0	2026-03-10 11:18:20.91315+08
+t	0	0	2026-03-10 23:48:24.882927+08
 \.
 
 
@@ -319,7 +348,7 @@ t	0	0	2026-03-10 11:18:20.91315+08
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.users (id, email, password_hash, role, created_at) FROM stdin;
+COPY public.users (id, email, password_hash, role, created_at, username) FROM stdin;
 \.
 
 
@@ -342,7 +371,7 @@ SELECT pg_catalog.setval('public.audit_logs_id_seq', 1, false);
 -- Name: events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.events_id_seq', 353, true);
+SELECT pg_catalog.setval('public.events_id_seq', 369, true);
 
 
 --
@@ -391,6 +420,22 @@ ALTER TABLE ONLY public.events
 
 ALTER TABLE ONLY public.jobs
     ADD CONSTRAINT jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -445,6 +490,13 @@ CREATE INDEX idx_clients_last_seen ON public.clients USING btree (last_seen_at);
 --
 
 CREATE INDEX idx_clients_name ON public.clients USING btree (name);
+
+
+--
+-- Name: idx_clients_owner_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_clients_owner_user ON public.clients USING btree (owner_user_id);
 
 
 --
@@ -504,6 +556,27 @@ CREATE INDEX idx_jobs_target_client ON public.jobs USING btree (target_client_id
 
 
 --
+-- Name: idx_refresh_tokens_expires; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_refresh_tokens_expires ON public.refresh_tokens USING btree (expires_at);
+
+
+--
+-- Name: idx_refresh_tokens_revoked; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_refresh_tokens_revoked ON public.refresh_tokens USING btree (revoked_at);
+
+
+--
+-- Name: idx_refresh_tokens_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_refresh_tokens_user ON public.refresh_tokens USING btree (user_id);
+
+
+--
 -- Name: idx_sessions_client; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -518,11 +591,26 @@ CREATE INDEX idx_sessions_last_seen ON public.sessions USING btree (last_seen_at
 
 
 --
+-- Name: idx_users_username_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_users_username_unique ON public.users USING btree (lower((username)::text)) WHERE (username IS NOT NULL);
+
+
+--
 -- Name: api_keys api_keys_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.api_keys
     ADD CONSTRAINT api_keys_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE CASCADE;
+
+
+--
+-- Name: clients clients_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clients
+    ADD CONSTRAINT clients_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -566,6 +654,22 @@ ALTER TABLE ONLY public.jobs
 
 
 --
+-- Name: refresh_tokens refresh_tokens_replaced_by_token_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_replaced_by_token_id_fkey FOREIGN KEY (replaced_by_token_id) REFERENCES public.refresh_tokens(id) ON DELETE SET NULL;
+
+
+--
+-- Name: refresh_tokens refresh_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: sessions sessions_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -593,5 +697,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1uERs5KRBkhelhbHOMwx4MMps76Uqvf1G9BINSLt9PqWdR10oIta34ykyeruQck
+\unrestrict DWKbz3tuK3KHOcCKcYkXLeqHfrxYWj2brxD17ySBkyT5frNfpei1cuCBO36AJQb
 
