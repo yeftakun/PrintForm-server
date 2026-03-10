@@ -17,7 +17,11 @@ const { toPublicClient } = require("../utils/publicMapper");
 const { withClientStatus } = require("../services/status");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { createInMemoryRateLimiter } = require("../middleware/rateLimiter");
-const { notifyClientUpserted, notifyClientRemoved } = require("../services/realtime");
+const {
+  notifyClientUpserted,
+  notifyClientRemoved,
+  isClientRealtimeConnected
+} = require("../services/realtime");
 
 const router = express.Router();
 
@@ -62,7 +66,18 @@ const heartbeatRateLimiter = createInMemoryRateLimiter({
 
 router.get("/", asyncHandler(async (req, res) => {
   const clients = await getClients();
-  res.json(clients.map(withClientStatus).map(toPublicClient));
+  const payload = clients.map(client => {
+    const withStatusClient = withClientStatus(client);
+    if (isClientRealtimeConnected(client.id)) {
+      return toPublicClient({
+        ...withStatusClient,
+        status: "online"
+      });
+    }
+    return toPublicClient(withStatusClient);
+  });
+
+  res.json(payload);
 }));
 
 router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {

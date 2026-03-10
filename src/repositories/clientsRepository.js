@@ -2,14 +2,8 @@ const { useDb } = require("../config");
 const { readClients, writeClients } = require("../storage/jsonStore");
 const { query, withTransaction } = require("../db");
 
-async function getClients() {
-  if (!useDb) {
-    return readClients();
-  }
-  const res = await query(
-    "select id, name, printers, selected_printer, created_at, last_seen_at, status from clients order by created_at desc"
-  );
-  return res.rows.map(row => ({
+function mapClientRow(row) {
+  return {
     id: row.id,
     name: row.name,
     printers: row.printers || [],
@@ -17,7 +11,17 @@ async function getClients() {
     createdAt: row.created_at?.toISOString?.() || row.created_at,
     lastSeen: row.last_seen_at?.toISOString?.() || row.last_seen_at,
     status: row.status || "offline"
-  }));
+  };
+}
+
+async function getClients() {
+  if (!useDb) {
+    return readClients();
+  }
+  const res = await query(
+    "select id, name, printers, selected_printer, created_at, last_seen_at, status from clients order by created_at desc"
+  );
+  return res.rows.map(mapClientRow);
 }
 
 async function saveClients(clients) {
@@ -95,6 +99,62 @@ async function updateClientStatuses(statusById = {}) {
   return entries.length;
 }
 
+async function updateClientPresence(clientId, { status, lastSeen } = {}) {
+  const normalizedClientId = String(clientId || "").trim();
+  if (!normalizedClientId) {
+    return null;
+  }
+
+  const normalizedStatus = typeof status === "string"
+    ? status.trim().toLowerCase()
+    : null;
+  const safeStatus = (normalizedStatus === "online" || normalizedStatus === "offline")
+    ? normalizedStatus
+    : null;
+
+  const parsedLastSeen = lastSeen ? new Date(lastSeen) : null;
+  const safeLastSeen = parsedLastSeen && Number.isFinite(parsedLastSeen.getTime())
+    ? parsedLastSeen
+    : null;
+
+  if (!safeStatus && !safeLastSeen) {
+    return null;
+  }
+
+  if (!useDb) {
+    const clients = await readClients();
+    const client = clients.find(c => c.id === normalizedClientId);
+    if (!client) {
+      return null;
+    }
+
+    if (safeStatus) {
+      client.status = safeStatus;
+    }
+    if (safeLastSeen) {
+      client.lastSeen = safeLastSeen.toISOString();
+    }
+
+    await writeClients(clients);
+    return client;
+  }
+
+  const res = await query(
+    `UPDATE clients
+       SET status = COALESCE($2, status),
+           last_seen_at = COALESCE($3, last_seen_at)
+     WHERE id = $1
+     RETURNING id, name, printers, selected_printer, created_at, last_seen_at, status`,
+    [normalizedClientId, safeStatus, safeLastSeen]
+  );
+
+  if (!res.rows[0]) {
+    return null;
+  }
+
+  return mapClientRow(res.rows[0]);
+}
+
 async function deleteClientsByIds(ids = []) {
   if (!useDb) {
     return 0; // handled in caller for JSON mode
@@ -110,5 +170,6 @@ module.exports = {
   getClients,
   saveClients,
   deleteClientsByIds,
-  updateClientStatuses
+  updateClientStatuses,
+  updateClientPresence
 };

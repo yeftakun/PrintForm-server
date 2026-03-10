@@ -78,6 +78,10 @@ Tuning env vars for upload and storage:
 ## Presence and rate-limit
 
 - Online/offline status is derived from `last_seen_at`/`lastSeen` and `CLIENT_TTL_MS`.
+- Realtime presence is WS-first for print clients:
+  - Print client websocket sends identity (`clientId`) on connect.
+  - Socket disconnect triggers fast offline transition after grace window (`REALTIME_CLIENT_OFFLINE_GRACE_MS`).
+  - TTL-based derivation remains as safety net for silent network failures.
 - Offline clients are not deleted immediately; stale data cleanup uses retention settings.
 - In-memory rate-limit is enabled for client endpoints:
   - `POST /api/clients/register`
@@ -87,6 +91,7 @@ Tuning env vars for upload and storage:
   - `CLIENT_REGISTER_RATE_LIMIT_MAX`
   - `CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS`
   - `CLIENT_HEARTBEAT_RATE_LIMIT_MAX`
+  - `REALTIME_CLIENT_OFFLINE_GRACE_MS`
 
 ## API summary
 

@@ -4,6 +4,11 @@ const {
 } = require("../config");
 
 function isClientOnline(client) {
+  const cachedStatus = String(client?.status || "").toLowerCase();
+  if (cachedStatus === "offline") {
+    return false;
+  }
+
   const lastSeen = new Date(client.lastSeen).getTime();
   return Number.isFinite(lastSeen) && Date.now() - lastSeen <= CLIENT_TTL_MS;
 }

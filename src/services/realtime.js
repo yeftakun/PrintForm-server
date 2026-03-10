@@ -1,21 +1,32 @@
 const crypto = require("crypto");
+const { URL } = require("url");
 const { WebSocketServer, WebSocket } = require("ws");
 const {
   REALTIME_PATH,
   REALTIME_PRESENCE_SYNC_INTERVAL_MS,
-  REALTIME_PING_INTERVAL_MS
+  REALTIME_PING_INTERVAL_MS,
+  REALTIME_CLIENT_OFFLINE_GRACE_MS
 } = require("../config");
-const { getClients, updateClientStatuses } = require("../repositories/clientsRepository");
+const {
+  getClients,
+  updateClientStatuses,
+  updateClientPresence
+} = require("../repositories/clientsRepository");
 const { withClientStatus } = require("./status");
 const { toPublicClient } = require("../utils/publicMapper");
+const { normalizeClientId, isValidClientId } = require("../utils/clientId");
 
 const CHANNEL_ANY = "*";
 const DEFAULT_CHANNELS = [CHANNEL_ANY];
+const ROLE_OBSERVER = "observer";
+const ROLE_CLIENT = "client";
 
 const state = {
   wss: null,
   clientsMeta: new Map(),
   presenceByClientId: new Map(),
+  presenceSocketsByClientId: new Map(),
+  offlineTimersByClientId: new Map(),
   presenceInitialized: false,
   pingIntervalRef: null,
   presenceIntervalRef: null
@@ -47,6 +58,217 @@ function parseChannels(value) {
   }
 
   return new Set(channels);
+}
+
+function normalizeRealtimeRole(value) {
+  const role = String(value || "").trim().toLowerCase();
+  if (role === "client" || role === "print-client" || role === "printer") {
+    return ROLE_CLIENT;
+  }
+  return ROLE_OBSERVER;
+}
+
+function parseIdentityFromRequest(request) {
+  if (!request || typeof request.url !== "string") {
+    return null;
+  }
+
+  try {
+    const host = request.headers?.host || "localhost";
+    const parsedUrl = new URL(request.url, `http://${host}`);
+    const clientId = normalizeClientId(parsedUrl.searchParams.get("clientId"));
+    if (!clientId || !isValidClientId(clientId)) {
+      return null;
+    }
+
+    const role = normalizeRealtimeRole(parsedUrl.searchParams.get("role") || ROLE_CLIENT);
+    return { clientId, role };
+  } catch {
+    return null;
+  }
+}
+
+function hasActivePresenceSocket(clientId) {
+  const sockets = state.presenceSocketsByClientId.get(clientId);
+  return Boolean(sockets && sockets.size > 0);
+}
+
+function clearOfflineTransitionTimer(clientId) {
+  const existing = state.offlineTimersByClientId.get(clientId);
+  if (!existing) {
+    return;
+  }
+
+  clearTimeout(existing);
+  state.offlineTimersByClientId.delete(clientId);
+}
+
+function trackPresenceSocket(clientId, ws) {
+  clearOfflineTransitionTimer(clientId);
+
+  let sockets = state.presenceSocketsByClientId.get(clientId);
+  if (!sockets) {
+    sockets = new Set();
+    state.presenceSocketsByClientId.set(clientId, sockets);
+  }
+  sockets.add(ws);
+}
+
+function untrackPresenceSocket(clientId, ws) {
+  const sockets = state.presenceSocketsByClientId.get(clientId);
+  if (!sockets) {
+    return 0;
+  }
+
+  sockets.delete(ws);
+  if (sockets.size === 0) {
+    state.presenceSocketsByClientId.delete(clientId);
+    return 0;
+  }
+
+  return sockets.size;
+}
+
+async function markClientOnlineFromRealtime(clientId, source) {
+  const updatedClient = await updateClientPresence(clientId, {
+    status: "online",
+    lastSeen: new Date().toISOString()
+  });
+
+  if (!updatedClient) {
+    return;
+  }
+
+  const previousStatus = state.presenceByClientId.get(clientId) || null;
+  state.presenceByClientId.set(clientId, "online");
+
+  if (previousStatus !== "online") {
+    publishRealtimeEvent({
+      type: "client.status.changed",
+      channel: "clients",
+      payload: {
+        client: toPublicClient(withClientStatus(updatedClient)),
+        previousStatus,
+        currentStatus: "online",
+        source: source || "realtime-identify"
+      }
+    });
+  }
+}
+
+async function markClientOfflineFromRealtime(clientId, source) {
+  const updatedClient = await updateClientPresence(clientId, {
+    status: "offline"
+  });
+
+  if (!updatedClient) {
+    return;
+  }
+
+  const previousStatus = state.presenceByClientId.get(clientId) || null;
+  state.presenceByClientId.set(clientId, "offline");
+
+  if (previousStatus !== "offline") {
+    publishRealtimeEvent({
+      type: "client.status.changed",
+      channel: "clients",
+      payload: {
+        client: toPublicClient(withClientStatus(updatedClient)),
+        previousStatus,
+        currentStatus: "offline",
+        source: source || "realtime-disconnect"
+      }
+    });
+  }
+}
+
+function scheduleClientOfflineTransition(clientId, source) {
+  clearOfflineTransitionTimer(clientId);
+
+  const delayMs = Math.max(0, REALTIME_CLIENT_OFFLINE_GRACE_MS);
+  const timer = setTimeout(() => {
+    state.offlineTimersByClientId.delete(clientId);
+    if (hasActivePresenceSocket(clientId)) {
+      return;
+    }
+
+    markClientOfflineFromRealtime(clientId, source || "realtime-disconnect").catch(err => {
+      console.warn("Realtime offline transition failed:", err.message);
+    });
+  }, delayMs);
+
+  state.offlineTimersByClientId.set(clientId, timer);
+}
+
+async function identifySocketClient(ws, { clientId, role, source }) {
+  const meta = state.clientsMeta.get(ws);
+  if (!meta || meta.closed) {
+    return;
+  }
+
+  const normalizedClientId = normalizeClientId(clientId);
+  if (!normalizedClientId || !isValidClientId(normalizedClientId)) {
+    sendJson(ws, {
+      type: "realtime.error",
+      message: "identify requires valid clientId"
+    });
+    return;
+  }
+
+  const normalizedRole = normalizeRealtimeRole(role || ROLE_CLIENT);
+  if (normalizedRole !== ROLE_CLIENT) {
+    sendJson(ws, {
+      type: "realtime.error",
+      message: "identify role is not eligible for client presence"
+    });
+    return;
+  }
+
+  const previousClientId = meta.clientId;
+  meta.role = normalizedRole;
+  meta.clientId = normalizedClientId;
+
+  if (previousClientId && previousClientId !== normalizedClientId) {
+    const remainingOldSockets = untrackPresenceSocket(previousClientId, ws);
+    if (remainingOldSockets === 0) {
+      scheduleClientOfflineTransition(previousClientId, "realtime-switch-identity");
+    }
+  }
+
+  trackPresenceSocket(normalizedClientId, ws);
+  await markClientOnlineFromRealtime(normalizedClientId, source || "realtime-identify");
+
+  sendJson(ws, {
+    type: "realtime.identified",
+    clientId: normalizedClientId,
+    role: normalizedRole,
+    source: source || "realtime-identify"
+  });
+}
+
+function cleanupSocket(ws, source) {
+  const meta = state.clientsMeta.get(ws);
+  if (!meta) {
+    return;
+  }
+
+  if (meta.closed) {
+    state.clientsMeta.delete(ws);
+    return;
+  }
+
+  meta.closed = true;
+  state.clientsMeta.delete(ws);
+
+  if (meta.clientId) {
+    const disconnectedClientId = meta.clientId;
+    meta.clientId = null;
+
+    const remainingSockets = untrackPresenceSocket(disconnectedClientId, ws);
+    if (remainingSockets === 0) {
+      scheduleClientOfflineTransition(disconnectedClientId, source || "realtime-disconnect");
+    }
+  }
 }
 
 function canReceiveChannel(meta, channel) {
@@ -91,7 +313,16 @@ function publishRealtimeEvent({ type, channel, payload }) {
 async function sendClientSnapshot(ws) {
   const clients = await getClients();
   const payload = {
-    clients: clients.map(withClientStatus).map(toPublicClient)
+    clients: clients.map(client => {
+      const withStatus = withClientStatus(client);
+      const effectiveStatus = hasActivePresenceSocket(client.id)
+        ? "online"
+        : withStatus.status;
+      return toPublicClient({
+        ...withStatus,
+        status: effectiveStatus
+      });
+    })
   };
   sendJson(ws, createEventEnvelope({
     type: "clients.snapshot",
@@ -102,30 +333,34 @@ async function sendClientSnapshot(ws) {
 
 async function syncPresence({ emitChanges }) {
   const clients = await getClients();
-  const current = clients.map(withClientStatus).map(toPublicClient);
-  const rawById = new Map(clients.map(client => [client.id, client]));
   const nextPresence = new Map();
   const cacheStatusUpdates = {};
 
-  for (const client of current) {
-    const previousStatus = state.presenceByClientId.get(client.id) || null;
-    nextPresence.set(client.id, client.status);
+  for (const rawClient of clients) {
+    const withStatus = withClientStatus(rawClient);
+    const hasSocketPresence = hasActivePresenceSocket(rawClient.id);
+    const effectiveStatus = hasSocketPresence ? "online" : withStatus.status;
+    const previousStatus = state.presenceByClientId.get(rawClient.id) || null;
 
-    const rawClient = rawById.get(client.id);
+    nextPresence.set(rawClient.id, effectiveStatus);
+
     const cachedStatus = String(rawClient?.status || "").toLowerCase();
-    if (cachedStatus !== client.status) {
-      cacheStatusUpdates[client.id] = client.status;
+    if (cachedStatus !== effectiveStatus) {
+      cacheStatusUpdates[rawClient.id] = effectiveStatus;
     }
 
-    if (emitChanges && previousStatus !== client.status) {
+    if (emitChanges && previousStatus !== effectiveStatus) {
       publishRealtimeEvent({
         type: "client.status.changed",
         channel: "clients",
         payload: {
-          client,
+          client: toPublicClient({
+            ...withStatus,
+            status: effectiveStatus
+          }),
           previousStatus,
-          currentStatus: client.status,
-          source: "presence-sync"
+          currentStatus: effectiveStatus,
+          source: hasSocketPresence ? "presence-sync-ws" : "presence-sync-ttl"
         }
       });
     }
@@ -180,7 +415,22 @@ function handleClientMessage(ws, rawData) {
     return;
   }
 
-  const action = String(parsed?.action || "").toLowerCase();
+  const action = String(parsed?.action || "").trim().toLowerCase();
+
+  if (action === "identify") {
+    identifySocketClient(ws, {
+      clientId: parsed.clientId,
+      role: parsed.role,
+      source: "realtime-identify-message"
+    }).catch(err => {
+      sendJson(ws, {
+        type: "realtime.error",
+        message: `identify failed: ${err.message}`
+      });
+    });
+    return;
+  }
+
   if (action === "subscribe") {
     const channels = parseChannels(parsed.channels);
     const meta = state.clientsMeta.get(ws);
@@ -195,6 +445,13 @@ function handleClientMessage(ws, rawData) {
   }
 
   if (action === "ping") {
+    const meta = state.clientsMeta.get(ws);
+    if (meta?.clientId) {
+      markClientOnlineFromRealtime(meta.clientId, "realtime-client-ping").catch(err => {
+        console.warn("Realtime ping presence touch failed:", err.message);
+      });
+    }
+
     sendJson(ws, {
       type: "realtime.pong",
       at: new Date().toISOString()
@@ -236,9 +493,12 @@ function initializeRealtime(server) {
     path: REALTIME_PATH
   });
 
-  wss.on("connection", ws => {
+  wss.on("connection", (ws, request) => {
     const meta = {
-      channels: new Set(DEFAULT_CHANNELS)
+      channels: new Set(DEFAULT_CHANNELS),
+      role: ROLE_OBSERVER,
+      clientId: null,
+      closed: false
     };
 
     state.clientsMeta.set(ws, meta);
@@ -262,16 +522,37 @@ function initializeRealtime(server) {
     });
 
     ws.on("close", () => {
-      state.clientsMeta.delete(ws);
+      cleanupSocket(ws, "socket-close");
     });
 
     ws.on("error", () => {
-      state.clientsMeta.delete(ws);
+      cleanupSocket(ws, "socket-error");
     });
 
     ws.on("pong", () => {
-      // Keepalive hook for future idle timeout logic.
+      const currentMeta = state.clientsMeta.get(ws);
+      if (!currentMeta?.clientId) {
+        return;
+      }
+
+      markClientOnlineFromRealtime(currentMeta.clientId, "realtime-socket-pong").catch(err => {
+        console.warn("Realtime pong presence touch failed:", err.message);
+      });
     });
+
+    const identityFromRequest = parseIdentityFromRequest(request);
+    if (identityFromRequest) {
+      identifySocketClient(ws, {
+        clientId: identityFromRequest.clientId,
+        role: identityFromRequest.role,
+        source: "realtime-identify-query"
+      }).catch(err => {
+        sendJson(ws, {
+          type: "realtime.error",
+          message: `identify failed: ${err.message}`
+        });
+      });
+    }
   });
 
   state.wss = wss;
@@ -302,8 +583,14 @@ function shutdownRealtime() {
     state.wss = null;
   }
 
+  for (const timer of state.offlineTimersByClientId.values()) {
+    clearTimeout(timer);
+  }
+
   state.clientsMeta.clear();
   state.presenceByClientId.clear();
+  state.presenceSocketsByClientId.clear();
+  state.offlineTimersByClientId.clear();
   state.presenceInitialized = false;
 }
 
@@ -368,8 +655,18 @@ function getRealtimeState() {
     enabled: Boolean(state.wss),
     path: REALTIME_PATH,
     connections: state.clientsMeta.size,
+    trackedClients: state.presenceSocketsByClientId.size,
+    clientOfflineGraceMs: REALTIME_CLIENT_OFFLINE_GRACE_MS,
     channels: ["*", "clients", "jobs", "sessions", "system"]
   };
+}
+
+function isClientRealtimeConnected(clientId) {
+  const normalizedClientId = normalizeClientId(clientId);
+  if (!normalizedClientId || !isValidClientId(normalizedClientId)) {
+    return false;
+  }
+  return hasActivePresenceSocket(normalizedClientId);
 }
 
 module.exports = {
@@ -381,5 +678,6 @@ module.exports = {
   notifyJobsRemoved,
   notifyClientUpserted,
   notifyClientRemoved,
-  getRealtimeState
+  getRealtimeState,
+  isClientRealtimeConnected
 };
