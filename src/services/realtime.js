@@ -5,7 +5,7 @@ const {
   REALTIME_PRESENCE_SYNC_INTERVAL_MS,
   REALTIME_PING_INTERVAL_MS
 } = require("../config");
-const { getClients } = require("../repositories/clientsRepository");
+const { getClients, updateClientStatuses } = require("../repositories/clientsRepository");
 const { withClientStatus } = require("./status");
 const { toPublicClient } = require("../utils/publicMapper");
 
@@ -103,11 +103,19 @@ async function sendClientSnapshot(ws) {
 async function syncPresence({ emitChanges }) {
   const clients = await getClients();
   const current = clients.map(withClientStatus).map(toPublicClient);
+  const rawById = new Map(clients.map(client => [client.id, client]));
   const nextPresence = new Map();
+  const cacheStatusUpdates = {};
 
   for (const client of current) {
     const previousStatus = state.presenceByClientId.get(client.id) || null;
     nextPresence.set(client.id, client.status);
+
+    const rawClient = rawById.get(client.id);
+    const cachedStatus = String(rawClient?.status || "").toLowerCase();
+    if (cachedStatus !== client.status) {
+      cacheStatusUpdates[client.id] = client.status;
+    }
 
     if (emitChanges && previousStatus !== client.status) {
       publishRealtimeEvent({
@@ -121,6 +129,10 @@ async function syncPresence({ emitChanges }) {
         }
       });
     }
+  }
+
+  if (Object.keys(cacheStatusUpdates).length > 0) {
+    await updateClientStatuses(cacheStatusUpdates);
   }
 
   if (emitChanges) {

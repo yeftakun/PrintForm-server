@@ -93,7 +93,8 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
       printers,
       selectedPrinter,
       createdAt: nowIso,
-      lastSeen: nowIso
+      lastSeen: nowIso,
+      status: "online"
     };
     clients.unshift(client);
   } else {
@@ -101,6 +102,7 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
     client.printers = printers;
     client.selectedPrinter = selectedPrinter;
     client.lastSeen = nowIso;
+    client.status = "online";
   }
 
   await saveClients(clients);
@@ -132,6 +134,7 @@ router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) =>
     client.selectedPrinter = selectedPrinter;
   }
   client.lastSeen = new Date().toISOString();
+  client.status = "online";
   await saveClients(clients);
   notifyClientUpserted(
     toPublicClient(withClientStatus(client)),
@@ -184,6 +187,7 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
   }
 
   client.lastSeen = new Date().toISOString();
+  client.status = "online";
   await saveClients(clients);
 
   const pings = await getPings();

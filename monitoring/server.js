@@ -8,6 +8,7 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const PORT = Number(process.env.MONITORING_PORT) || 3100;
 const DATABASE_URL = process.env.DATABASE_URL;
+const CLIENT_TTL_MS = Number(process.env.CLIENT_TTL_MS) || 2 * 60 * 1000;
 if (!DATABASE_URL) {
   throw new Error("DATABASE_URL is required for monitoring app");
 }
@@ -77,10 +78,18 @@ async function fetchSnapshot() {
     { rows: storageRows }
   ] = await Promise.all([
     pool.query(
-      `select id, name, status, selected_printer, last_seen_at
+      `select id,
+              name,
+              selected_printer,
+              last_seen_at,
+              case
+                when last_seen_at >= (now() - ($1::bigint * interval '1 millisecond')) then 'online'
+                else 'offline'
+              end as status
          from clients
          order by last_seen_at desc
-         limit 50`
+         limit 50`,
+      [CLIENT_TTL_MS]
     ),
     pool.query(
       `select id, client_id, status, created_at, last_seen_at

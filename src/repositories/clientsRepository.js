@@ -52,6 +52,49 @@ async function saveClients(clients) {
   });
 }
 
+async function updateClientStatuses(statusById = {}) {
+  const entries = Object.entries(statusById || {}).filter(([id, status]) => {
+    const normalizedId = String(id || "").trim();
+    const normalizedStatus = String(status || "").trim().toLowerCase();
+    return normalizedId.length > 0 && (normalizedStatus === "online" || normalizedStatus === "offline");
+  });
+
+  if (entries.length === 0) {
+    return 0;
+  }
+
+  if (!useDb) {
+    const clients = await readClients();
+    let changed = 0;
+    for (const client of clients) {
+      const nextStatus = statusById[client.id];
+      if (!nextStatus) {
+        continue;
+      }
+      if (client.status !== nextStatus) {
+        client.status = nextStatus;
+        changed += 1;
+      }
+    }
+
+    if (changed > 0) {
+      await writeClients(clients);
+    }
+    return changed;
+  }
+
+  await withTransaction(async client => {
+    for (const [id, status] of entries) {
+      await client.query(
+        "UPDATE clients SET status = $2 WHERE id = $1",
+        [id, status]
+      );
+    }
+  });
+
+  return entries.length;
+}
+
 async function deleteClientsByIds(ids = []) {
   if (!useDb) {
     return 0; // handled in caller for JSON mode
@@ -66,5 +109,6 @@ async function deleteClientsByIds(ids = []) {
 module.exports = {
   getClients,
   saveClients,
-  deleteClientsByIds
+  deleteClientsByIds,
+  updateClientStatuses
 };
