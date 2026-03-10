@@ -104,7 +104,7 @@ Tuning env vars for upload and storage:
 
 - Create session for a selected client (with optional sender alias).
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
-- Jika websocket client tidak sedang connected, server wajib menjalankan pending confirmation aktif (ping check) sebelum membuat session.
+- Jika websocket client tidak sedang connected, server menunggu confirmation window singkat untuk mendeteksi reconnect atau aktivitas terbaru client sebelum membuat session.
 - Upload jobs (A4/A5, copies).
 - Job list with:
   - "Buat lagi" (clone job with same file/config).

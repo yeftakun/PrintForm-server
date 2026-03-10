@@ -2,7 +2,6 @@ const express = require("express");
 const fsp = require("fs").promises;
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, updateClientPresence } = require("../repositories/clientsRepository");
-const { getPings, savePings } = require("../repositories/pingsRepository");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const {
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
@@ -36,28 +35,11 @@ function isClientAvailableForNewSession(client) {
   return Boolean(client && isClientRealtimeConnected(client.id));
 }
 
-async function enqueueConfirmationPing(clientId) {
-  const pings = await getPings();
-  if (!Array.isArray(pings[clientId])) {
-    pings[clientId] = [];
-  }
-
-  pings[clientId].push({
-    id: `session_ping_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    at: new Date().toISOString(),
-    source: "session-create-confirm"
-  });
-
-  await savePings(pings);
-}
-
 async function waitForClientConfirmation(client) {
   const timeoutMs = Math.max(0, SESSION_CREATE_CONFIRM_TIMEOUT_MS);
   const pollIntervalMs = Math.max(100, SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS);
   const startedAt = Date.now();
   const baselineLastSeenMs = getLastSeenMs(client);
-
-  await enqueueConfirmationPing(client.id);
 
   while (Date.now() - startedAt < timeoutMs) {
     await delay(pollIntervalMs);
@@ -78,7 +60,7 @@ async function waitForClientConfirmation(client) {
       return {
         ok: true,
         client: latestClient,
-        reason: "ping-confirmed"
+        reason: "activity-confirmed"
       };
     }
   }
