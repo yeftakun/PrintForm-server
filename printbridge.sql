@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wegu0LESkvvDldp6kynD7gghzy30QQyN6QYVkappXokpdlAshD7Zojh9vVuZ1Ha
+\restrict 8RI7XhXsi4TQ7wrVV4vgO2B2gPNQE3SsuuZ3o5SpKVGVdUQUQLg0LZXMHQYbI50
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -299,7 +299,6 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 --
 
 COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status, owner_user_id) FROM stdin;
-1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["Sipil (HP LaserJet MFP E72530)", "OneNote (Desktop)", "Microsoft Print to PDF", "HP LaserJet Professional P1102", "Fax", "Canon MG2500 series Printer", "Canon G1030 series"]	Canon G1030 series	2026-03-10 11:18:49.555+08	2026-03-10 22:09:27.734+08	offline	\N
 \.
 
 
@@ -340,7 +339,7 @@ COPY public.sessions (id, client_id, alias, created_at, last_seen_at, status) FR
 --
 
 COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
-t	0	0	2026-03-10 23:48:24.882927+08
+t	0	0	2026-03-12 07:23:16.068823+08
 \.
 
 
@@ -364,7 +363,7 @@ COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 1, false);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 381, true);
 
 
 --
@@ -697,5 +696,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wegu0LESkvvDldp6kynD7gghzy30QQyN6QYVkappXokpdlAshD7Zojh9vVuZ1Ha
+\unrestrict 8RI7XhXsi4TQ7wrVV4vgO2B2gPNQE3SsuuZ3o5SpKVGVdUQUQLg0LZXMHQYbI50
 
