@@ -39,6 +39,37 @@
           <div class="status" id="heroStatus"></div>
         </div>
       </section>
+
+      <section class="panel hidden" id="linkedClientsSection">
+        <div class="panel-head">
+          <h2>Client Terhubung ke Akun</h2>
+          <button class="btn btn-outline" id="refreshLinkedClientsBtn" type="button">Muat Ulang</button>
+        </div>
+        <p class="page-note">
+          Daftar berikut berisi client yang sedang terikat pada akun mitra yang login saat ini.
+          Gunakan unbind jika perangkat akan dipindahkan atau dipasangkan ulang.
+        </p>
+        <div class="status" id="linkedClientsStatus"></div>
+        <div class="table-wrap">
+          <table class="clients-table">
+            <thead>
+              <tr>
+                <th>Nama Client</th>
+                <th>Client ID</th>
+                <th>Status / Kesiapan</th>
+                <th>Printer Aktif</th>
+                <th>Terakhir Aktif</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="linkedClientsBody">
+              <tr>
+                <td colspan="6" class="muted-cell">Silakan login untuk melihat daftar client.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <div class="modal-backdrop" id="loginModalBackdrop" aria-hidden="true">
