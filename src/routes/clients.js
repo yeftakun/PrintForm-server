@@ -94,7 +94,7 @@ router.get("/", asyncHandler(async (req, res) => {
   const clients = await getClients();
   const visibleClients = req.user
     ? clients.filter(client => !client.ownerUserId || client.ownerUserId === req.user.id)
-    : clients.filter(client => !client.ownerUserId);
+    : clients.filter(client => Boolean(client.ownerUserId));
 
   const payload = visibleClients.map(client => {
     const withStatusClient = withClientStatus(client);

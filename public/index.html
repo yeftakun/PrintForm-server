@@ -157,6 +157,10 @@
       let loadJobsTimer = null;
       let realtimeManualClose = false;
 
+      async function apiFetch(input, init = {}, options = {}) {
+        return fetch(input, init);
+      }
+
       function isRealtimeConnected() {
         return Boolean(realtimeSocket && realtimeSocket.readyState === WebSocket.OPEN);
       }
@@ -232,7 +236,7 @@
         }
 
         try {
-          await fetch("/api/sessions/close", {
+          await apiFetch("/api/sessions/close", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId })
@@ -245,8 +249,15 @@
       async function loadClients() {
         const previousSelection = clientSelect.value;
         try {
-          const res = await fetch("/api/clients");
+          const res = await apiFetch("/api/clients");
           if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              clientSelect.innerHTML = '<option value="">Daftar client tidak tersedia</option>';
+              clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Daftar client tidak bisa diakses saat ini.</td></tr>';
+              clientsStatus.textContent = "Gagal memuat daftar client.";
+              clientsStatus.className = "status error";
+              return;
+            }
             throw new Error("failed to fetch clients");
           }
 
@@ -302,8 +313,13 @@
         }
 
         try {
-          const res = await fetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
+          const res = await apiFetch(`/api/jobs?sessionId=${encodeURIComponent(sessionId)}`);
           if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              jobsStatus.textContent = "Akses job untuk session ini ditolak.";
+              jobsStatus.className = "status error";
+              return;
+            }
             throw new Error("failed to fetch jobs");
           }
 
@@ -356,7 +372,7 @@
           formData.append("sessionId", sessionId);
         }
         try {
-          const res = await fetch("/api/jobs", {
+          const res = await apiFetch("/api/jobs", {
             method: "POST",
             body: formData
           });
@@ -387,13 +403,18 @@
         sessionStatus.textContent = "Membuat session...";
         sessionStatus.className = "status";
         try {
-          const res = await fetch("/api/sessions", {
+          const res = await apiFetch("/api/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ clientId, alias: senderAlias })
           });
           const body = await res.json();
           if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              sessionStatus.textContent = "Session tidak bisa dibuat untuk client ini.";
+              sessionStatus.className = "status error";
+              return;
+            }
             sessionStatus.textContent = body.error || "Gagal membuat session.";
             sessionStatus.className = "status error";
             if (body.code === "CLIENT_UNAVAILABLE") {
@@ -463,8 +484,10 @@
           jobsStatus.textContent = "Membuat ulang job...";
           jobsStatus.className = "status";
           try {
-            const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
-              method: "POST"
+            const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId })
             });
             const body = await res.json();
             if (!res.ok) {
@@ -489,10 +512,10 @@
           jobsStatus.textContent = "Membatalkan job...";
           jobsStatus.className = "status";
           try {
-            const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
+            const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "canceled" })
+              body: JSON.stringify({ status: "canceled", sessionId })
             });
             const body = await res.json();
             if (!res.ok) {
@@ -525,7 +548,7 @@
         clientsStatus.className = "status";
 
         try {
-          const res = await fetch(`/api/clients/${clientId}/ping`, { method: "POST" });
+          const res = await apiFetch(`/api/clients/${clientId}/ping`, { method: "POST" });
           if (!res.ok) {
             clientsStatus.textContent = "Gagal mengirim ping.";
             clientsStatus.className = "status error";
@@ -544,7 +567,7 @@
         }
 
         try {
-          const res = await fetch("/api/sessions/heartbeat", {
+          const res = await apiFetch("/api/sessions/heartbeat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId })
@@ -595,7 +618,7 @@
       async function getRealtimeUrl() {
         let realtimePath = "/ws";
         try {
-          const res = await fetch("/api/health", { cache: "no-store" });
+          const res = await apiFetch("/api/health", { cache: "no-store" }, { retry: false });
           if (res.ok) {
             const health = await res.json();
             if (typeof health?.realtime?.path === "string" && health.realtime.path.trim().length > 0) {
@@ -763,12 +786,26 @@
           }
         }
 
-        if (!sessionId || !navigator.sendBeacon) {
+        if (!sessionId) {
           return;
         }
+
         const payload = JSON.stringify({ sessionId });
-        const blob = new Blob([payload], { type: "application/json" });
-        navigator.sendBeacon("/api/sessions/close", blob);
+
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: "application/json" });
+          navigator.sendBeacon("/api/sessions/close", blob);
+          return;
+        }
+
+        void fetch("/api/sessions/close", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true
+        }).catch(() => {
+          // ignore
+        });
       });
 
       setSessionUi(Boolean(sessionId));

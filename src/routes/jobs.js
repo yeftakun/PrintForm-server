@@ -104,6 +104,24 @@ function canAccessClientId(accessibleClientIds, clientId) {
   return Boolean(clientId) && accessibleClientIds.has(clientId);
 }
 
+function getRequestSessionId(req) {
+  const bodySessionId = typeof req.body?.sessionId === "string"
+    ? req.body.sessionId.trim()
+    : "";
+  if (bodySessionId) {
+    return bodySessionId;
+  }
+
+  const querySessionId = typeof req.query?.sessionId === "string"
+    ? req.query.sessionId.trim()
+    : "";
+  if (querySessionId) {
+    return querySessionId;
+  }
+
+  return null;
+}
+
 const upload = multer({
   dest: filesDir,
   limits: {
@@ -156,6 +174,23 @@ router.get("/", asyncHandler(async (req, res) => {
 
   if (accessibleClientIds) {
     jobs = jobs.filter(job => canAccessClientId(accessibleClientIds, job.targetClientId));
+  } else {
+    const guestSessionId = typeof req.query.sessionId === "string"
+      ? req.query.sessionId.trim()
+      : "";
+    if (!guestSessionId) {
+      res.json([]);
+      return;
+    }
+
+    const sessions = await getSessions();
+    const session = sessions.find(item => item.id === guestSessionId);
+    if (!session || !isSessionActive(session)) {
+      res.json([]);
+      return;
+    }
+
+    jobs = jobs.filter(job => job.sessionId === guestSessionId);
   }
 
   if (req.query.clientId) {
@@ -172,6 +207,11 @@ router.get("/", asyncHandler(async (req, res) => {
 
 router.get("/:id", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
   const jobs = await getJobs();
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
@@ -190,6 +230,11 @@ router.get("/:id", asyncHandler(async (req, res) => {
 
 router.get("/:id/download", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
   const jobs = await getJobs();
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
@@ -222,8 +267,21 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     return;
   }
 
+  const requestSessionId = getRequestSessionId(req);
+  if (!req.user) {
+    if (!requestSessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+
+    if (requestSessionId !== sourceJob.sessionId) {
+      res.status(403).json({ error: "Job does not belong to the current session" });
+      return;
+    }
+  }
+
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (!canAccessClientId(accessibleClientIds, sourceJob.targetClientId)) {
+  if (req.user && !canAccessClientId(accessibleClientIds, sourceJob.targetClientId)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -235,7 +293,12 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     return;
   }
 
-  if (!canAccessClientId(accessibleClientIds, session.clientId)) {
+  if (!req.user && requestSessionId && requestSessionId !== session.id) {
+    res.status(403).json({ error: "Session mismatch" });
+    return;
+  }
+
+  if (req.user && !canAccessClientId(accessibleClientIds, session.clientId)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -333,6 +396,24 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   if (!ALLOWED_JOB_STATUSES.has(normalizedStatus)) {
     res.status(400).json({ error: "Unsupported status" });
     return;
+  }
+
+  const requestSessionId = getRequestSessionId(req);
+  if (!req.user) {
+    if (!requestSessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+
+    if (requestSessionId !== job.sessionId) {
+      res.status(403).json({ error: "Job does not belong to the current session" });
+      return;
+    }
+
+    if (normalizedStatus !== "canceled") {
+      res.status(403).json({ error: "Guest can only cancel jobs" });
+      return;
+    }
   }
 
   const previousStatus = job.status;

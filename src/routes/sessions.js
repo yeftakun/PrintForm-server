@@ -93,17 +93,17 @@ router.post("/", asyncHandler(async (req, res) => {
     return;
   }
 
-  if (req.user && client.ownerUserId && client.ownerUserId !== req.user.id) {
-    res.status(403).json({ error: "Client belongs to another account" });
-    return;
-  }
-
-  if (req.user && !client.ownerUserId) {
+  if (!client.ownerUserId) {
     res.status(409).json({
       error: "Client belum login dan belum dikenali oleh akun manapun.",
       code: "CLIENT_UNRECOGNIZED",
       clientId: client.id
     });
+    return;
+  }
+
+  if (req.user && client.ownerUserId && client.ownerUserId !== req.user.id) {
+    res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
 

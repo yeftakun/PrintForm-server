@@ -1,9 +1,9 @@
 const express = require("express");
 const path = require("path");
-const { AUTH_ENFORCE, rootDir } = require("./config");
+const { rootDir } = require("./config");
 const { requestLogger } = require("./middleware/requestLogger");
 const { errorHandler } = require("./middleware/errorHandler");
-const { optionalAuth, requireAuth } = require("./middleware/auth");
+const { optionalAuth } = require("./middleware/auth");
 const healthRouter = require("./routes/health");
 const authRouter = require("./routes/auth");
 const clientsRouter = require("./routes/clients");
@@ -23,10 +23,10 @@ function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
 
-  const protectedApiMiddleware = AUTH_ENFORCE ? requireAuth : optionalAuth;
+  // Customer flow on `/` is guest-first; routes still receive `req.user` when bearer token exists.
   app.use("/api/clients", optionalAuth, clientsRouter);
-  app.use("/api/sessions", protectedApiMiddleware, sessionsRouter);
-  app.use("/api/jobs", protectedApiMiddleware, jobsRouter);
+  app.use("/api/sessions", optionalAuth, sessionsRouter);
+  app.use("/api/jobs", optionalAuth, jobsRouter);
 
   app.use(errorHandler);
 
