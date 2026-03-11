@@ -18,3 +18,4 @@ Ceritanya ini pelanggan yang mau ngeprint dokumennya di kois percetakan (aplikas
 3. komputer percetakan yang sudah terinstall aplikasi client menerima job tersebut di aplikasinya itu.
 4. Operator percetakan tinggal menekan print untuk melakukan print karena file ataupun segala konfigurasinya sudah diatur pelanggan.
 5. Selesai.
+
