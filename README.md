@@ -231,4 +231,5 @@ Related realtime env vars:
 ## Notes
 
 - Step 7 authentication is now available (local account + JWT access/refresh token).
+- Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
 - For stricter privacy, you can shorten the orphan cleanup grace period or delete files immediately after successful print.

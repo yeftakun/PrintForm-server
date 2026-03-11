@@ -22,6 +22,7 @@ const {
   notifyClientRemoved,
   isClientRealtimeConnected
 } = require("../services/realtime");
+const { getActorFromRequest, writeAuditLogSafe } = require("../services/audit");
 
 const router = express.Router();
 
@@ -150,6 +151,20 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   }
 
   await saveClients(clients);
+
+  const actor = getActorFromRequest(req, "client");
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: isNewClient ? "client.registered" : "client.updated",
+    targetType: "client",
+    targetId: client.id,
+    detail: {
+      clientId: client.id,
+      clientName: client.name || null
+    }
+  });
+
   notifyClientUpserted(
     toPublicClient(withClientStatus(client)),
     isNewClient ? "register-created" : "register-updated"
@@ -277,6 +292,19 @@ router.post("/unregister", asyncHandler(async (req, res) => {
   const removed = clients.length - next.length;
   if (removed > 0) {
     await saveClients(next);
+
+    const actor = getActorFromRequest(req, "client");
+    await writeAuditLogSafe({
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "client.unregistered",
+      targetType: "client",
+      targetId: clientId,
+      detail: {
+        removed
+      }
+    });
+
     notifyClientRemoved(clientId, "unregister");
   }
   res.json({ ok: true, removed });

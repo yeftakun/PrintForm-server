@@ -18,6 +18,7 @@ const {
   publishRealtimeEvent,
   isClientRealtimeConnected
 } = require("../services/realtime");
+const { getActorFromRequest, writeAuditLogSafe } = require("../services/audit");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const router = express.Router();
@@ -141,6 +142,21 @@ router.post("/", asyncHandler(async (req, res) => {
 
   sessions.unshift(session);
   await saveSessions(sessions);
+
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "session.created",
+    targetType: "session",
+    targetId: session.id,
+    detail: {
+      clientId: session.clientId,
+      availabilitySource,
+      alias: session.alias || null
+    }
+  });
+
   res.json({
     ...session,
     availabilitySource
@@ -229,6 +245,19 @@ router.post("/close", asyncHandler(async (req, res) => {
     channel: "sessions",
     payload: {
       sessionId,
+      removedJobs: removedJobIds.length
+    }
+  });
+
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "session.closed",
+    targetType: "session",
+    targetId: sessionId,
+    detail: {
+      clientId: targetSession?.clientId || null,
       removedJobs: removedJobIds.length
     }
   });

@@ -23,6 +23,7 @@ const {
   notifyJobStatusChanged,
   publishRealtimeEvent
 } = require("../services/realtime");
+const { getActorFromRequest, writeAuditLogSafe } = require("../services/audit");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const ALLOWED_MIME_TYPES = new Set(
@@ -283,6 +284,21 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     jobs.unshift(clonedJob);
     await saveJobs(jobs);
     await refreshStorageUsageSnapshot(jobs);
+
+    const actor = getActorFromRequest(req);
+    await writeAuditLogSafe({
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "job.cloned",
+      targetType: "job",
+      targetId: clonedJob.id,
+      detail: {
+        sourceJobId: sourceJob.id,
+        clientId: clonedJob.targetClientId || null,
+        sessionId: clonedJob.sessionId || null
+      }
+    });
+
     const publicClonedJob = toPublicJob(clonedJob);
     notifyJobCreated(publicClonedJob, "clone");
     res.status(201).json(publicClonedJob);
@@ -342,6 +358,22 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   job.status = normalizedStatus;
   await saveJobs(jobs);
   await refreshStorageUsageSnapshot(jobs);
+
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "job.status.changed",
+    targetType: "job",
+    targetId: job.id,
+    detail: {
+      previousStatus,
+      nextStatus: normalizedStatus,
+      clientId: job.targetClientId || null,
+      sessionId: job.sessionId || null
+    }
+  });
+
   const publicJob = toPublicJob(job);
   notifyJobStatusChanged(publicJob, previousStatus);
   res.json(publicJob);
@@ -426,6 +458,21 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     jobs.unshift(job);
     await saveJobs(jobs);
     await refreshStorageUsageSnapshot(jobs);
+
+    const actor = getActorFromRequest(req);
+    await writeAuditLogSafe({
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "job.created",
+      targetType: "job",
+      targetId: job.id,
+      detail: {
+        clientId: job.targetClientId || null,
+        sessionId: job.sessionId || null,
+        originalName: job.originalName || null
+      }
+    });
+
     const publicJob = toPublicJob(job);
     notifyJobCreated(publicJob, "upload");
     res.status(201).json(publicJob);

@@ -34,6 +34,7 @@ const {
 } = require("../services/auth");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { optionalAuth, requireAuth } = require("../middleware/auth");
+const { writeAuditLogSafe } = require("../services/audit");
 
 const router = express.Router();
 
@@ -160,6 +161,19 @@ router.post("/register", asyncHandler(async (req, res) => {
     role
   });
 
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: user.id,
+    action: "auth.register",
+    targetType: "user",
+    targetId: user.id,
+    detail: {
+      username: user.username || null,
+      email: user.email || null,
+      role: user.role || "user"
+    }
+  });
+
   const tokenBundle = await issueAuthTokens(user, req);
   res.status(201).json({
     user: toPublicUser(user),
@@ -191,6 +205,18 @@ router.post("/login", asyncHandler(async (req, res) => {
   }
 
   const tokenBundle = await issueAuthTokens(user, req);
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: user.id,
+    action: "auth.login",
+    targetType: "user",
+    targetId: user.id,
+    detail: {
+      identifier
+    }
+  });
+
   res.json({
     user: toPublicUser(user),
     ...toPublicTokenBundle(tokenBundle)
@@ -236,6 +262,18 @@ router.post("/refresh", asyncHandler(async (req, res) => {
     replacedByTokenId: nextTokenBundle.refreshTokenId
   });
 
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: user.id,
+    action: "auth.refresh",
+    targetType: "user",
+    targetId: user.id,
+    detail: {
+      previousRefreshTokenId: storedToken.id,
+      nextRefreshTokenId: nextTokenBundle.refreshTokenId
+    }
+  });
+
   res.json({
     user: toPublicUser(user),
     ...toPublicTokenBundle(nextTokenBundle)
@@ -249,12 +287,43 @@ router.post("/logout", asyncHandler(async (req, res) => {
     return;
   }
 
+  let logoutPayload = null;
+  try {
+    logoutPayload = verifyRefreshToken(refreshToken);
+  } catch {
+    logoutPayload = null;
+  }
+
   const revokedCount = await revokeRefreshTokenByHash(hashToken(refreshToken));
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: logoutPayload?.sub || null,
+    action: "auth.logout",
+    targetType: "user",
+    targetId: logoutPayload?.sub || null,
+    detail: {
+      revokedCount
+    }
+  });
+
   res.json({ ok: true, revokedCount });
 }));
 
 router.post("/logout-all", requireAuth, asyncHandler(async (req, res) => {
   const revokedCount = await revokeAllUserRefreshTokens(req.user.id);
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "auth.logout_all",
+    targetType: "user",
+    targetId: req.user.id,
+    detail: {
+      revokedCount
+    }
+  });
+
   res.json({ ok: true, revokedCount });
 }));
 
@@ -315,6 +384,18 @@ router.patch("/me", requireAuth, asyncHandler(async (req, res) => {
     return;
   }
 
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "user.profile.updated",
+    targetType: "user",
+    targetId: req.user.id,
+    detail: {
+      updatedUsername: hasUsername,
+      updatedEmail: hasEmail
+    }
+  });
+
   res.json({ user: toPublicUser(updatedUser) });
 }));
 
@@ -352,6 +433,17 @@ router.patch("/me/password", requireAuth, asyncHandler(async (req, res) => {
   }
 
   await revokeAllUserRefreshTokens(req.user.id);
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "user.password.updated",
+    targetType: "user",
+    targetId: req.user.id,
+    detail: {
+      refreshTokensRevoked: true
+    }
+  });
 
   res.json({
     ok: true,

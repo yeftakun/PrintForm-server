@@ -27,7 +27,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 4. Presence & rate-limit tanpa Redis — status online/offline tetap *derived* dari `last_seen_at` + TTL; rate-limit register/heartbeat dengan in-memory limiter sederhana (scope single-node). **Selesai.**
 5. File storage & privacy controls — enforce kuota 1GB, validasi MIME/size, cleanup orphan, pencatatan usage, dan mekanisme penghapusan aman pasca-cetak. **Selesai.**
 6. Realtime channel — implement WebSocket endpoint untuk push event (job masuk, status job berubah, client online/offline) ke Web UI dan .NET client. **Selesai — server + .NET client + Web UI utama realtime aktif (polling fallback tetap ada).**
-7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download, dan fondasi akun user (username/password) untuk Web UI + desktop client. **Sedang berjalan (backend auth + migrasi DB baseline sudah aktif).**
+7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download, dan fondasi akun user (username/password) untuk Web UI + desktop client. **Selesai untuk scope `PrintForm-server` (JWT + refresh token, ownership guard, hardening endpoint, audit log, dashboard mitra `/mitra`, self-service akun). Integrasi login/logout desktop dieksekusi di repo client terpisah.**
 8. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik.
 9. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai.**
 10. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
@@ -38,8 +38,10 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 2. Gunakan `access token` pendek + `refresh token` untuk Web UI dan desktop client.
 3. Tambahkan binding `owner_user_id` ke client agar identitas client tidak hanya berdasarkan GUID.
 4. Lindungi endpoint sensitif (`/api/clients/*`, `/api/sessions/*`, `/api/jobs/*`) dengan verifikasi token.
-5. Desktop client login via endpoint auth, simpan refresh token secara aman (Windows Credential Manager/DPAPI), refresh token otomatis saat access token expired.
-6. Google login dikerjakan setelah local auth stabil, sebagai provider tambahan (bukan mengganti alur token yang sudah ada).
+5. Pisahkan surface UI: halaman pelanggan print tetap di `/`, dashboard mitra auth di `/mitra/`, dan halaman pengaturan akun di `/mitra/account/`.
+6. Mitra dapat mengelola data akun sendiri: update profil (`PATCH /api/auth/me`) dan update password (`PATCH /api/auth/me/password`).
+7. Desktop client login via endpoint auth, simpan refresh token secara aman (Windows Credential Manager/DPAPI), refresh token otomatis saat access token expired (implementasi sisi client ada di repo desktop terpisah; endpoint server sudah siap).
+8. Google login dikerjakan setelah local auth stabil, sebagai provider tambahan (bukan mengganti alur token yang sudah ada).
 
 ## Pra-Realtime Stabilization
 
@@ -59,8 +61,10 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 - Cleanup check: file orphan, session expired, dan stale client berjalan sesuai interval.
 - Security check: endpoint sensitif menolak request tanpa kredensial valid.
 - Auth check web: login berhasil/gagal, refresh token, logout, dan revoke token berjalan benar.
+- Auth check mitra web: modal login/daftar, tombol akun/logout, update profil, dan update password berjalan benar di `/mitra`.
 - Auth check desktop: login user sukses, token refresh otomatis, dan request gagal jika token invalid/expired tanpa refresh.
 - Identity check: satu user bisa mengelola beberapa client GUID, audit log menyimpan `user_id` dan `client_id`.
+- Ownership guard check: akses client/session/job milik akun lain harus ditolak (`403`).
 
 ## Decisions
 
@@ -70,3 +74,4 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 - Background processing cukup internal scheduler, bukan message broker.
 - Identitas klien wajib GUID stabil; nanti bisa diikat ke akun/API key.
 - Urutan auth: local auth (username/password) dikerjakan sekarang pada Step 7, Google login menyusul sebagai fase lanjutan.
+- Pemisahan UI: `/` tetap untuk pelanggan print, sedangkan dashboard mitra dan akun berjalan di `/mitra`.
