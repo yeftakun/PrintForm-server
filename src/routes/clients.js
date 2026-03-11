@@ -44,6 +44,22 @@ function parseRequiredClientId(raw) {
   return { clientId };
 }
 
+function isOwnedByAnotherUser(client, user) {
+  if (!user || !client?.ownerUserId) {
+    return false;
+  }
+  return client.ownerUserId !== user.id;
+}
+
+function ensureClientAccess(req, res, client) {
+  if (!isOwnedByAnotherUser(client, req.user)) {
+    return true;
+  }
+
+  res.status(403).json({ error: "Client belongs to another account" });
+  return false;
+}
+
 const registerRateLimiter = createInMemoryRateLimiter({
   windowMs: CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
   maxRequests: CLIENT_REGISTER_RATE_LIMIT_MAX,
@@ -66,7 +82,11 @@ const heartbeatRateLimiter = createInMemoryRateLimiter({
 
 router.get("/", asyncHandler(async (req, res) => {
   const clients = await getClients();
-  const payload = clients.map(client => {
+  const visibleClients = req.user
+    ? clients.filter(client => !client.ownerUserId || client.ownerUserId === req.user.id)
+    : clients;
+
+  const payload = visibleClients.map(client => {
     const withStatusClient = withClientStatus(client);
     if (isClientRealtimeConnected(client.id)) {
       return toPublicClient({
@@ -101,18 +121,27 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   const isNewClient = !clients.some(c => c.id === clientId);
 
   let client = clients.find(c => c.id === clientId);
+  if (isOwnedByAnotherUser(client, req.user)) {
+    res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
   if (!client) {
     client = {
       id: clientId,
       name,
       printers,
       selectedPrinter,
+      ownerUserId: req.user?.id || null,
       createdAt: nowIso,
       lastSeen: nowIso,
       status: "online"
     };
     clients.unshift(client);
   } else {
+    if (!client.ownerUserId && req.user?.id) {
+      client.ownerUserId = req.user.id;
+    }
     client.name = name;
     client.printers = printers;
     client.selectedPrinter = selectedPrinter;
@@ -143,6 +172,13 @@ router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) =>
     res.status(404).json({ error: "Client not found" });
     return;
   }
+  if (!ensureClientAccess(req, res, client)) {
+    return;
+  }
+
+  if (!client.ownerUserId && req.user?.id) {
+    client.ownerUserId = req.user.id;
+  }
 
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, client.printers);
   if (selectedPrinter) {
@@ -170,6 +206,9 @@ router.post("/:id/ping", asyncHandler(async (req, res) => {
   const client = clients.find(c => c.id === parsedClientId.clientId);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
+    return;
+  }
+  if (!ensureClientAccess(req, res, client)) {
     return;
   }
 
@@ -200,6 +239,13 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Client not found" });
     return;
   }
+  if (!ensureClientAccess(req, res, client)) {
+    return;
+  }
+
+  if (!client.ownerUserId && req.user?.id) {
+    client.ownerUserId = req.user.id;
+  }
 
   client.lastSeen = new Date().toISOString();
   client.status = "online";
@@ -222,6 +268,11 @@ router.post("/unregister", asyncHandler(async (req, res) => {
   const { clientId } = parsedClientId;
 
   const clients = await getClients();
+  const matched = clients.find(c => c.id === clientId);
+  if (matched && !ensureClientAccess(req, res, matched)) {
+    return;
+  }
+
   const next = clients.filter(c => c.id !== clientId);
   const removed = clients.length - next.length;
   if (removed > 0) {

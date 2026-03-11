@@ -14,6 +14,16 @@ npm start
 
 Open `http://localhost:3000`.
 
+Apply Step 7 auth migration (required before enabling auth features):
+
+```powershell
+psql "$env:DATABASE_URL" -f scripts/migrations/20260310_step7_auth_baseline.sql
+```
+
+```bash
+psql "$DATABASE_URL" -f scripts/migrations/20260310_step7_auth_baseline.sql
+```
+
 ## .env Reference
 
 ### Core
@@ -22,6 +32,17 @@ Open `http://localhost:3000`.
 - `USE_DB`: `true` untuk Postgres repository, `false` untuk JSON storage.
 - `DATABASE_URL`: connection string Postgres, wajib jika `USE_DB=true`.
 - `MONITORING_PORT`: port app monitoring (optional, dipakai `monitoring/server.js`).
+
+### Authentication
+
+- Catatan: fitur auth Step 7 hanya aktif jika `USE_DB=true`.
+- `AUTH_ENFORCE`: wajibkan auth bearer untuk endpoint API utama.
+- `AUTH_ALLOW_PUBLIC_REGISTER`: izinkan register user tanpa login admin.
+- `AUTH_ACCESS_TOKEN_SECRET`: secret sign JWT access token.
+- `AUTH_REFRESH_TOKEN_SECRET`: secret sign JWT refresh token.
+- `AUTH_ACCESS_TOKEN_TTL`: masa berlaku access token (format `jsonwebtoken`).
+- `AUTH_REFRESH_TOKEN_TTL_DAYS`: masa berlaku refresh token (hari).
+- `AUTH_BCRYPT_ROUNDS`: cost hash bcrypt password.
 
 ### Storage and upload
 
@@ -151,6 +172,13 @@ Tuning env vars for upload and storage:
   - `POST /api/sessions`
   - `POST /api/sessions/heartbeat`
   - `POST /api/sessions/close`
+- Auth:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `POST /api/auth/refresh`
+  - `POST /api/auth/logout`
+  - `POST /api/auth/logout-all`
+  - `GET /api/auth/me`
 - Jobs:
   - `GET /api/jobs?sessionId=...` or `?clientId=...`
   - `GET /api/jobs/:id`

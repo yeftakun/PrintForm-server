@@ -12,6 +12,7 @@ const {
 } = require("../config");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions } = require("../repositories/sessionsRepository");
+const { getClients } = require("../repositories/clientsRepository");
 const { normalizePaperSize, normalizeCopies } = require("../utils/normalize");
 const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
@@ -72,6 +73,36 @@ async function removeFileSafe(filePath) {
   await fsp.unlink(filePath).catch(() => null);
 }
 
+function isAccessibleClientForUser(client, user) {
+  if (!user) {
+    return true;
+  }
+  if (!client?.ownerUserId) {
+    return true;
+  }
+  return client.ownerUserId === user.id;
+}
+
+async function buildAccessibleClientIdSet(user) {
+  if (!user) {
+    return null;
+  }
+
+  const clients = await getClients();
+  const ids = clients
+    .filter(client => isAccessibleClientForUser(client, user))
+    .map(client => client.id);
+
+  return new Set(ids);
+}
+
+function canAccessClientId(accessibleClientIds, clientId) {
+  if (!accessibleClientIds) {
+    return true;
+  }
+  return Boolean(clientId) && accessibleClientIds.has(clientId);
+}
+
 const upload = multer({
   dest: filesDir,
   limits: {
@@ -120,6 +151,12 @@ const router = express.Router();
 router.get("/", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   let jobs = await getJobs();
+  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+
+  if (accessibleClientIds) {
+    jobs = jobs.filter(job => canAccessClientId(accessibleClientIds, job.targetClientId));
+  }
+
   if (req.query.clientId) {
     jobs = jobs.filter(job => job.targetClientId === req.query.clientId);
   }
@@ -140,6 +177,13 @@ router.get("/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
+
+  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+  if (!canAccessClientId(accessibleClientIds, job.targetClientId)) {
+    res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
   res.json(toPublicJob(job));
 }));
 
@@ -149,6 +193,12 @@ router.get("/:id/download", asyncHandler(async (req, res) => {
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
     res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+  if (!canAccessClientId(accessibleClientIds, job.targetClientId)) {
+    res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
 
@@ -171,10 +221,21 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     return;
   }
 
+  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+  if (!canAccessClientId(accessibleClientIds, sourceJob.targetClientId)) {
+    res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
   const sessions = await getSessions();
   const session = sessions.find(s => s.id === sourceJob.sessionId);
   if (!session || !isSessionActive(session)) {
     res.status(400).json({ error: "Session is not active" });
+    return;
+  }
+
+  if (!canAccessClientId(accessibleClientIds, session.clientId)) {
+    res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
 
@@ -237,6 +298,12 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   const job = jobs.find(j => j.id === req.params.id);
   if (!job) {
     res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+  if (!canAccessClientId(accessibleClientIds, job.targetClientId)) {
+    res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
 
@@ -318,6 +385,13 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
   if (!isSessionActive(session)) {
     await removeFileSafe(req.file.path);
     res.status(400).json({ error: "Session is not active" });
+    return;
+  }
+
+  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+  if (!canAccessClientId(accessibleClientIds, session.clientId)) {
+    await removeFileSafe(req.file.path);
+    res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
 

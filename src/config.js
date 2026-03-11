@@ -12,6 +12,22 @@ function parseCsvList(value, fallback) {
   return items.length > 0 ? items : fallback;
 }
 
+function parseBoolean(value, fallback = false) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
+
 const port = Number(process.env.PORT) || 3000;
 const rootDir = path.join(__dirname, "..");
 const useDb = process.env.USE_DB === "true";
@@ -68,6 +84,14 @@ const REALTIME_PRESENCE_SYNC_INTERVAL_MS = Number(process.env.REALTIME_PRESENCE_
 const REALTIME_PING_INTERVAL_MS = Number(process.env.REALTIME_PING_INTERVAL_MS) || 30 * 1000;
 const REALTIME_CLIENT_OFFLINE_GRACE_MS = Number(process.env.REALTIME_CLIENT_OFFLINE_GRACE_MS) || 1500;
 
+const AUTH_ENFORCE = parseBoolean(process.env.AUTH_ENFORCE, false);
+const AUTH_ALLOW_PUBLIC_REGISTER = parseBoolean(process.env.AUTH_ALLOW_PUBLIC_REGISTER, true);
+const AUTH_ACCESS_TOKEN_SECRET = process.env.AUTH_ACCESS_TOKEN_SECRET || "dev-access-secret-change-me";
+const AUTH_REFRESH_TOKEN_SECRET = process.env.AUTH_REFRESH_TOKEN_SECRET || "dev-refresh-secret-change-me";
+const AUTH_ACCESS_TOKEN_TTL = process.env.AUTH_ACCESS_TOKEN_TTL || "15m";
+const AUTH_REFRESH_TOKEN_TTL_DAYS = Number(process.env.AUTH_REFRESH_TOKEN_TTL_DAYS) || 30;
+const AUTH_BCRYPT_ROUNDS = Number(process.env.AUTH_BCRYPT_ROUNDS) || 12;
+
 module.exports = {
   port,
   rootDir,
@@ -100,5 +124,12 @@ module.exports = {
   REALTIME_PATH,
   REALTIME_PRESENCE_SYNC_INTERVAL_MS,
   REALTIME_PING_INTERVAL_MS,
-  REALTIME_CLIENT_OFFLINE_GRACE_MS
+  REALTIME_CLIENT_OFFLINE_GRACE_MS,
+  AUTH_ENFORCE,
+  AUTH_ALLOW_PUBLIC_REGISTER,
+  AUTH_ACCESS_TOKEN_SECRET,
+  AUTH_REFRESH_TOKEN_SECRET,
+  AUTH_ACCESS_TOKEN_TTL,
+  AUTH_REFRESH_TOKEN_TTL_DAYS,
+  AUTH_BCRYPT_ROUNDS
 };

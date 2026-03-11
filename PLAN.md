@@ -5,6 +5,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 ## Scope Guard
 
 ### Wajib dikerjakan
+
 - PostgreSQL sebagai penyimpanan utama.
 - Realtime notifikasi memakai WebSocket/SignalR-equivalent.
 - Cleanup file/sesi/client berjalan otomatis via scheduler internal.
@@ -13,6 +14,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 - Deploy single-node dengan Docker + Nginx (TLS).
 
 ### Di luar scope saat ini (dibatalkan)
+
 - Redis dependency untuk presence/pubsub/rate-limit.
 - External message broker (RabbitMQ/BullMQ).
 - Horizontal scaling, load balancer, shared FS lintas node.
@@ -25,7 +27,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 4. Presence & rate-limit tanpa Redis — status online/offline tetap *derived* dari `last_seen_at` + TTL; rate-limit register/heartbeat dengan in-memory limiter sederhana (scope single-node). **Selesai.**
 5. File storage & privacy controls — enforce kuota 1GB, validasi MIME/size, cleanup orphan, pencatatan usage, dan mekanisme penghapusan aman pasca-cetak. **Selesai.**
 6. Realtime channel — implement WebSocket endpoint untuk push event (job masuk, status job berubah, client online/offline) ke Web UI dan .NET client. **Selesai — server + .NET client + Web UI utama realtime aktif (polling fallback tetap ada).**
-7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download, dan fondasi akun user (username/password) untuk Web UI + desktop client. **Sedang berjalan (mulai sekarang).**
+7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download, dan fondasi akun user (username/password) untuk Web UI + desktop client. **Sedang berjalan (backend auth + migrasi DB baseline sudah aktif).**
 8. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik.
 9. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai.**
 10. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.

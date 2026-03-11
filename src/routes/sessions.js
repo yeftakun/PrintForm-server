@@ -35,6 +35,13 @@ function isClientAvailableForNewSession(client) {
   return Boolean(client && isClientRealtimeConnected(client.id));
 }
 
+function isClientOwnedByAnotherUser(client, user) {
+  if (!user || !client?.ownerUserId) {
+    return false;
+  }
+  return client.ownerUserId !== user.id;
+}
+
 async function waitForClientConfirmation(client) {
   const timeoutMs = Math.max(0, SESSION_CREATE_CONFIRM_TIMEOUT_MS);
   const pollIntervalMs = Math.max(100, SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS);
@@ -82,6 +89,11 @@ router.post("/", asyncHandler(async (req, res) => {
   const client = clients.find(c => c.id === clientId);
   if (!client) {
     res.status(404).json({ error: "Client not found" });
+    return;
+  }
+
+  if (req.user && client.ownerUserId && client.ownerUserId !== req.user.id) {
+    res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
 
@@ -150,6 +162,15 @@ router.post("/heartbeat", asyncHandler(async (req, res) => {
     return;
   }
 
+  if (req.user) {
+    const clients = await getClients();
+    const sessionClient = clients.find(c => c.id === session.clientId);
+    if (isClientOwnedByAnotherUser(sessionClient, req.user)) {
+      res.status(403).json({ error: "Client belongs to another account" });
+      return;
+    }
+  }
+
   session.lastSeen = new Date().toISOString();
   await saveSessions(sessions);
   res.json({ ok: true });
@@ -163,6 +184,17 @@ router.post("/close", asyncHandler(async (req, res) => {
   }
 
   const sessions = await getSessions();
+  const targetSession = sessions.find(s => s.id === sessionId);
+
+  if (req.user && targetSession) {
+    const clients = await getClients();
+    const sessionClient = clients.find(c => c.id === targetSession.clientId);
+    if (isClientOwnedByAnotherUser(sessionClient, req.user)) {
+      res.status(403).json({ error: "Client belongs to another account" });
+      return;
+    }
+  }
+
   const remainingSessions = sessions.filter(s => s.id !== sessionId);
 
   const jobs = await getJobs();

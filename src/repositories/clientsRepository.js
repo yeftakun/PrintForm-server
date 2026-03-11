@@ -8,6 +8,7 @@ function mapClientRow(row) {
     name: row.name,
     printers: row.printers || [],
     selectedPrinter: row.selected_printer || null,
+    ownerUserId: row.owner_user_id || null,
     createdAt: row.created_at?.toISOString?.() || row.created_at,
     lastSeen: row.last_seen_at?.toISOString?.() || row.last_seen_at,
     status: row.status || "offline"
@@ -19,7 +20,7 @@ async function getClients() {
     return readClients();
   }
   const res = await query(
-    "select id, name, printers, selected_printer, created_at, last_seen_at, status from clients order by created_at desc"
+    "select id, name, printers, selected_printer, owner_user_id, created_at, last_seen_at, status from clients order by created_at desc"
   );
   return res.rows.map(mapClientRow);
 }
@@ -33,12 +34,13 @@ async function saveClients(clients) {
     for (const c of clients) {
       const printersJson = JSON.stringify(c.printers || []);
       await client.query(
-        `INSERT INTO clients (id, name, printers, selected_printer, created_at, last_seen_at, status)
-         VALUES ($1,$2,$3::jsonb,$4,COALESCE($5, now()),$6,$7)
+        `INSERT INTO clients (id, name, printers, selected_printer, owner_user_id, created_at, last_seen_at, status)
+         VALUES ($1,$2,$3::jsonb,$4,$5,COALESCE($6, now()),$7,$8)
          ON CONFLICT (id) DO UPDATE SET
            name = EXCLUDED.name,
            printers = EXCLUDED.printers,
            selected_printer = EXCLUDED.selected_printer,
+           owner_user_id = COALESCE(clients.owner_user_id, EXCLUDED.owner_user_id),
            created_at = LEAST(clients.created_at, EXCLUDED.created_at),
            last_seen_at = EXCLUDED.last_seen_at,
            status = EXCLUDED.status`,
@@ -47,6 +49,7 @@ async function saveClients(clients) {
           c.name,
           printersJson,
           c.selectedPrinter || null,
+          c.ownerUserId || null,
           c.createdAt ? new Date(c.createdAt) : null,
           c.lastSeen ? new Date(c.lastSeen) : new Date(),
           c.status || "offline"
@@ -144,7 +147,7 @@ async function updateClientPresence(clientId, { status, lastSeen } = {}) {
        SET status = COALESCE($2, status),
            last_seen_at = COALESCE($3, last_seen_at)
      WHERE id = $1
-     RETURNING id, name, printers, selected_printer, created_at, last_seen_at, status`,
+     RETURNING id, name, printers, selected_printer, owner_user_id, created_at, last_seen_at, status`,
     [normalizedClientId, safeStatus, safeLastSeen]
   );
 
