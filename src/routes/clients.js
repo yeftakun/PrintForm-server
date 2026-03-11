@@ -46,13 +46,22 @@ function parseRequiredClientId(raw) {
 }
 
 function isOwnedByAnotherUser(client, user) {
-  if (!user || !client?.ownerUserId) {
+  if (!client?.ownerUserId || !user) {
     return false;
   }
   return client.ownerUserId !== user.id;
 }
 
 function ensureClientAccess(req, res, client) {
+  if (!client?.ownerUserId) {
+    return true;
+  }
+
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required for recognized client" });
+    return false;
+  }
+
   if (!isOwnedByAnotherUser(client, req.user)) {
     return true;
   }
@@ -85,7 +94,7 @@ router.get("/", asyncHandler(async (req, res) => {
   const clients = await getClients();
   const visibleClients = req.user
     ? clients.filter(client => !client.ownerUserId || client.ownerUserId === req.user.id)
-    : clients;
+    : clients.filter(client => !client.ownerUserId);
 
   const payload = visibleClients.map(client => {
     const withStatusClient = withClientStatus(client);
@@ -122,8 +131,7 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   const isNewClient = !clients.some(c => c.id === clientId);
 
   let client = clients.find(c => c.id === clientId);
-  if (isOwnedByAnotherUser(client, req.user)) {
-    res.status(403).json({ error: "Client belongs to another account" });
+  if (client && !ensureClientAccess(req, res, client)) {
     return;
   }
 
@@ -170,7 +178,12 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
     isNewClient ? "register-created" : "register-updated"
   );
   console.log("Client register:", client.id, client.name);
-  res.json(toPublicClient(withClientStatus(client)));
+
+  const publicClient = toPublicClient(withClientStatus(client));
+  res.json({
+    ...publicClient,
+    recognized: Boolean(client.ownerUserId)
+  });
 }));
 
 router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) => {

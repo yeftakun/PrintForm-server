@@ -232,4 +232,5 @@ Related realtime env vars:
 
 - Step 7 authentication is now available (local account + JWT access/refresh token).
 - Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
+- Mode auth saat ini: client boleh melakukan onboarding koneksi awal via `/api/clients/*` tanpa token jika belum dikenali (owner belum terikat), tetapi pembuatan session/job tetap membutuhkan login; client yang belum dikenali akan ditolak untuk menerima job (`CLIENT_UNRECOGNIZED`).
 - For stricter privacy, you can shorten the orphan cleanup grace period or delete files immediately after successful print.

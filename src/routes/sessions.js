@@ -98,6 +98,15 @@ router.post("/", asyncHandler(async (req, res) => {
     return;
   }
 
+  if (req.user && !client.ownerUserId) {
+    res.status(409).json({
+      error: "Client belum login dan belum dikenali oleh akun manapun.",
+      code: "CLIENT_UNRECOGNIZED",
+      clientId: client.id
+    });
+    return;
+  }
+
   let sessionTargetClient = client;
   let availabilitySource = "initial";
 

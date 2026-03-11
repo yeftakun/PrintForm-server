@@ -24,7 +24,7 @@ function createApp() {
   app.use("/api/auth", authRouter);
 
   const protectedApiMiddleware = AUTH_ENFORCE ? requireAuth : optionalAuth;
-  app.use("/api/clients", protectedApiMiddleware, clientsRouter);
+  app.use("/api/clients", optionalAuth, clientsRouter);
   app.use("/api/sessions", protectedApiMiddleware, sessionsRouter);
   app.use("/api/jobs", protectedApiMiddleware, jobsRouter);
 
