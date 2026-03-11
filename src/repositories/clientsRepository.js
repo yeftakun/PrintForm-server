@@ -158,6 +158,46 @@ async function updateClientPresence(clientId, { status, lastSeen } = {}) {
   return mapClientRow(res.rows[0]);
 }
 
+async function updateClientOwner(clientId, ownerUserId) {
+  const normalizedClientId = String(clientId || "").trim();
+  if (!normalizedClientId) {
+    return null;
+  }
+
+  const normalizedOwnerUserId = typeof ownerUserId === "string"
+    ? ownerUserId.trim()
+    : null;
+  const safeOwnerUserId = normalizedOwnerUserId && normalizedOwnerUserId.length > 0
+    ? normalizedOwnerUserId
+    : null;
+
+  if (!useDb) {
+    const clients = await readClients();
+    const client = clients.find(item => item.id === normalizedClientId);
+    if (!client) {
+      return null;
+    }
+
+    client.ownerUserId = safeOwnerUserId;
+    await writeClients(clients);
+    return client;
+  }
+
+  const res = await query(
+    `UPDATE clients
+       SET owner_user_id = $2
+     WHERE id = $1
+     RETURNING id, name, printers, selected_printer, owner_user_id, created_at, last_seen_at, status`,
+    [normalizedClientId, safeOwnerUserId]
+  );
+
+  if (!res.rows[0]) {
+    return null;
+  }
+
+  return mapClientRow(res.rows[0]);
+}
+
 async function deleteClientsByIds(ids = []) {
   if (!useDb) {
     return 0; // handled in caller for JSON mode
@@ -172,6 +212,7 @@ async function deleteClientsByIds(ids = []) {
 module.exports = {
   getClients,
   saveClients,
+  updateClientOwner,
   deleteClientsByIds,
   updateClientStatuses,
   updateClientPresence

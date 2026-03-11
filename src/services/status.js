@@ -13,6 +13,21 @@ function isClientOnline(client) {
   return Number.isFinite(lastSeen) && Date.now() - lastSeen <= CLIENT_TTL_MS;
 }
 
+function isClientRecognized(client) {
+  return Boolean(client?.ownerUserId);
+}
+
+function getClientReadiness(client) {
+  if (!isClientOnline(client)) {
+    return "offline";
+  }
+  return isClientRecognized(client) ? "ready" : "not_ready";
+}
+
+function canClientAcceptJobs(client) {
+  return getClientReadiness(client) === "ready";
+}
+
 function withClientStatus(client) {
   const online = isClientOnline(client);
   return {
@@ -28,6 +43,9 @@ function isSessionActive(session) {
 
 module.exports = {
   isClientOnline,
+  isClientRecognized,
+  getClientReadiness,
+  canClientAcceptJobs,
   withClientStatus,
   isSessionActive
 };

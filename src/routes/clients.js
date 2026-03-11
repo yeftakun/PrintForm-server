@@ -1,11 +1,16 @@
 const express = require("express");
-const { getClients, saveClients } = require("../repositories/clientsRepository");
+const {
+  getClients,
+  saveClients,
+  updateClientOwner
+} = require("../repositories/clientsRepository");
 const { getPings, savePings } = require("../repositories/pingsRepository");
 const {
   CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
   CLIENT_REGISTER_RATE_LIMIT_MAX,
   CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS,
-  CLIENT_HEARTBEAT_RATE_LIMIT_MAX
+  CLIENT_HEARTBEAT_RATE_LIMIT_MAX,
+  CLIENT_LIST_INCLUDE_UNRECOGNIZED
 } = require("../config");
 const {
   normalizeName,
@@ -16,6 +21,7 @@ const { normalizeClientId, isValidClientId } = require("../utils/clientId");
 const { toPublicClient } = require("../utils/publicMapper");
 const { withClientStatus } = require("../services/status");
 const { asyncHandler } = require("../utils/asyncHandler");
+const { requireAuth } = require("../middleware/auth");
 const { createInMemoryRateLimiter } = require("../middleware/rateLimiter");
 const {
   notifyClientUpserted,
@@ -92,9 +98,12 @@ const heartbeatRateLimiter = createInMemoryRateLimiter({
 
 router.get("/", asyncHandler(async (req, res) => {
   const clients = await getClients();
-  const visibleClients = req.user
-    ? clients.filter(client => !client.ownerUserId || client.ownerUserId === req.user.id)
-    : clients.filter(client => Boolean(client.ownerUserId));
+  let visibleClients = clients;
+  if (req.user) {
+    visibleClients = clients.filter(client => !client.ownerUserId || client.ownerUserId === req.user.id);
+  } else if (!CLIENT_LIST_INCLUDE_UNRECOGNIZED) {
+    visibleClients = clients.filter(client => Boolean(client.ownerUserId));
+  }
 
   const payload = visibleClients.map(client => {
     const withStatusClient = withClientStatus(client);
@@ -285,6 +294,61 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
   await savePings(pings);
   console.log("Client ping poll:", client.id, "items:", items.length);
   res.json({ items });
+}));
+
+router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
+  const parsedClientId = parseRequiredClientId(req.params.id);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
+    return;
+  }
+
+  const clients = await getClients();
+  const client = clients.find(c => c.id === parsedClientId.clientId);
+  if (!client) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+
+  if (!client.ownerUserId) {
+    res.status(409).json({ error: "Client is already unbound" });
+    return;
+  }
+
+  const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+  if (client.ownerUserId !== req.user.id && !isAdmin) {
+    res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
+  const previousOwnerUserId = client.ownerUserId;
+  const updatedClient = await updateClientOwner(client.id, null);
+  if (!updatedClient) {
+    res.status(500).json({ error: "Failed to unbind client" });
+    return;
+  }
+
+  const actor = getActorFromRequest(req, "user");
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "client.unbound",
+    targetType: "client",
+    targetId: client.id,
+    detail: {
+      previousOwnerUserId
+    }
+  });
+
+  notifyClientUpserted(
+    toPublicClient(withClientStatus(updatedClient)),
+    "owner-unbound"
+  );
+
+  res.json({
+    ok: true,
+    client: toPublicClient(withClientStatus(updatedClient))
+  });
 }));
 
 router.post("/unregister", asyncHandler(async (req, res) => {

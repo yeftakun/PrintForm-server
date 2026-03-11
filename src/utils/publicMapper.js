@@ -1,3 +1,5 @@
+const { getClientReadiness, canClientAcceptJobs } = require("../services/status");
+
 function toPublicJob(job) {
   return {
     id: job.id,
@@ -14,13 +16,17 @@ function toPublicJob(job) {
 }
 
 function toPublicClient(client) {
+  const readiness = getClientReadiness(client);
   return {
     id: client.id,
     name: client.name,
     printers: client.printers,
     selectedPrinter: client.selectedPrinter || null,
     lastSeen: client.lastSeen,
-    status: client.status
+    status: client.status,
+    recognized: Boolean(client.ownerUserId),
+    readiness,
+    acceptingJobs: canClientAcceptJobs(client)
   };
 }
 

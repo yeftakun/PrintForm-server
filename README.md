@@ -69,6 +69,7 @@ psql "$DATABASE_URL" -f scripts/migrations/20260310_step7_auth_baseline.sql
 - `REALTIME_PRESENCE_SYNC_INTERVAL_MS`: interval sinkronisasi presence loop (ms).
 - `REALTIME_PING_INTERVAL_MS`: interval ping keepalive websocket (ms).
 - `REALTIME_CLIENT_OFFLINE_GRACE_MS`: grace disconnect WS sebelum client dipaksa offline (ms).
+- `CLIENT_LIST_INCLUDE_UNRECOGNIZED`: tampilkan semua client di daftar guest (`/`) untuk mode development.
 
 ### Cleanup and retention
 
@@ -130,7 +131,9 @@ Tuning env vars for upload and storage:
 ## Web UI features
 
 - Create session for a selected client (with optional sender alias).
+- Daftar client kini menampilkan status koneksi dan kesiapan (`ready` / `not_ready` / `offline`).
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
+- Create session ditolak jika target client belum recognized/login owner (`409 CLIENT_UNRECOGNIZED`).
 - Jika websocket client tidak sedang connected, server menunggu confirmation window singkat untuk mendeteksi reconnect atau aktivitas terbaru client sebelum membuat session.
 - Upload jobs (A4/A5, copies).
 - Job list with:
@@ -173,6 +176,7 @@ Tuning env vars for upload and storage:
   - `POST /api/clients/heartbeat`
   - `POST /api/clients/:id/ping`
   - `GET /api/clients/:id/ping`
+  - `POST /api/clients/:id/unbind` (auth owner/admin)
   - `POST /api/clients/unregister`
 - Sessions:
   - `POST /api/sessions`
@@ -232,5 +236,9 @@ Related realtime env vars:
 
 - Step 7 authentication is now available (local account + JWT access/refresh token).
 - Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
-- Mode auth saat ini: client boleh melakukan onboarding koneksi awal via `/api/clients/*` tanpa token jika belum dikenali (owner belum terikat), tetapi pembuatan session/job tetap membutuhkan login; client yang belum dikenali akan ditolak untuk menerima job (`CLIENT_UNRECOGNIZED`).
+- Mode auth saat ini:
+  - Desktop client wajib login agar client menjadi recognized (owner terikat).
+  - Web pelanggan di `/` tetap guest-first untuk membuat session/upload job.
+  - Client yang belum recognized tidak bisa menerima job (`CLIENT_UNRECOGNIZED`).
+  - Guest dibatasi per `sessionId` untuk aksi job (clone/cancel), sementara endpoint detail/download job tetap auth-only.
 - For stricter privacy, you can shorten the orphan cleanup grace period or delete files immediately after successful print.

@@ -104,7 +104,7 @@
           <thead>
             <tr>
               <th>Nama</th>
-              <th>Status</th>
+              <th>Status / Kesiapan</th>
               <th>Terakhir Terlihat</th>
               <th>Printer Aktif</th>
               <th>Printer</th>
@@ -269,9 +269,16 @@
           }
 
           const options = clients.map(client => {
+            const readiness = String(client.readiness || "").toLowerCase();
+            const readinessLabel = readiness === "ready"
+              ? "siap"
+              : readiness === "not_ready"
+                ? "belum login"
+                : "offline";
+            const canSelect = readiness === "ready";
             const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
-            const label = `${client.name} (${client.status})${printerLabel}`;
-            return `<option value="${client.id}">${label}</option>`;
+            const label = `${client.name} (${client.status}, ${readinessLabel})${printerLabel}`;
+            return `<option value="${client.id}"${canSelect ? "" : " disabled"}>${label}</option>`;
           }).join("");
 
           clientSelect.innerHTML = options;
@@ -292,7 +299,7 @@
           clientsBody.innerHTML = clients.map(client => `
             <tr>
               <td>${client.name}</td>
-              <td>${client.status}</td>
+              <td>${client.status} / ${client.readiness === "ready" ? "siap" : client.readiness === "not_ready" ? "belum login" : "offline"}</td>
               <td>${new Date(client.lastSeen).toLocaleString()}</td>
               <td>${client.selectedPrinter || "-"}</td>
               <td>${(client.printers || []).join(", ") || "-"}</td>
