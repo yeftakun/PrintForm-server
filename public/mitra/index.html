@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrintForm Mitra</title>
+    <link rel="stylesheet" href="/mitra/style.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <a href="/mitra/" class="brand">
+          <span class="brand-mark">M</span>
+          <span>PrintForm Mitra</span>
+        </a>
+
+        <div class="top-actions" id="guestActions">
+          <a href="/" class="btn btn-ghost">Halaman Pelanggan</a>
+          <button class="btn btn-outline" id="openLoginBtn" type="button">Login</button>
+          <button class="btn btn-primary" id="openRegisterBtn" type="button">Daftar</button>
+        </div>
+
+        <div class="top-actions hidden" id="userActions">
+          <span class="auth-chip" id="userChip">@user</span>
+          <button class="btn btn-outline" id="openAccountBtn" type="button">Akun</button>
+          <button class="btn btn-ghost" id="logoutBtn" type="button">Logout</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <h1>Selamat datang</h1>
+        <p>
+          Portal mitra untuk mengelola akun Anda. Halaman pelanggan print tetap tersedia di
+          <strong>/</strong>, sedangkan area ini dipakai untuk autentikasi dan pengaturan profil.
+        </p>
+        <div class="panel" id="heroPanel">
+          <h2>Mulai dari sini</h2>
+          <p id="heroText">Silakan login atau daftar untuk membuka pengaturan akun.</p>
+          <div class="status" id="heroStatus"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="loginModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+        <div class="modal-header">
+          <h2 id="loginModalTitle">Login Mitra</h2>
+          <button type="button" class="modal-close" data-close="loginModalBackdrop">x</button>
+        </div>
+        <form class="form" id="loginForm">
+          <label class="field">
+            <span>Username atau Email</span>
+            <input type="text" name="identifier" autocomplete="username" required>
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" autocomplete="current-password" required>
+          </label>
+          <div class="form-footer">
+            <button class="btn btn-primary" type="submit">Masuk</button>
+            <button class="btn btn-link" type="button" id="toRegisterBtn">Belum punya akun? Daftar</button>
+          </div>
+          <div class="status" id="loginStatus"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="registerModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="registerModalTitle">
+        <div class="modal-header">
+          <h2 id="registerModalTitle">Daftar Akun Mitra</h2>
+          <button type="button" class="modal-close" data-close="registerModalBackdrop">x</button>
+        </div>
+        <form class="form" id="registerForm">
+          <label class="field">
+            <span>Username</span>
+            <input type="text" name="username" minlength="3" maxlength="64" required>
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input type="email" name="email" autocomplete="email" placeholder="opsional">
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" minlength="8" autocomplete="new-password" required>
+          </label>
+          <div class="form-footer">
+            <button class="btn btn-primary" type="submit">Buat Akun</button>
+            <button class="btn btn-link" type="button" id="toLoginBtn">Sudah punya akun? Login</button>
+          </div>
+          <div class="status" id="registerStatus"></div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/mitra/auth-client.js"></script>
+    <script src="/mitra/index.js"></script>
+  </body>
+</html>

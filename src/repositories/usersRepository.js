@@ -120,11 +120,69 @@ async function createUser({ id, username, email, passwordHash, role }) {
   return mapUserRow(res.rows[0]);
 }
 
+async function updateUserProfile(userId, {
+  username,
+  email,
+  updateUsername = false,
+  updateEmail = false
+} = {}) {
+  ensureDbEnabled();
+  if (!userId) {
+    return null;
+  }
+
+  const setClauses = [];
+  const values = [userId];
+
+  if (updateUsername) {
+    values.push(username || null);
+    setClauses.push(`username = $${values.length}`);
+  }
+
+  if (updateEmail) {
+    values.push(email || null);
+    setClauses.push(`email = $${values.length}`);
+  }
+
+  if (setClauses.length === 0) {
+    return getUserById(userId);
+  }
+
+  const res = await query(
+    `UPDATE users
+        SET ${setClauses.join(", ")}
+      WHERE id = $1
+      RETURNING id, username, email, password_hash, role, created_at`,
+    values
+  );
+
+  return mapUserRow(res.rows[0]);
+}
+
+async function updateUserPasswordHash(userId, passwordHash) {
+  ensureDbEnabled();
+  if (!userId || !passwordHash) {
+    return null;
+  }
+
+  const res = await query(
+    `UPDATE users
+        SET password_hash = $2
+      WHERE id = $1
+      RETURNING id, username, email, password_hash, role, created_at`,
+    [userId, passwordHash]
+  );
+
+  return mapUserRow(res.rows[0]);
+}
+
 module.exports = {
   countUsers,
   getUserById,
   getUserByUsername,
   getUserByEmail,
   getUserByIdentifier,
-  createUser
+  createUser,
+  updateUserProfile,
+  updateUserPasswordHash
 };

@@ -14,6 +14,12 @@ npm start
 
 Open `http://localhost:3000`.
 
+UI routes:
+
+- Customer print page: `http://localhost:3000/`
+- Mitra dashboard: `http://localhost:3000/mitra/`
+- Mitra account settings: `http://localhost:3000/mitra/account/`
+
 Apply Step 7 auth migration (required before enabling auth features):
 
 ```powershell
@@ -179,6 +185,8 @@ Tuning env vars for upload and storage:
   - `POST /api/auth/logout`
   - `POST /api/auth/logout-all`
   - `GET /api/auth/me`
+  - `PATCH /api/auth/me`
+  - `PATCH /api/auth/me/password`
 - Jobs:
   - `GET /api/jobs?sessionId=...` or `?clientId=...`
   - `GET /api/jobs/:id`
@@ -222,5 +230,5 @@ Related realtime env vars:
 
 ## Notes
 
-- No authentication or encryption is implemented. This is a local prototype.
-- If you want stricter privacy, you can shorten the orphan cleanup grace period or delete files immediately after successful print.
+- Step 7 authentication is now available (local account + JWT access/refresh token).
+- For stricter privacy, you can shorten the orphan cleanup grace period or delete files immediately after successful print.

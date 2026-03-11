@@ -9,7 +9,9 @@ const {
   getUserByEmail,
   getUserByIdentifier,
   getUserById,
-  createUser
+  createUser,
+  updateUserProfile,
+  updateUserPasswordHash
 } = require("../repositories/usersRepository");
 const {
   createRefreshTokenRecord,
@@ -258,6 +260,103 @@ router.post("/logout-all", requireAuth, asyncHandler(async (req, res) => {
 
 router.get("/me", requireAuth, asyncHandler(async (req, res) => {
   res.json({ user: toPublicUser(req.user) });
+}));
+
+router.patch("/me", requireAuth, asyncHandler(async (req, res) => {
+  const hasUsername = Object.prototype.hasOwnProperty.call(req.body || {}, "username");
+  const hasEmail = Object.prototype.hasOwnProperty.call(req.body || {}, "email");
+
+  if (!hasUsername && !hasEmail) {
+    res.status(400).json({ error: "username or email is required" });
+    return;
+  }
+
+  let nextUsername = req.user.username;
+  if (hasUsername) {
+    nextUsername = normalizeUsername(req.body?.username);
+    if (!nextUsername) {
+      res.status(400).json({ error: "username must be 3-64 chars (a-z, 0-9, ., _, -)" });
+      return;
+    }
+
+    const existingByUsername = await getUserByUsername(nextUsername);
+    if (existingByUsername && existingByUsername.id !== req.user.id) {
+      res.status(409).json({ error: "username already exists" });
+      return;
+    }
+  }
+
+  let nextEmail = req.user.email;
+  if (hasEmail) {
+    nextEmail = normalizeEmail(req.body?.email);
+    if (req.body?.email && !nextEmail) {
+      res.status(400).json({ error: "email format is invalid" });
+      return;
+    }
+
+    if (nextEmail) {
+      const existingByEmail = await getUserByEmail(nextEmail);
+      if (existingByEmail && existingByEmail.id !== req.user.id) {
+        res.status(409).json({ error: "email already exists" });
+        return;
+      }
+    }
+  }
+
+  const updatedUser = await updateUserProfile(req.user.id, {
+    username: nextUsername,
+    email: nextEmail,
+    updateUsername: hasUsername,
+    updateEmail: hasEmail
+  });
+
+  if (!updatedUser) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  res.json({ user: toPublicUser(updatedUser) });
+}));
+
+router.patch("/me/password", requireAuth, asyncHandler(async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || "");
+  const newPassword = normalizePassword(req.body?.newPassword);
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "currentPassword and newPassword are required (min 8 chars)" });
+    return;
+  }
+
+  if (!req.user.passwordHash) {
+    res.status(400).json({ error: "Current password is not set for this account" });
+    return;
+  }
+
+  const currentPasswordValid = await verifyPassword(currentPassword, req.user.passwordHash);
+  if (!currentPasswordValid) {
+    res.status(401).json({ error: "Current password is invalid" });
+    return;
+  }
+
+  const isSamePassword = await verifyPassword(newPassword, req.user.passwordHash);
+  if (isSamePassword) {
+    res.status(400).json({ error: "newPassword must be different from currentPassword" });
+    return;
+  }
+
+  const nextPasswordHash = await hashPassword(newPassword);
+  const updatedUser = await updateUserPasswordHash(req.user.id, nextPasswordHash);
+  if (!updatedUser) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await revokeAllUserRefreshTokens(req.user.id);
+
+  res.json({
+    ok: true,
+    message: "Password updated. Please sign in again on other devices."
+  });
 }));
 
 module.exports = router;

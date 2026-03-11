@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Akun Mitra - PrintForm</title>
+    <link rel="stylesheet" href="/mitra/style.css">
+  </head>
+  <body>
+    <main class="page account-page">
+      <header class="topbar">
+        <a href="/mitra/" class="brand">
+          <span class="brand-mark">M</span>
+          <span>PrintForm Mitra</span>
+        </a>
+
+        <div class="top-actions">
+          <a href="/mitra/" class="btn btn-outline">Kembali</a>
+          <button class="btn btn-ghost" id="logoutBtn" type="button">Logout</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <h1>Pengaturan Akun</h1>
+        <p>Perbarui data profil dan password akun Anda secara mandiri.</p>
+        <div class="panel" id="authRequiredPanel">
+          <h2>Perlu login</h2>
+          <p>Anda belum login. Silakan kembali ke halaman mitra untuk masuk.</p>
+          <div class="status" id="authRequiredStatus"></div>
+          <div style="margin-top: 12px;">
+            <a class="btn btn-primary" href="/mitra/">Ke Halaman Mitra</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="account-grid hidden" id="accountGrid">
+        <article class="panel">
+          <h2>Profil Saya</h2>
+          <p class="page-note">Username dan email ini dipakai sebagai identitas akun mitra.</p>
+
+          <form class="form" id="profileForm" style="margin-top: 12px;">
+            <label class="field">
+              <span>Username</span>
+              <input type="text" name="username" minlength="3" maxlength="64" required>
+            </label>
+            <label class="field">
+              <span>Email</span>
+              <input type="email" name="email" placeholder="opsional">
+            </label>
+            <div class="form-footer">
+              <button type="submit" class="btn btn-primary">Simpan Profil</button>
+            </div>
+            <div class="status" id="profileStatus"></div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <h2>Ganti Password</h2>
+          <p class="page-note">Gunakan password baru yang berbeda dari password lama.</p>
+
+          <form class="form" id="passwordForm" style="margin-top: 12px;">
+            <label class="field">
+              <span>Password Saat Ini</span>
+              <input type="password" name="currentPassword" autocomplete="current-password" required>
+            </label>
+            <label class="field">
+              <span>Password Baru</span>
+              <input type="password" name="newPassword" minlength="8" autocomplete="new-password" required>
+            </label>
+            <label class="field">
+              <span>Konfirmasi Password Baru</span>
+              <input type="password" name="confirmPassword" minlength="8" autocomplete="new-password" required>
+            </label>
+            <div class="form-footer">
+              <button type="submit" class="btn btn-primary">Perbarui Password</button>
+            </div>
+            <div class="status" id="passwordStatus"></div>
+          </form>
+        </article>
+      </section>
+    </main>
+
+    <script src="/mitra/auth-client.js"></script>
+    <script src="/mitra/account/index.js"></script>
+  </body>
+</html>
