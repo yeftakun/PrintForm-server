@@ -10,8 +10,11 @@ const {
   CLIENT_REGISTER_RATE_LIMIT_MAX,
   CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS,
   CLIENT_HEARTBEAT_RATE_LIMIT_MAX,
-  CLIENT_LIST_INCLUDE_UNRECOGNIZED
+  CLIENT_LIST_INCLUDE_UNRECOGNIZED,
+  AUTH_ACCESS_TOKEN_TTL
 } = require("../config");
+const { getUserByIdentifier } = require("../repositories/usersRepository");
+const { createRefreshTokenRecord } = require("../repositories/refreshTokensRepository");
 const {
   normalizeName,
   normalizePrinters,
@@ -33,6 +36,15 @@ const {
   isClientRealtimeConnected
 } = require("../services/realtime");
 const { getActorFromRequest, writeAuditLogSafe } = require("../services/audit");
+const {
+  createOpaqueId,
+  createAccessToken,
+  createRefreshToken,
+  getRefreshTokenExpiryDate,
+  hashToken,
+  verifyPassword,
+  toPublicUser
+} = require("../services/auth");
 
 const router = express.Router();
 
@@ -53,6 +65,14 @@ function parseRequiredClientId(raw) {
     return { error: "clientId must be a valid GUID/UUID" };
   }
   return { clientId };
+}
+
+function normalizePairIdentifier(raw) {
+  return String(raw || "").trim().toLowerCase();
+}
+
+function normalizePairPassword(raw) {
+  return String(raw || "");
 }
 
 function isOwnedByAnotherUser(client, user) {
@@ -112,6 +132,48 @@ const heartbeatRateLimiter = createInMemoryRateLimiter({
   },
   errorMessage: "Too many heartbeat requests"
 });
+
+const pairRateLimiter = createInMemoryRateLimiter({
+  windowMs: CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
+  maxRequests: CLIENT_REGISTER_RATE_LIMIT_MAX,
+  keyFn: req => {
+    const clientId = normalizeClientId(req.params?.id);
+    const identifier = normalizePairIdentifier(req.body?.identifier || req.body?.username || req.body?.email);
+    if (clientId && identifier) {
+      return `pair:${clientId}:${identifier}`;
+    }
+    if (clientId) {
+      return `pair:${clientId}`;
+    }
+    return `pair-ip:${getRequesterIp(req)}`;
+  },
+  errorMessage: "Too many pairing attempts"
+});
+
+async function issueAuthTokens(user, req) {
+  const refreshTokenId = createOpaqueId("rt");
+  const accessToken = createAccessToken(user);
+  const refreshToken = createRefreshToken({ user, tokenId: refreshTokenId });
+  const refreshTokenHash = hashToken(refreshToken);
+  const refreshTokenExpiresAt = getRefreshTokenExpiryDate();
+  const requesterIp = getRequesterIp(req);
+
+  await createRefreshTokenRecord({
+    id: refreshTokenId,
+    userId: user.id,
+    tokenHash: refreshTokenHash,
+    userAgent: req.headers["user-agent"] || null,
+    ipAddress: requesterIp === "unknown" ? null : requesterIp,
+    expiresAt: refreshTokenExpiresAt
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    accessTokenTtl: AUTH_ACCESS_TOKEN_TTL,
+    refreshTokenExpiresAt: refreshTokenExpiresAt.toISOString()
+  };
+}
 
 router.get("/", asyncHandler(async (req, res) => {
   const clients = await getClients();
@@ -304,6 +366,81 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
   await savePings(pings);
   console.log("Client ping poll:", client.id, "items:", items.length);
   res.json({ items });
+}));
+
+router.post("/:id/pair", pairRateLimiter, asyncHandler(async (req, res) => {
+  const parsedClientId = parseRequiredClientId(req.params.id);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
+    return;
+  }
+
+  const identifier = normalizePairIdentifier(req.body?.identifier || req.body?.username || req.body?.email);
+  const password = normalizePairPassword(req.body?.password);
+
+  if (!identifier || !password) {
+    res.status(400).json({ error: "identifier and password are required" });
+    return;
+  }
+
+  const clients = await getClients();
+  const client = clients.find(c => c.id === parsedClientId.clientId);
+  if (!client) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+
+  const user = await getUserByIdentifier(identifier);
+  if (!user || !user.passwordHash) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
+  const validPassword = await verifyPassword(password, user.passwordHash);
+  if (!validPassword) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
+  if (client.ownerUserId && client.ownerUserId !== user.id) {
+    res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
+  const tokenBundle = await issueAuthTokens(user, req);
+  const previousOwnerUserId = client.ownerUserId || null;
+  const updatedClient = await updateClientOwner(client.id, user.id);
+  if (!updatedClient) {
+    res.status(500).json({ error: "Failed to pair client" });
+    return;
+  }
+
+  markClientRuntimeAuthenticated(updatedClient.id, user.id);
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: user.id,
+    action: "client.paired",
+    targetType: "client",
+    targetId: client.id,
+    detail: {
+      previousOwnerUserId,
+      nextOwnerUserId: user.id,
+      identifier
+    }
+  });
+
+  notifyClientUpserted(
+    toPublicClient(withClientStatus(updatedClient)),
+    "owner-paired"
+  );
+
+  res.json({
+    ok: true,
+    user: toPublicUser(user),
+    client: toPublicClient(withClientStatus(updatedClient)),
+    ...tokenBundle
+  });
 }));
 
 router.post("/:id/bind", requireAuth, asyncHandler(async (req, res) => {

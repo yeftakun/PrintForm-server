@@ -177,6 +177,7 @@ Tuning env vars for upload and storage:
   - `POST /api/clients/heartbeat`
   - `POST /api/clients/:id/ping`
   - `GET /api/clients/:id/ping`
+  - `POST /api/clients/:id/pair` (credential verify + bind + token issue)
   - `POST /api/clients/:id/bind` (auth)
   - `POST /api/clients/:id/unbind` (auth owner/admin)
   - `POST /api/clients/unregister`
@@ -239,7 +240,7 @@ Related realtime env vars:
 - Step 7 authentication is now available (local account + JWT access/refresh token).
 - Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
 - Mode auth saat ini:
-  - Binding owner ke client bersifat explicit lewat `POST /api/clients/:id/bind` (bukan auto-bind dari heartbeat/register).
+  - Binding owner ke client bersifat explicit lewat `POST /api/clients/:id/pair` (desktop pair sekali) atau `POST /api/clients/:id/bind` (flow auth bearer), bukan auto-bind dari heartbeat/register.
   - Desktop client yang sedang online tapi logout akan tampil sebagai `owned` (sudah bind, belum login aktif).
   - Web pelanggan di `/` tetap guest-first untuk membuat session/upload job.
   - Client yang belum recognized tidak bisa menerima job (`CLIENT_UNRECOGNIZED`).
