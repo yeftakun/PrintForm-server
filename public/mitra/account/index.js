@@ -5,9 +5,11 @@
 
   const profileForm = document.getElementById("profileForm");
   const passwordForm = document.getElementById("passwordForm");
+  const pinForm = document.getElementById("pinForm");
 
   const profileStatus = document.getElementById("profileStatus");
   const passwordStatus = document.getElementById("passwordStatus");
+  const pinStatus = document.getElementById("pinStatus");
 
   function setStatus(el, text, kind = "") {
     if (!el) {
@@ -132,6 +134,43 @@
     }
   }
 
+  async function onPinSubmit(event) {
+    event.preventDefault();
+    setStatus(pinStatus, "Menyimpan PIN...");
+
+    const currentPassword = String(pinForm.elements.currentPassword.value || "");
+    const pin = String(pinForm.elements.pin.value || "").trim();
+    const confirmPin = String(pinForm.elements.confirmPin.value || "").trim();
+
+    if (!/^\d{4,8}$/.test(pin)) {
+      setStatus(pinStatus, "PIN harus 4-8 digit angka.", "error");
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      setStatus(pinStatus, "Konfirmasi PIN tidak sama.", "error");
+      return;
+    }
+
+    try {
+      await window.MitraAuth.apiJson("/api/auth/me/pin", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          currentPassword,
+          pin
+        })
+      });
+
+      pinForm.reset();
+      setStatus(pinStatus, "PIN berhasil disimpan.", "success");
+    } catch (err) {
+      setStatus(pinStatus, err.message || "Gagal menyimpan PIN.", "error");
+    }
+  }
+
   async function onLogout() {
     await window.MitraAuth.logoutCurrentSession();
     window.location.href = "/mitra/";
@@ -140,6 +179,7 @@
   logoutBtn.addEventListener("click", onLogout);
   profileForm.addEventListener("submit", onProfileSubmit);
   passwordForm.addEventListener("submit", onPasswordSubmit);
+  pinForm.addEventListener("submit", onPinSubmit);
 
   loadCurrentUser();
 })();

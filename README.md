@@ -191,8 +191,10 @@ Tuning env vars for upload and storage:
   - `POST /api/auth/refresh`
   - `POST /api/auth/logout`
   - `POST /api/auth/logout-all`
+  - `POST /api/auth/verify-pin`
   - `GET /api/auth/me`
   - `PATCH /api/auth/me`
+  - `PATCH /api/auth/me/pin`
   - `PATCH /api/auth/me/password`
 - Jobs:
   - `GET /api/jobs?sessionId=...` or `?clientId=...`
@@ -238,6 +240,8 @@ Related realtime env vars:
 ## Notes
 
 - Step 7 authentication is now available (local account + JWT access/refresh token).
+- Step 8 adds account PIN support (`users.pin_hash`) for sensitive client-side actions (e.g. desktop unpair verification).
+  - Run migration first: `scripts/migrations/20260312_step8_account_pin.sql`.
 - Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
 - Mode auth saat ini:
   - Binding owner ke client bersifat explicit lewat `POST /api/clients/:id/pair` (desktop pair sekali) atau `POST /api/clients/:id/bind` (flow auth bearer), bukan auto-bind dari heartbeat/register.

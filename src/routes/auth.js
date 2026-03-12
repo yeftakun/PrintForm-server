@@ -11,7 +11,8 @@ const {
   getUserById,
   createUser,
   updateUserProfile,
-  updateUserPasswordHash
+  updateUserPasswordHash,
+  updateUserPinHash
 } = require("../repositories/usersRepository");
 const {
   createRefreshTokenRecord,
@@ -70,6 +71,14 @@ function normalizePassword(value) {
     return null;
   }
   return password;
+}
+
+function normalizePin(value) {
+  const pin = String(value || "").trim();
+  if (!/^\d{4,8}$/.test(pin)) {
+    return null;
+  }
+  return pin;
 }
 
 function getRequesterIp(req) {
@@ -449,6 +458,68 @@ router.patch("/me/password", requireAuth, asyncHandler(async (req, res) => {
     ok: true,
     message: "Password updated. Please sign in again on other devices."
   });
+}));
+
+router.patch("/me/pin", requireAuth, asyncHandler(async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || "");
+  const pin = normalizePin(req.body?.pin);
+
+  if (!currentPassword || !pin) {
+    res.status(400).json({ error: "currentPassword and pin are required (pin 4-8 digit)" });
+    return;
+  }
+
+  if (!req.user.passwordHash) {
+    res.status(400).json({ error: "Current password is not set for this account" });
+    return;
+  }
+
+  const currentPasswordValid = await verifyPassword(currentPassword, req.user.passwordHash);
+  if (!currentPasswordValid) {
+    res.status(401).json({ error: "Current password is invalid" });
+    return;
+  }
+
+  const pinHash = await hashPassword(pin);
+  const updatedUser = await updateUserPinHash(req.user.id, pinHash);
+  if (!updatedUser) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "user.pin.updated",
+    targetType: "user",
+    targetId: req.user.id,
+    detail: {
+      pinLength: pin.length
+    }
+  });
+
+  res.json({ ok: true, message: "PIN updated" });
+}));
+
+router.post("/verify-pin", requireAuth, asyncHandler(async (req, res) => {
+  const pin = normalizePin(req.body?.pin);
+  if (!pin) {
+    res.status(400).json({ error: "pin is required (4-8 digit)" });
+    return;
+  }
+
+  if (!req.user.pinHash) {
+    res.status(409).json({ error: "PIN akun belum diatur. Atur PIN di halaman akun mitra." });
+    return;
+  }
+
+  const valid = await verifyPassword(pin, req.user.pinHash);
+  if (!valid) {
+    res.status(401).json({ error: "PIN tidak valid" });
+    return;
+  }
+
+  res.json({ ok: true });
 }));
 
 module.exports = router;

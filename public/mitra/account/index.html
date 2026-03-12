@@ -77,6 +77,30 @@
             <div class="status" id="passwordStatus"></div>
           </form>
         </article>
+
+        <article class="panel">
+          <h2>PIN Akun</h2>
+          <p class="page-note">PIN ini dipakai untuk verifikasi aksi sensitif seperti Lepas Pairing dari desktop client.</p>
+
+          <form class="form" id="pinForm" style="margin-top: 12px;">
+            <label class="field">
+              <span>Password Saat Ini</span>
+              <input type="password" name="currentPassword" autocomplete="current-password" required>
+            </label>
+            <label class="field">
+              <span>PIN Baru (4-8 digit)</span>
+              <input type="password" name="pin" minlength="4" maxlength="8" inputmode="numeric" pattern="[0-9]{4,8}" required>
+            </label>
+            <label class="field">
+              <span>Konfirmasi PIN</span>
+              <input type="password" name="confirmPin" minlength="4" maxlength="8" inputmode="numeric" pattern="[0-9]{4,8}" required>
+            </label>
+            <div class="form-footer">
+              <button type="submit" class="btn btn-primary">Simpan PIN</button>
+            </div>
+            <div class="status" id="pinStatus"></div>
+          </form>
+        </article>
       </section>
     </main>
 
