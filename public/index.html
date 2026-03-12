@@ -272,9 +272,11 @@
             const readiness = String(client.readiness || "").toLowerCase();
             const readinessLabel = readiness === "ready"
               ? "siap"
-              : readiness === "not_ready"
-                ? "belum login"
-                : "offline";
+              : readiness === "owned"
+                ? "sudah bind (logout)"
+                : readiness === "unowned" || readiness === "not_ready"
+                  ? "belum bind"
+                  : "offline";
             const canSelect = readiness === "ready";
             const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
             const label = `${client.name} (${client.status}, ${readinessLabel})${printerLabel}`;
@@ -299,7 +301,7 @@
           clientsBody.innerHTML = clients.map(client => `
             <tr>
               <td>${client.name}</td>
-              <td>${client.status} / ${client.readiness === "ready" ? "siap" : client.readiness === "not_ready" ? "belum login" : "offline"}</td>
+              <td>${client.status} / ${client.readiness === "ready" ? "siap" : client.readiness === "owned" ? "sudah bind (logout)" : (client.readiness === "unowned" || client.readiness === "not_ready") ? "belum bind" : "offline"}</td>
               <td>${new Date(client.lastSeen).toLocaleString()}</td>
               <td>${client.selectedPrinter || "-"}</td>
               <td>${(client.printers || []).join(", ") || "-"}</td>

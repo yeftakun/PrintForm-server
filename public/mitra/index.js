@@ -59,8 +59,11 @@
     if (normalized === "ready") {
       return "siap";
     }
-    if (normalized === "not_ready") {
-      return "belum login";
+    if (normalized === "owned") {
+      return "sudah bind (logout)";
+    }
+    if (normalized === "unowned" || normalized === "not_ready") {
+      return "belum bind";
     }
     return "offline";
   }

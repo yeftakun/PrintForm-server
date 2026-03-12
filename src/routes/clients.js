@@ -19,7 +19,11 @@ const {
 } = require("../utils/normalize");
 const { normalizeClientId, isValidClientId } = require("../utils/clientId");
 const { toPublicClient } = require("../utils/publicMapper");
-const { withClientStatus } = require("../services/status");
+const {
+  withClientStatus,
+  markClientRuntimeAuthenticated,
+  markClientRuntimeUnauthenticated
+} = require("../services/status");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireAuth } = require("../middleware/auth");
 const { createInMemoryRateLimiter } = require("../middleware/rateLimiter");
@@ -58,14 +62,9 @@ function isOwnedByAnotherUser(client, user) {
   return client.ownerUserId !== user.id;
 }
 
-function ensureClientAccess(req, res, client) {
-  if (!client?.ownerUserId) {
+function ensureClientOwnerMatch(req, res, client) {
+  if (!client?.ownerUserId || !req.user) {
     return true;
-  }
-
-  if (!req.user) {
-    res.status(401).json({ error: "Authentication required for recognized client" });
-    return false;
   }
 
   if (!isOwnedByAnotherUser(client, req.user)) {
@@ -74,6 +73,24 @@ function ensureClientAccess(req, res, client) {
 
   res.status(403).json({ error: "Client belongs to another account" });
   return false;
+}
+
+function syncClientRuntimeAuth(client, user) {
+  if (!client?.id) {
+    return;
+  }
+
+  if (!client.ownerUserId) {
+    markClientRuntimeUnauthenticated(client.id);
+    return;
+  }
+
+  if (user?.id && user.id === client.ownerUserId) {
+    markClientRuntimeAuthenticated(client.id, user.id);
+    return;
+  }
+
+  markClientRuntimeUnauthenticated(client.id);
 }
 
 const registerRateLimiter = createInMemoryRateLimiter({
@@ -140,7 +157,7 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
   const isNewClient = !clients.some(c => c.id === clientId);
 
   let client = clients.find(c => c.id === clientId);
-  if (client && !ensureClientAccess(req, res, client)) {
+  if (client && !ensureClientOwnerMatch(req, res, client)) {
     return;
   }
 
@@ -150,22 +167,21 @@ router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {
       name,
       printers,
       selectedPrinter,
-      ownerUserId: req.user?.id || null,
+      ownerUserId: null,
       createdAt: nowIso,
       lastSeen: nowIso,
       status: "online"
     };
     clients.unshift(client);
   } else {
-    if (!client.ownerUserId && req.user?.id) {
-      client.ownerUserId = req.user.id;
-    }
     client.name = name;
     client.printers = printers;
     client.selectedPrinter = selectedPrinter;
     client.lastSeen = nowIso;
     client.status = "online";
   }
+
+  syncClientRuntimeAuth(client, req.user);
 
   await saveClients(clients);
 
@@ -209,12 +225,8 @@ router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) =>
     res.status(404).json({ error: "Client not found" });
     return;
   }
-  if (!ensureClientAccess(req, res, client)) {
+  if (!ensureClientOwnerMatch(req, res, client)) {
     return;
-  }
-
-  if (!client.ownerUserId && req.user?.id) {
-    client.ownerUserId = req.user.id;
   }
 
   const selectedPrinter = normalizeSelectedPrinter(req.body?.selectedPrinter, client.printers);
@@ -223,6 +235,7 @@ router.post("/heartbeat", heartbeatRateLimiter, asyncHandler(async (req, res) =>
   }
   client.lastSeen = new Date().toISOString();
   client.status = "online";
+  syncClientRuntimeAuth(client, req.user);
   await saveClients(clients);
   notifyClientUpserted(
     toPublicClient(withClientStatus(client)),
@@ -245,7 +258,7 @@ router.post("/:id/ping", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Client not found" });
     return;
   }
-  if (!ensureClientAccess(req, res, client)) {
+  if (!ensureClientOwnerMatch(req, res, client)) {
     return;
   }
 
@@ -276,16 +289,13 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Client not found" });
     return;
   }
-  if (!ensureClientAccess(req, res, client)) {
+  if (!ensureClientOwnerMatch(req, res, client)) {
     return;
-  }
-
-  if (!client.ownerUserId && req.user?.id) {
-    client.ownerUserId = req.user.id;
   }
 
   client.lastSeen = new Date().toISOString();
   client.status = "online";
+  syncClientRuntimeAuth(client, req.user);
   await saveClients(clients);
 
   const pings = await getPings();
@@ -294,6 +304,60 @@ router.get("/:id/ping", asyncHandler(async (req, res) => {
   await savePings(pings);
   console.log("Client ping poll:", client.id, "items:", items.length);
   res.json({ items });
+}));
+
+router.post("/:id/bind", requireAuth, asyncHandler(async (req, res) => {
+  const parsedClientId = parseRequiredClientId(req.params.id);
+  if (parsedClientId.error) {
+    res.status(400).json({ error: parsedClientId.error });
+    return;
+  }
+
+  const clients = await getClients();
+  const client = clients.find(c => c.id === parsedClientId.clientId);
+  if (!client) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+
+  const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+  if (client.ownerUserId && client.ownerUserId !== req.user.id && !isAdmin) {
+    res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
+  const previousOwnerUserId = client.ownerUserId || null;
+  const nextOwnerUserId = req.user.id;
+  const updatedClient = await updateClientOwner(client.id, nextOwnerUserId);
+  if (!updatedClient) {
+    res.status(500).json({ error: "Failed to bind client" });
+    return;
+  }
+
+  markClientRuntimeAuthenticated(updatedClient.id, nextOwnerUserId);
+
+  const actor = getActorFromRequest(req, "user");
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "client.bound",
+    targetType: "client",
+    targetId: client.id,
+    detail: {
+      previousOwnerUserId,
+      nextOwnerUserId
+    }
+  });
+
+  notifyClientUpserted(
+    toPublicClient(withClientStatus(updatedClient)),
+    "owner-bound"
+  );
+
+  res.json({
+    ok: true,
+    client: toPublicClient(withClientStatus(updatedClient))
+  });
 }));
 
 router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
@@ -328,6 +392,8 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
     return;
   }
 
+  markClientRuntimeUnauthenticated(updatedClient.id);
+
   const actor = getActorFromRequest(req, "user");
   await writeAuditLogSafe({
     actorType: actor.actorType,
@@ -361,13 +427,14 @@ router.post("/unregister", asyncHandler(async (req, res) => {
 
   const clients = await getClients();
   const matched = clients.find(c => c.id === clientId);
-  if (matched && !ensureClientAccess(req, res, matched)) {
+  if (matched && !ensureClientOwnerMatch(req, res, matched)) {
     return;
   }
 
   const next = clients.filter(c => c.id !== clientId);
   const removed = clients.length - next.length;
   if (removed > 0) {
+    markClientRuntimeUnauthenticated(clientId);
     await saveClients(next);
 
     const actor = getActorFromRequest(req, "client");

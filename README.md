@@ -131,9 +131,10 @@ Tuning env vars for upload and storage:
 ## Web UI features
 
 - Create session for a selected client (with optional sender alias).
-- Daftar client kini menampilkan status koneksi dan kesiapan (`ready` / `not_ready` / `offline`).
+- Daftar client kini menampilkan status koneksi dan kesiapan (`ready` / `owned` / `unowned` / `offline`).
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
 - Create session ditolak jika target client belum recognized/login owner (`409 CLIENT_UNRECOGNIZED`).
+- Create session ditolak jika client sudah bind akun tetapi desktop client belum login aktif (`409 CLIENT_NOT_READY`).
 - Jika websocket client tidak sedang connected, server menunggu confirmation window singkat untuk mendeteksi reconnect atau aktivitas terbaru client sebelum membuat session.
 - Upload jobs (A4/A5, copies).
 - Job list with:
@@ -176,6 +177,7 @@ Tuning env vars for upload and storage:
   - `POST /api/clients/heartbeat`
   - `POST /api/clients/:id/ping`
   - `GET /api/clients/:id/ping`
+  - `POST /api/clients/:id/bind` (auth)
   - `POST /api/clients/:id/unbind` (auth owner/admin)
   - `POST /api/clients/unregister`
 - Sessions:
@@ -237,8 +239,10 @@ Related realtime env vars:
 - Step 7 authentication is now available (local account + JWT access/refresh token).
 - Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
 - Mode auth saat ini:
-  - Desktop client wajib login agar client menjadi recognized (owner terikat).
+  - Binding owner ke client bersifat explicit lewat `POST /api/clients/:id/bind` (bukan auto-bind dari heartbeat/register).
+  - Desktop client yang sedang online tapi logout akan tampil sebagai `owned` (sudah bind, belum login aktif).
   - Web pelanggan di `/` tetap guest-first untuk membuat session/upload job.
   - Client yang belum recognized tidak bisa menerima job (`CLIENT_UNRECOGNIZED`).
+  - Client recognized namun belum login aktif ditolak saat create session (`CLIENT_NOT_READY`).
   - Guest dibatasi per `sessionId` untuk aksi job (clone/cancel), sementara endpoint detail/download job tetap auth-only.
 - For stricter privacy, you can shorten the orphan cleanup grace period or delete files immediately after successful print.

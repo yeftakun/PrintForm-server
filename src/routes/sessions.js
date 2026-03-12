@@ -8,7 +8,7 @@ const {
   SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS
 } = require("../config");
 const { normalizeAlias } = require("../utils/normalize");
-const { isClientOnline, withClientStatus } = require("../services/status");
+const { isClientOnline, withClientStatus, getClientReadiness } = require("../services/status");
 const { toPublicClient } = require("../utils/publicMapper");
 const { cleanupExpiredSessions } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
@@ -93,10 +93,25 @@ router.post("/", asyncHandler(async (req, res) => {
     return;
   }
 
-  if (!client.ownerUserId) {
+  const normalizedClient = withClientStatus(client);
+  const readiness = getClientReadiness({
+    ...normalizedClient,
+    status: isClientRealtimeConnected(client.id) ? "online" : normalizedClient.status
+  });
+
+  if (readiness === "unowned") {
     res.status(409).json({
       error: "Client belum login dan belum dikenali oleh akun manapun.",
       code: "CLIENT_UNRECOGNIZED",
+      clientId: client.id
+    });
+    return;
+  }
+
+  if (readiness === "owned") {
+    res.status(409).json({
+      error: "Client sudah terikat akun, tetapi desktop client belum login aktif.",
+      code: "CLIENT_NOT_READY",
       clientId: client.id
     });
     return;
