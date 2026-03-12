@@ -33,6 +33,8 @@
               <th>ID</th>
               <th>Name</th>
               <th>Status</th>
+              <th>Owner User</th>
+              <th>Recognized</th>
               <th>Selected Printer</th>
               <th>Last Seen</th>
             </tr>
@@ -55,6 +57,8 @@
               <th>Status</th>
               <th>Client</th>
               <th>Original Name</th>
+              <th>Paper</th>
+              <th>Copies</th>
               <th>Size</th>
               <th>Created</th>
             </tr>
@@ -75,6 +79,7 @@
             <tr>
               <th>ID</th>
               <th>Client</th>
+              <th>Alias</th>
               <th>Status</th>
               <th>Created</th>
               <th>Last Seen</th>
@@ -130,20 +135,22 @@
 
     <section class="panel">
       <div class="panel-head">
-        <h2>API Keys (latest 50)</h2>
-        <span id="apikeys-count" class="muted"></span>
+        <h2>Refresh Tokens (latest 50)</h2>
+        <span id="refresh-count" class="muted"></span>
       </div>
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
               <th>ID</th>
-              <th>Client</th>
+              <th>User</th>
+              <th>Expires</th>
+              <th>Revoked</th>
               <th>Created</th>
-              <th>Last Used</th>
+              <th>Replaced By</th>
             </tr>
           </thead>
-          <tbody id="apikeys-body"></tbody>
+          <tbody id="refresh-body"></tbody>
         </table>
       </div>
     </section>
@@ -158,33 +165,14 @@
           <thead>
             <tr>
               <th>ID</th>
+              <th>Username</th>
               <th>Email</th>
               <th>Role</th>
+              <th>PIN</th>
               <th>Created</th>
             </tr>
           </thead>
           <tbody id="users-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Websocket Subscriptions (latest 50)</h2>
-        <span id="ws-count" class="muted"></span>
-      </div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Client</th>
-              <th>User</th>
-              <th>Channel</th>
-              <th>Connected</th>
-            </tr>
-          </thead>
-          <tbody id="ws-body"></tbody>
         </table>
       </div>
     </section>
@@ -211,12 +199,10 @@
     const eventsCount = document.getElementById('events-count');
     const auditBody = document.getElementById('audit-body');
     const auditCount = document.getElementById('audit-count');
-    const apiKeysBody = document.getElementById('apikeys-body');
-    const apiKeysCount = document.getElementById('apikeys-count');
+    const refreshBody = document.getElementById('refresh-body');
+    const refreshCount = document.getElementById('refresh-count');
     const usersBody = document.getElementById('users-body');
     const usersCount = document.getElementById('users-count');
-    const wsBody = document.getElementById('ws-body');
-    const wsCount = document.getElementById('ws-count');
     const storageCards = document.getElementById('storage-cards');
     const storageMeta = document.getElementById('storage-meta');
 
@@ -242,8 +228,10 @@
     function renderCards(summary, generatedAt) {
       const items = [
         { label: 'Clients Online', value: `${summary.clientsOnline}/${summary.clientsTotal}` },
+        { label: 'Clients Recognized', value: summary.clientsRecognized || 0 },
         { label: 'Sessions', value: summary.sessionsTotal },
         { label: 'Jobs', value: summary.jobsTotal },
+        { label: 'Refresh Tokens Active', value: `${summary.refreshTokensActive || 0}/${summary.refreshTokensTotal || 0}` },
         { label: 'Generated', value: formatter.format(new Date(generatedAt)) }
       ];
       cards.innerHTML = items.map(item => `
@@ -261,8 +249,10 @@
           <td title="${c.id}">${c.id}</td>
           <td>${c.name || ''}</td>
           <td><span class="badge ${c.status === 'online' ? 'green' : 'gray'}">${c.status || ''}</span></td>
+          <td title="${c.ownerUserId || ''}">${c.ownerUserId || ''}</td>
+          <td><span class="badge ${c.recognized ? 'blue' : 'gray'}">${c.recognized ? 'yes' : 'no'}</span></td>
           <td>${c.selectedPrinter || ''}</td>
-          <td>${c.lastSeenAt ? formatter.format(new Date(c.lastSeenAt)) : ''}</td>
+          <td>${formatDateSafe(c.lastSeenAt)}</td>
         </tr>
       `).join('');
     }
@@ -275,8 +265,10 @@
           <td>${j.status || ''}</td>
           <td title="${j.targetClientId || ''}">${j.targetClientName || j.targetClientId || ''}</td>
           <td>${j.originalName || ''}</td>
+          <td>${j.paperSize || ''}</td>
+          <td>${j.copies || ''}</td>
           <td>${j.sizeBytes ? sizeFmt.format(j.sizeBytes / 1024) + ' KB' : ''}</td>
-          <td>${j.createdAt ? formatter.format(new Date(j.createdAt)) : ''}</td>
+          <td>${formatDateSafe(j.createdAt)}</td>
         </tr>
       `).join('');
     }
@@ -287,9 +279,10 @@
         <tr>
           <td title="${s.id}">${s.id}</td>
           <td title="${s.clientId || ''}">${s.clientId || ''}</td>
+          <td>${s.alias || ''}</td>
           <td><span class="badge ${s.status === 'active' ? 'green' : 'gray'}">${s.status || ''}</span></td>
-          <td>${s.createdAt ? formatter.format(new Date(s.createdAt)) : ''}</td>
-          <td>${s.lastSeenAt ? formatter.format(new Date(s.lastSeenAt)) : ''}</td>
+          <td>${formatDateSafe(s.createdAt)}</td>
+          <td>${formatDateSafe(s.lastSeenAt)}</td>
         </tr>
       `).join('');
     }
@@ -303,7 +296,7 @@
           <td title="${e.clientId || ''}">${e.clientId || ''}</td>
           <td title="${e.sessionId || ''}">${e.sessionId || ''}</td>
           <td title="${e.jobId || ''}">${e.jobId || ''}</td>
-          <td>${e.createdAt ? formatter.format(new Date(e.createdAt)) : ''}</td>
+          <td>${formatDateSafe(e.createdAt)}</td>
         </tr>
       `).join('');
     }
@@ -316,19 +309,21 @@
           <td>${a.actorType || ''}${a.actorId ? ` (${a.actorId})` : ''}</td>
           <td>${a.action || ''}</td>
           <td>${a.targetType || ''}${a.targetId ? ` (${a.targetId})` : ''}</td>
-          <td>${a.createdAt ? formatter.format(new Date(a.createdAt)) : ''}</td>
+          <td>${formatDateSafe(a.createdAt)}</td>
         </tr>
       `).join('');
     }
 
-    function renderApiKeys(list) {
-      apiKeysCount.textContent = `${list.length} shown`;
-      apiKeysBody.innerHTML = list.map(k => `
+    function renderRefreshTokens(list) {
+      refreshCount.textContent = `${list.length} shown`;
+      refreshBody.innerHTML = list.map(token => `
         <tr>
-          <td title="${k.id}">${k.id}</td>
-          <td title="${k.clientId || ''}">${k.clientId || ''}</td>
-          <td>${k.createdAt ? formatter.format(new Date(k.createdAt)) : ''}</td>
-          <td>${k.lastUsedAt ? formatter.format(new Date(k.lastUsedAt)) : ''}</td>
+          <td title="${token.id}">${token.id}</td>
+          <td title="${token.userId || ''}">${token.userId || ''}</td>
+          <td>${formatDateSafe(token.expiresAt)}</td>
+          <td>${token.revokedAt ? formatDateSafe(token.revokedAt) : ''}</td>
+          <td>${formatDateSafe(token.createdAt)}</td>
+          <td title="${token.replacedByTokenId || ''}">${token.replacedByTokenId || ''}</td>
         </tr>
       `).join('');
     }
@@ -338,22 +333,11 @@
       usersBody.innerHTML = list.map(u => `
         <tr>
           <td title="${u.id}">${u.id}</td>
+          <td>${u.username || ''}</td>
           <td>${u.email || ''}</td>
           <td>${u.role || ''}</td>
-          <td>${u.createdAt ? formatter.format(new Date(u.createdAt)) : ''}</td>
-        </tr>
-      `).join('');
-    }
-
-    function renderWs(list) {
-      wsCount.textContent = `${list.length} shown`;
-      wsBody.innerHTML = list.map(w => `
-        <tr>
-          <td title="${w.id}">${w.id}</td>
-          <td title="${w.clientId || ''}">${w.clientId || ''}</td>
-          <td title="${w.userId || ''}">${w.userId || ''}</td>
-          <td>${w.channel || ''}</td>
-          <td>${w.connectedAt ? formatter.format(new Date(w.connectedAt)) : ''}</td>
+          <td><span class="badge ${u.hasPin ? 'purple' : 'gray'}">${u.hasPin ? 'set' : 'unset'}</span></td>
+          <td>${formatDateSafe(u.createdAt)}</td>
         </tr>
       `).join('');
     }
@@ -392,9 +376,8 @@
       renderSessions(data.sessions || []);
       renderEvents(data.events || []);
       renderAudit(data.auditLogs || []);
-      renderApiKeys(data.apiKeys || []);
+      renderRefreshTokens(data.refreshTokens || []);
       renderUsers(data.users || []);
-      renderWs(data.websocketSubs || []);
       renderStorage(data.summary?.storage || null);
       setStatus('Live', true);
     }
