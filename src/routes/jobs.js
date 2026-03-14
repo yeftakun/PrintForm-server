@@ -218,6 +218,17 @@ function getRequestClientId(req) {
   return "";
 }
 
+function getRequestClaimClientId(req) {
+  const queryClaimClientId = typeof req.query?.claimClientId === "string"
+    ? req.query.claimClientId.trim()
+    : "";
+  if (queryClaimClientId) {
+    return queryClaimClientId;
+  }
+
+  return "";
+}
+
 function getRequestOwnerUserId(req) {
   const query = req?.query || {};
   const candidates = [query.ownerUserId, query.kioskId, query.accountId];
@@ -331,7 +342,12 @@ router.get("/", asyncHandler(async (req, res) => {
       return shouldIncludeJobInOwnerScope(job, ownerScopeUserId, accessibleClientIds);
     });
 
-    const claimClientId = getRequestClientId(req);
+    const claimClientId = getRequestClaimClientId(req);
+    if (claimClientId && !canAccessClientId(accessibleClientIds, claimClientId)) {
+      res.status(403).json({ error: "Client belongs to another account" });
+      return;
+    }
+
     jobs = filterJobsByClaimClient(jobs, claimClientId);
   } else {
     const guestSessionId = typeof req.query.sessionId === "string"

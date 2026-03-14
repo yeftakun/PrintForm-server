@@ -153,6 +153,7 @@ Tuning env vars for upload and storage:
 - Create session untuk kios terpilih (dengan optional sender alias).
 - Halaman pelanggan (`/`) menampilkan daftar kios berbasis akun lewat `GET /api/clients/kiosks` (hanya akun dengan minimal 1 client recognized).
 - Kios ditandai siap jika memiliki minimal 1 client `ready`; `POST /api/sessions` kini menerima `kioskId` (dengan fallback legacy `clientId`) dan server memilih target client siap milik akun tersebut.
+- Respons `POST /api/sessions` menyertakan metadata transisi (`targetSource`, `requestedKioskId`, `compatibility.legacyClientTarget`) untuk observability rollout.
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
 - Create session ditolak jika target client belum recognized/login owner (`409 CLIENT_UNRECOGNIZED`).
 - Create session ditolak jika client sudah bind akun tetapi desktop client belum login aktif (`409 CLIENT_NOT_READY`).
@@ -224,7 +225,7 @@ Tuning env vars for upload and storage:
   - `PATCH /api/auth/me/password`
 - Jobs:
   - `GET /api/jobs?sessionId=...` or `?clientId=...`
-  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `clientId` sebagai claim filter.
+  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `claimClientId` untuk view claim-aware.
   - `GET /api/jobs/:id`
   - `GET /api/jobs/:id/download`
   - `POST /api/jobs` (multipart upload)

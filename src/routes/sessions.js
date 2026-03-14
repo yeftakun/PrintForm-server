@@ -86,13 +86,22 @@ function summarizeKioskClientState(kioskClients) {
   };
 }
 
-function toSessionResponsePayload(session, availabilitySource) {
+function toSessionResponsePayload(session, availabilitySource, {
+  targetSource = "client-id",
+  requestedKioskId = null
+} = {}) {
+  const legacyClientTarget = targetSource === "client-id";
   return {
     id: session.id,
     clientId: session.clientId,
     clientName: session.clientName || null,
     ownerUserId: session.ownerUserId || null,
     kioskId: session.ownerUserId || null,
+    requestedKioskId: requestedKioskId || null,
+    targetSource,
+    compatibility: {
+      legacyClientTarget
+    },
     alias: session.alias || null,
     createdAt: session.createdAt,
     lastSeen: session.lastSeen,
@@ -310,7 +319,10 @@ router.post("/", asyncHandler(async (req, res) => {
     }
   });
 
-  res.json(toSessionResponsePayload(session, availabilitySource));
+  res.json(toSessionResponsePayload(session, availabilitySource, {
+    targetSource,
+    requestedKioskId: kioskId || null
+  }));
 }));
 
 router.post("/heartbeat", asyncHandler(async (req, res) => {
