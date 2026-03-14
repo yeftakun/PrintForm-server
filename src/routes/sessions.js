@@ -37,10 +37,33 @@ function isClientAvailableForNewSession(client) {
 }
 
 function isClientOwnedByAnotherUser(client, user) {
-  if (!user || !client?.ownerUserId) {
+  if (!user || !client) {
     return false;
   }
-  return client.ownerUserId !== user.id;
+  return isOwnerUserDifferent(client.ownerUserId, user);
+}
+
+function isOwnerUserDifferent(ownerUserId, user) {
+  if (!user || !ownerUserId) {
+    return false;
+  }
+  return ownerUserId !== user.id;
+}
+
+function resolveSessionOwnerUserId(session, client) {
+  return session?.ownerUserId || client?.ownerUserId || null;
+}
+
+function toSessionResponsePayload(session, availabilitySource) {
+  return {
+    id: session.id,
+    clientId: session.clientId,
+    clientName: session.clientName || null,
+    alias: session.alias || null,
+    createdAt: session.createdAt,
+    lastSeen: session.lastSeen,
+    availabilitySource
+  };
 }
 
 async function waitForClientConfirmation(client) {
@@ -117,7 +140,7 @@ router.post("/", asyncHandler(async (req, res) => {
     return;
   }
 
-  if (req.user && client.ownerUserId && client.ownerUserId !== req.user.id) {
+  if (isClientOwnedByAnotherUser(client, req.user)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -158,6 +181,7 @@ router.post("/", asyncHandler(async (req, res) => {
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     clientId: sessionTargetClient.id,
+    ownerUserId: sessionTargetClient.ownerUserId || null,
     clientName: sessionTargetClient.name,
     alias,
     createdAt: new Date().toISOString(),
@@ -176,15 +200,13 @@ router.post("/", asyncHandler(async (req, res) => {
     targetId: session.id,
     detail: {
       clientId: session.clientId,
+      ownerUserId: session.ownerUserId || null,
       availabilitySource,
       alias: session.alias || null
     }
   });
 
-  res.json({
-    ...session,
-    availabilitySource
-  });
+  res.json(toSessionResponsePayload(session, availabilitySource));
 }));
 
 router.post("/heartbeat", asyncHandler(async (req, res) => {
@@ -203,9 +225,14 @@ router.post("/heartbeat", asyncHandler(async (req, res) => {
   }
 
   if (req.user) {
-    const clients = await getClients();
-    const sessionClient = clients.find(c => c.id === session.clientId);
-    if (isClientOwnedByAnotherUser(sessionClient, req.user)) {
+    let ownerUserId = resolveSessionOwnerUserId(session, null);
+    if (!ownerUserId) {
+      const clients = await getClients();
+      const sessionClient = clients.find(c => c.id === session.clientId);
+      ownerUserId = resolveSessionOwnerUserId(session, sessionClient);
+    }
+
+    if (isOwnerUserDifferent(ownerUserId, req.user)) {
       res.status(403).json({ error: "Client belongs to another account" });
       return;
     }
@@ -227,9 +254,14 @@ router.post("/close", asyncHandler(async (req, res) => {
   const targetSession = sessions.find(s => s.id === sessionId);
 
   if (req.user && targetSession) {
-    const clients = await getClients();
-    const sessionClient = clients.find(c => c.id === targetSession.clientId);
-    if (isClientOwnedByAnotherUser(sessionClient, req.user)) {
+    let ownerUserId = resolveSessionOwnerUserId(targetSession, null);
+    if (!ownerUserId) {
+      const clients = await getClients();
+      const sessionClient = clients.find(c => c.id === targetSession.clientId);
+      ownerUserId = resolveSessionOwnerUserId(targetSession, sessionClient);
+    }
+
+    if (isOwnerUserDifferent(ownerUserId, req.user)) {
       res.status(403).json({ error: "Client belongs to another account" });
       return;
     }
@@ -282,6 +314,7 @@ router.post("/close", asyncHandler(async (req, res) => {
     targetId: sessionId,
     detail: {
       clientId: targetSession?.clientId || null,
+      ownerUserId: targetSession?.ownerUserId || null,
       removedJobs: removedJobIds.length
     }
   });

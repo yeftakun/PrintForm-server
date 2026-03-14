@@ -42,12 +42,14 @@ async function main() {
   const enrichedSessions = sessions.map(s => ({
     ...s,
     clientId: s.clientId,
+    ownerUserId: s.ownerUserId || null,
     status: s.status || "active"
   }));
 
   const normalizedJobs = jobs.map(j => ({
     id: j.id,
     sessionId: j.sessionId,
+    ownerUserId: j.ownerUserId || null,
     targetClientId: j.targetClientId,
     targetClientName: j.targetClientName || null,
     originalName: j.originalName,

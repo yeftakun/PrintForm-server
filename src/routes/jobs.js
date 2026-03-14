@@ -104,6 +104,40 @@ function canAccessClientId(accessibleClientIds, clientId) {
   return Boolean(clientId) && accessibleClientIds.has(clientId);
 }
 
+function canAccessOwnedResource({ ownerUserId, clientId }, user, accessibleClientIds) {
+  if (!user) {
+    return true;
+  }
+
+  if (ownerUserId) {
+    return ownerUserId === user.id;
+  }
+
+  return canAccessClientId(accessibleClientIds, clientId);
+}
+
+function canAccessSessionForUser(session, user, accessibleClientIds) {
+  return canAccessOwnedResource(
+    {
+      ownerUserId: session?.ownerUserId || null,
+      clientId: session?.clientId || null
+    },
+    user,
+    accessibleClientIds
+  );
+}
+
+function canAccessJobForUser(job, user, accessibleClientIds) {
+  return canAccessOwnedResource(
+    {
+      ownerUserId: job?.ownerUserId || null,
+      clientId: job?.targetClientId || null
+    },
+    user,
+    accessibleClientIds
+  );
+}
+
 function getRequestSessionId(req) {
   const bodySessionId = typeof req.body?.sessionId === "string"
     ? req.body.sessionId.trim()
@@ -173,7 +207,7 @@ router.get("/", asyncHandler(async (req, res) => {
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
 
   if (accessibleClientIds) {
-    jobs = jobs.filter(job => canAccessClientId(accessibleClientIds, job.targetClientId));
+    jobs = jobs.filter(job => canAccessJobForUser(job, req.user, accessibleClientIds));
   } else {
     const guestSessionId = typeof req.query.sessionId === "string"
       ? req.query.sessionId.trim()
@@ -220,7 +254,7 @@ router.get("/:id", asyncHandler(async (req, res) => {
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (!canAccessClientId(accessibleClientIds, job.targetClientId)) {
+  if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -243,7 +277,7 @@ router.get("/:id/download", asyncHandler(async (req, res) => {
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (!canAccessClientId(accessibleClientIds, job.targetClientId)) {
+  if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -281,7 +315,7 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (req.user && !canAccessClientId(accessibleClientIds, sourceJob.targetClientId)) {
+  if (req.user && !canAccessJobForUser(sourceJob, req.user, accessibleClientIds)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -298,7 +332,7 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     return;
   }
 
-  if (req.user && !canAccessClientId(accessibleClientIds, session.clientId)) {
+  if (req.user && !canAccessSessionForUser(session, req.user, accessibleClientIds)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -338,6 +372,7 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     status: "ready",
     alias: sourceJob.alias || null,
     sessionId: session.id,
+    ownerUserId: session.ownerUserId || sourceJob.ownerUserId || null,
     targetClientId: session.clientId,
     targetClientName: session.clientName,
     printConfig: sourceJob.printConfig
@@ -358,6 +393,7 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
       detail: {
         sourceJobId: sourceJob.id,
         clientId: clonedJob.targetClientId || null,
+        ownerUserId: clonedJob.ownerUserId || null,
         sessionId: clonedJob.sessionId || null
       }
     });
@@ -381,7 +417,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (!canAccessClientId(accessibleClientIds, job.targetClientId)) {
+  if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -451,6 +487,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
       previousStatus,
       nextStatus: normalizedStatus,
       clientId: job.targetClientId || null,
+      ownerUserId: job.ownerUserId || null,
       sessionId: job.sessionId || null
     }
   });
@@ -502,7 +539,7 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (!canAccessClientId(accessibleClientIds, session.clientId)) {
+  if (!canAccessSessionForUser(session, req.user, accessibleClientIds)) {
     await removeFileSafe(req.file.path);
     res.status(403).json({ error: "Client belongs to another account" });
     return;
@@ -527,6 +564,7 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     status: "ready",
     alias: session.alias || null,
     sessionId: session.id,
+    ownerUserId: session.ownerUserId || null,
     targetClientId: session.clientId,
     targetClientName: session.clientName,
     printConfig: {
@@ -549,6 +587,7 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
       targetId: job.id,
       detail: {
         clientId: job.targetClientId || null,
+        ownerUserId: job.ownerUserId || null,
         sessionId: job.sessionId || null,
         originalName: job.originalName || null
       }

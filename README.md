@@ -30,6 +30,16 @@ psql "$env:DATABASE_URL" -f scripts/migrations/20260310_step7_auth_baseline.sql
 psql "$DATABASE_URL" -f scripts/migrations/20260310_step7_auth_baseline.sql
 ```
 
+Apply Step 8a account ownership migration for sessions/jobs:
+
+```powershell
+psql "$env:DATABASE_URL" -f scripts/migrations/20260314_step8a_account_queue_ownership.sql
+```
+
+```bash
+psql "$DATABASE_URL" -f scripts/migrations/20260314_step8a_account_queue_ownership.sql
+```
+
 ## .env Reference
 
 ### Core
@@ -240,6 +250,8 @@ Related realtime env vars:
 ## Notes
 
 - Step 7 authentication is now available (local account + JWT access/refresh token).
+- Step 8a starts account-centric queue migration by anchoring `sessions` and `jobs` to `owner_user_id` (account ownership), with compatibility fallback while old rows are still client-centric.
+  - Run migration first: `scripts/migrations/20260314_step8a_account_queue_ownership.sql`.
 - Step 8 adds account PIN support (`users.pin_hash`) for sensitive client-side actions (e.g. desktop unpair verification).
   - Run migration first: `scripts/migrations/20260312_step8_account_pin.sql`.
 - `POST /api/clients/:id/unbind` bersifat idempotent: jika client sudah unbound, endpoint tetap mengembalikan `200` dengan `alreadyUnbound=true`.
