@@ -242,6 +242,7 @@ Related realtime env vars:
 - Step 7 authentication is now available (local account + JWT access/refresh token).
 - Step 8 adds account PIN support (`users.pin_hash`) for sensitive client-side actions (e.g. desktop unpair verification).
   - Run migration first: `scripts/migrations/20260312_step8_account_pin.sql`.
+- `POST /api/clients/:id/unbind` bersifat idempotent: jika client sudah unbound, endpoint tetap mengembalikan `200` dengan `alreadyUnbound=true`.
 - Step 7 audit trail aktif di tabel `audit_logs` untuk event kritikal auth/client/session/job.
 - Mode auth saat ini:
   - Binding owner ke client bersifat explicit lewat `POST /api/clients/:id/pair` (desktop pair sekali) atau `POST /api/clients/:id/bind` (flow auth bearer), bukan auto-bind dari heartbeat/register.

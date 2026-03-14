@@ -512,7 +512,12 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
   }
 
   if (!client.ownerUserId) {
-    res.status(409).json({ error: "Client is already unbound" });
+    markClientRuntimeUnauthenticated(client.id);
+    res.json({
+      ok: true,
+      alreadyUnbound: true,
+      client: toPublicClient(withClientStatus(client))
+    });
     return;
   }
 
@@ -550,6 +555,7 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
 
   res.json({
     ok: true,
+    alreadyUnbound: false,
     client: toPublicClient(withClientStatus(updatedClient))
   });
 }));
