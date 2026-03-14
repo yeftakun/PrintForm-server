@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8RI7XhXsi4TQ7wrVV4vgO2B2gPNQE3SsuuZ3o5SpKVGVdUQUQLg0LZXMHQYbI50
+\restrict QhfEoWa54g2r2EWIDjOI3nedSZbv0g0nGgUN9pMKs7j31s76FLnoWUThdTXX7eA
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -243,7 +243,8 @@ CREATE TABLE public.users (
     password_hash text,
     role character varying(32),
     created_at timestamp with time zone DEFAULT now(),
-    username character varying(64)
+    username character varying(64),
+    pin_hash text
 );
 
 
@@ -339,7 +340,7 @@ COPY public.sessions (id, client_id, alias, created_at, last_seen_at, status) FR
 --
 
 COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
-t	0	0	2026-03-12 07:23:16.068823+08
+t	0	0	2026-03-14 21:42:30.451745+08
 \.
 
 
@@ -347,7 +348,7 @@ t	0	0	2026-03-12 07:23:16.068823+08
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.users (id, email, password_hash, role, created_at, username) FROM stdin;
+COPY public.users (id, email, password_hash, role, created_at, username, pin_hash) FROM stdin;
 \.
 
 
@@ -363,7 +364,7 @@ COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 381, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 4595, true);
 
 
 --
@@ -696,5 +697,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8RI7XhXsi4TQ7wrVV4vgO2B2gPNQE3SsuuZ3o5SpKVGVdUQUQLg0LZXMHQYbI50
+\unrestrict QhfEoWa54g2r2EWIDjOI3nedSZbv0g0nGgUN9pMKs7j31s76FLnoWUThdTXX7eA
 
