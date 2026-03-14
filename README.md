@@ -97,7 +97,7 @@ psql "$DATABASE_URL" -f scripts/migrations/20260314_step8a_account_queue_ownersh
 
 ## Flow overview
 
-1. Web user selects a target .NET client and creates a session (optional alias for sender).
+1. Web user selects a target kiosk account from customer page (`/`) and creates a session (optional alias for sender).
 2. Web user uploads one or more jobs inside the session.
 3. The .NET client opens its Job List and prints or rejects jobs.
 4. Session end (or session timeout) deletes session jobs and their files.
@@ -140,8 +140,9 @@ Tuning env vars for upload and storage:
 
 ## Web UI features
 
-- Create session for a selected client (with optional sender alias).
-- Daftar client kini menampilkan status koneksi dan kesiapan (`ready` / `owned` / `unowned` / `offline`).
+- Create session untuk kios terpilih (dengan optional sender alias).
+- Halaman pelanggan (`/`) menampilkan daftar kios berbasis akun lewat `GET /api/clients/kiosks` (hanya akun dengan minimal 1 client recognized).
+- Kios ditandai siap jika memiliki minimal 1 client `ready`; sementara bridge Step 8b memilih `targetClientId` internal agar flow session lama tetap berjalan.
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
 - Create session ditolak jika target client belum recognized/login owner (`409 CLIENT_UNRECOGNIZED`).
 - Create session ditolak jika client sudah bind akun tetapi desktop client belum login aktif (`409 CLIENT_NOT_READY`).
@@ -183,6 +184,7 @@ Tuning env vars for upload and storage:
 
 - Clients:
   - `GET /api/clients`
+  - `GET /api/clients/kiosks`
   - `POST /api/clients/register`
   - `POST /api/clients/heartbeat`
   - `POST /api/clients/:id/ping`

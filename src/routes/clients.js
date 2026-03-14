@@ -11,9 +11,10 @@ const {
   CLIENT_HEARTBEAT_RATE_LIMIT_WINDOW_MS,
   CLIENT_HEARTBEAT_RATE_LIMIT_MAX,
   CLIENT_LIST_INCLUDE_UNRECOGNIZED,
-  AUTH_ACCESS_TOKEN_TTL
+  AUTH_ACCESS_TOKEN_TTL,
+  useDb
 } = require("../config");
-const { getUserByIdentifier } = require("../repositories/usersRepository");
+const { getUserByIdentifier, getUserById } = require("../repositories/usersRepository");
 const { createRefreshTokenRecord } = require("../repositories/refreshTokensRepository");
 const {
   normalizeName,
@@ -23,6 +24,7 @@ const {
 const { normalizeClientId, isValidClientId } = require("../utils/clientId");
 const { toPublicClient } = require("../utils/publicMapper");
 const {
+  getClientReadiness,
   withClientStatus,
   markClientRuntimeAuthenticated,
   markClientRuntimeUnauthenticated
@@ -113,6 +115,50 @@ function syncClientRuntimeAuth(client, user) {
   markClientRuntimeUnauthenticated(client.id);
 }
 
+function getLastSeenMs(value) {
+  const lastSeenMs = new Date(value).getTime();
+  return Number.isFinite(lastSeenMs) ? lastSeenMs : 0;
+}
+
+function getKioskDisplayName(user, ownerUserId) {
+  if (user?.username) {
+    return user.username;
+  }
+  const suffix = String(ownerUserId || "").slice(-6) || "unknown";
+  return `Kios-${suffix}`;
+}
+
+async function getOwnerUserMap(ownerUserIds) {
+  const userMap = new Map();
+  if (!useDb || ownerUserIds.length === 0) {
+    return userMap;
+  }
+
+  await Promise.all(ownerUserIds.map(async ownerUserId => {
+    try {
+      const user = await getUserById(ownerUserId);
+      if (user) {
+        userMap.set(ownerUserId, user);
+      }
+    } catch {
+      // Optional enrichment only; keep endpoint available even when lookup fails.
+    }
+  }));
+
+  return userMap;
+}
+
+function toEffectivePublicClient(client) {
+  const normalized = withClientStatus(client);
+  if (isClientRealtimeConnected(client.id)) {
+    return {
+      ...normalized,
+      status: "online"
+    };
+  }
+  return normalized;
+}
+
 const registerRateLimiter = createInMemoryRateLimiter({
   windowMs: CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
   maxRequests: CLIENT_REGISTER_RATE_LIMIT_MAX,
@@ -196,6 +242,73 @@ router.get("/", asyncHandler(async (req, res) => {
   });
 
   res.json(payload);
+}));
+
+router.get("/kiosks", asyncHandler(async (req, res) => {
+  const clients = await getClients();
+  const recognizedClients = clients.filter(client => Boolean(client?.ownerUserId));
+
+  if (recognizedClients.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const clientsByOwnerId = new Map();
+  for (const client of recognizedClients) {
+    const ownerUserId = client.ownerUserId;
+    if (!clientsByOwnerId.has(ownerUserId)) {
+      clientsByOwnerId.set(ownerUserId, []);
+    }
+
+    const effectiveClient = toEffectivePublicClient(client);
+    clientsByOwnerId.get(ownerUserId).push({
+      ...effectiveClient,
+      readiness: getClientReadiness(effectiveClient)
+    });
+  }
+
+  const ownerUserIds = [...clientsByOwnerId.keys()];
+  const ownerUserMap = await getOwnerUserMap(ownerUserIds);
+
+  const kiosks = ownerUserIds.map(ownerUserId => {
+    const ownerClients = [...(clientsByOwnerId.get(ownerUserId) || [])]
+      .sort((a, b) => getLastSeenMs(b.lastSeen) - getLastSeenMs(a.lastSeen));
+
+    const readyClients = ownerClients.filter(client => client.readiness === "ready");
+    const onlineClients = ownerClients.filter(client => client.status === "online");
+    const preferredClient = readyClients[0] || null;
+
+    const readiness = readyClients.length > 0
+      ? "ready"
+      : onlineClients.length > 0
+        ? "owned"
+        : "offline";
+
+    const ownerUser = ownerUserMap.get(ownerUserId) || null;
+
+    return {
+      id: ownerUserId,
+      ownerUserId,
+      displayName: getKioskDisplayName(ownerUser, ownerUserId),
+      readiness,
+      canStartSession: Boolean(preferredClient),
+      targetClientId: preferredClient?.id || null,
+      targetClientName: preferredClient?.name || null,
+      clientCount: ownerClients.length,
+      onlineClientCount: onlineClients.length,
+      readyClientCount: readyClients.length,
+      lastSeen: ownerClients[0]?.lastSeen || null
+    };
+  });
+
+  kiosks.sort((a, b) => {
+    if (a.canStartSession !== b.canStartSession) {
+      return a.canStartSession ? -1 : 1;
+    }
+    return getLastSeenMs(b.lastSeen) - getLastSeenMs(a.lastSeen);
+  });
+
+  res.json(kiosks);
 }));
 
 router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {

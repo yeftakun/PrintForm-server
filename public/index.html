@@ -26,9 +26,9 @@
             <button id="clearAliasBtn" type="button">Hapus Alias</button>
           </div>
           <label class="field">
-            <span>Tujuan Client</span>
+            <span>Tujuan Kios</span>
             <select id="clientSelect" required>
-              <option value="">Memuat daftar client...</option>
+              <option value="">Memuat daftar kios...</option>
             </select>
           </label>
           <button id="startSessionBtn" type="button">Mulai Session</button>
@@ -99,21 +99,21 @@
       </section>
 
       <section class="card">
-        <h2>Client Terhubung (Online)</h2>
+        <h2>Daftar Kios Percetakan</h2>
         <table>
           <thead>
             <tr>
-              <th>Nama</th>
-              <th>Status / Kesiapan</th>
-              <th>Terakhir Terlihat</th>
-              <th>Printer Aktif</th>
-              <th>Printer</th>
-              <th>Aksi</th>
+              <th>Nama Kios</th>
+              <th>Kesiapan</th>
+              <th>Client Terdaftar</th>
+              <th>Client Online</th>
+              <th>Client Siap</th>
+              <th>Target Aktif</th>
             </tr>
           </thead>
           <tbody id="clientsBody">
             <tr>
-              <td colspan="6" class="muted">Belum ada client.</td>
+              <td colspan="6" class="muted">Belum ada kios.</td>
             </tr>
           </tbody>
         </table>
@@ -209,7 +209,7 @@
         saveAliasBtn.disabled = active;
         clearAliasBtn.disabled = active;
         if (active) {
-          sessionClientName.textContent = sessionClient || "client";
+          sessionClientName.textContent = sessionClient || "kios";
           sessionIdText.textContent = sessionId ? `Session ID: ${sessionId}` : "";
           sessionAliasText.textContent = sessionAlias ? `Alias: ${sessionAlias}` : "Alias: -";
         } else {
@@ -249,67 +249,83 @@
       async function loadClients() {
         const previousSelection = clientSelect.value;
         try {
-          const res = await apiFetch("/api/clients");
+          const res = await apiFetch("/api/clients/kiosks");
           if (!res.ok) {
             if (res.status === 401 || res.status === 403) {
-              clientSelect.innerHTML = '<option value="">Daftar client tidak tersedia</option>';
-              clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Daftar client tidak bisa diakses saat ini.</td></tr>';
-              clientsStatus.textContent = "Gagal memuat daftar client.";
+              clientSelect.innerHTML = '<option value="">Daftar kios tidak tersedia</option>';
+              clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Daftar kios tidak bisa diakses saat ini.</td></tr>';
+              clientsStatus.textContent = "Gagal memuat daftar kios.";
               clientsStatus.className = "status error";
               return;
             }
-            throw new Error("failed to fetch clients");
+            throw new Error("failed to fetch kiosks");
           }
 
-          const clients = await res.json();
-          if (!Array.isArray(clients) || clients.length === 0) {
-            clientSelect.innerHTML = '<option value="">Belum ada client online</option>';
-            clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada client online.</td></tr>';
+          const kiosks = await res.json();
+          if (!Array.isArray(kiosks) || kiosks.length === 0) {
+            clientSelect.innerHTML = '<option value="">Belum ada kios terdaftar</option>';
+            clientsBody.innerHTML = '<tr><td colspan="6" class="muted">Belum ada kios terdaftar.</td></tr>';
+            clientsStatus.textContent = "";
+            clientsStatus.className = "status";
             return;
           }
 
-          const options = clients.map(client => {
-            const readiness = String(client.readiness || "").toLowerCase();
-            const readinessLabel = readiness === "ready"
-              ? "siap"
-              : readiness === "owned"
-                ? "sudah bind (logout)"
-                : readiness === "unowned" || readiness === "not_ready"
-                  ? "belum bind"
-                  : "offline";
-            const canSelect = readiness === "ready";
-            const printerLabel = client.selectedPrinter ? ` - ${client.selectedPrinter}` : "";
-            const label = `${client.name} (${client.status}, ${readinessLabel})${printerLabel}`;
-            return `<option value="${client.id}"${canSelect ? "" : " disabled"}>${label}</option>`;
+          const toReadinessLabel = (readiness) => {
+            switch (String(readiness || "").toLowerCase()) {
+              case "ready":
+                return "siap";
+              case "owned":
+                return "online (desktop belum login)";
+              case "offline":
+                return "offline";
+              default:
+                return "tidak diketahui";
+            }
+          };
+
+          const options = kiosks.map(kiosk => {
+            const targetClientId = kiosk.targetClientId || "";
+            const canSelect = Boolean(targetClientId);
+            const readinessLabel = toReadinessLabel(kiosk.readiness);
+            const activeTargetLabel = kiosk.targetClientName ? ` via ${kiosk.targetClientName}` : "";
+            const label = `${kiosk.displayName} (${readinessLabel}; ${kiosk.clientCount} client)${activeTargetLabel}`;
+            return `<option value="${targetClientId}" data-kiosk-name="${kiosk.displayName}"${canSelect ? "" : " disabled"}>${label}</option>`;
           }).join("");
 
           clientSelect.innerHTML = options;
-          if (clients.length === 1) {
-            clientSelect.value = clients[0].id;
+          const selectableKiosks = kiosks.filter(kiosk => Boolean(kiosk.targetClientId));
+          if (selectableKiosks.length === 1) {
+            clientSelect.value = selectableKiosks[0].targetClientId;
           } else {
             const placeholder = document.createElement("option");
             placeholder.value = "";
-            placeholder.textContent = "Pilih client";
+            placeholder.textContent = "Pilih kios";
             placeholder.disabled = true;
             placeholder.selected = true;
             clientSelect.prepend(placeholder);
             if (previousSelection) {
               clientSelect.value = previousSelection;
             }
+
+            if (!clientSelect.value && selectableKiosks.length > 0) {
+              clientSelect.value = selectableKiosks[0].targetClientId;
+            }
           }
 
-          clientsBody.innerHTML = clients.map(client => `
+          clientsBody.innerHTML = kiosks.map(kiosk => `
             <tr>
-              <td>${client.name}</td>
-              <td>${client.status} / ${client.readiness === "ready" ? "siap" : client.readiness === "owned" ? "sudah bind (logout)" : (client.readiness === "unowned" || client.readiness === "not_ready") ? "belum bind" : "offline"}</td>
-              <td>${new Date(client.lastSeen).toLocaleString()}</td>
-              <td>${client.selectedPrinter || "-"}</td>
-              <td>${(client.printers || []).join(", ") || "-"}</td>
-              <td><button type="button" data-client-id="${client.id}" data-client-name="${client.name}">Ping</button></td>
+              <td>${kiosk.displayName}</td>
+              <td>${toReadinessLabel(kiosk.readiness)}</td>
+              <td>${kiosk.clientCount}</td>
+              <td>${kiosk.onlineClientCount}</td>
+              <td>${kiosk.readyClientCount}</td>
+              <td>${kiosk.targetClientName || "-"}</td>
             </tr>
           `).join("");
+          clientsStatus.textContent = "";
+          clientsStatus.className = "status";
         } catch {
-          clientsStatus.textContent = "Gagal memuat daftar client.";
+          clientsStatus.textContent = "Gagal memuat daftar kios.";
           clientsStatus.className = "status error";
         }
       }
@@ -403,8 +419,10 @@
 
       startSessionBtn.addEventListener("click", async () => {
         const clientId = clientSelect.value;
+        const selectedOption = clientSelect.options[clientSelect.selectedIndex] || null;
+        const selectedKioskName = selectedOption?.dataset?.kioskName || "";
         if (!clientId) {
-          sessionStatus.textContent = "Pilih client terlebih dahulu.";
+          sessionStatus.textContent = "Pilih kios terlebih dahulu.";
           sessionStatus.className = "status error";
           return;
         }
@@ -420,7 +438,7 @@
           const body = await res.json();
           if (!res.ok) {
             if (res.status === 401 || res.status === 403) {
-              sessionStatus.textContent = "Session tidak bisa dibuat untuk client ini.";
+              sessionStatus.textContent = "Session tidak bisa dibuat untuk kios ini.";
               sessionStatus.className = "status error";
               return;
             }
@@ -433,7 +451,7 @@
           }
 
           sessionId = body.id;
-          sessionClient = body.clientName || "";
+          sessionClient = selectedKioskName || body.clientName || "";
           sessionClientId = clientId;
           sessionAlias = body.alias || senderAlias || "";
           sessionHeartbeatFailures = 0;
@@ -541,35 +559,7 @@
           }
         }
       });
-      clientsBody.addEventListener("click", async (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLButtonElement)) {
-          return;
-        }
 
-        const clientId = target.dataset.clientId;
-        const clientName = target.dataset.clientName;
-        if (!clientId) {
-          return;
-        }
-
-        clientsStatus.textContent = `Mengirim ping ke ${clientName || "client"}...`;
-        clientsStatus.className = "status";
-
-        try {
-          const res = await apiFetch(`/api/clients/${clientId}/ping`, { method: "POST" });
-          if (!res.ok) {
-            clientsStatus.textContent = "Gagal mengirim ping.";
-            clientsStatus.className = "status error";
-            return;
-          }
-          clientsStatus.textContent = `Ping terkirim ke ${clientName || "client"}.`;
-          clientsStatus.className = "status success";
-        } catch (err) {
-          clientsStatus.textContent = "Gagal terhubung ke server.";
-          clientsStatus.className = "status error";
-        }
-      });
       async function heartbeatSession() {
         if (!sessionId) {
           return;
