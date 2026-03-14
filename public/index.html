@@ -284,18 +284,17 @@
           };
 
           const options = kiosks.map(kiosk => {
-            const targetClientId = kiosk.targetClientId || "";
-            const canSelect = Boolean(targetClientId);
+            const canSelect = Boolean(kiosk.canStartSession);
             const readinessLabel = toReadinessLabel(kiosk.readiness);
             const activeTargetLabel = kiosk.targetClientName ? ` via ${kiosk.targetClientName}` : "";
             const label = `${kiosk.displayName} (${readinessLabel}; ${kiosk.clientCount} client)${activeTargetLabel}`;
-            return `<option value="${targetClientId}" data-kiosk-name="${kiosk.displayName}"${canSelect ? "" : " disabled"}>${label}</option>`;
+            return `<option value="${kiosk.id}" data-kiosk-name="${kiosk.displayName}"${canSelect ? "" : " disabled"}>${label}</option>`;
           }).join("");
 
           clientSelect.innerHTML = options;
-          const selectableKiosks = kiosks.filter(kiosk => Boolean(kiosk.targetClientId));
+          const selectableKiosks = kiosks.filter(kiosk => Boolean(kiosk.canStartSession));
           if (selectableKiosks.length === 1) {
-            clientSelect.value = selectableKiosks[0].targetClientId;
+            clientSelect.value = selectableKiosks[0].id;
           } else {
             const placeholder = document.createElement("option");
             placeholder.value = "";
@@ -308,7 +307,7 @@
             }
 
             if (!clientSelect.value && selectableKiosks.length > 0) {
-              clientSelect.value = selectableKiosks[0].targetClientId;
+              clientSelect.value = selectableKiosks[0].id;
             }
           }
 
@@ -418,10 +417,10 @@
       });
 
       startSessionBtn.addEventListener("click", async () => {
-        const clientId = clientSelect.value;
+        const kioskId = clientSelect.value;
         const selectedOption = clientSelect.options[clientSelect.selectedIndex] || null;
         const selectedKioskName = selectedOption?.dataset?.kioskName || "";
-        if (!clientId) {
+        if (!kioskId) {
           sessionStatus.textContent = "Pilih kios terlebih dahulu.";
           sessionStatus.className = "status error";
           return;
@@ -433,7 +432,7 @@
           const res = await apiFetch("/api/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clientId, alias: senderAlias })
+            body: JSON.stringify({ kioskId, alias: senderAlias })
           });
           const body = await res.json();
           if (!res.ok) {
@@ -444,7 +443,7 @@
             }
             sessionStatus.textContent = body.error || "Gagal membuat session.";
             sessionStatus.className = "status error";
-            if (body.code === "CLIENT_UNAVAILABLE") {
+            if (body.code === "CLIENT_UNAVAILABLE" || body.code === "KIOSK_UNAVAILABLE" || body.code === "KIOSK_NOT_READY") {
               scheduleLoadClients(0);
             }
             return;
@@ -452,7 +451,7 @@
 
           sessionId = body.id;
           sessionClient = selectedKioskName || body.clientName || "";
-          sessionClientId = clientId;
+          sessionClientId = body.clientId || body.targetClientId || "";
           sessionAlias = body.alias || senderAlias || "";
           sessionHeartbeatFailures = 0;
           sessionStorage.setItem("printformSessionId", sessionId);

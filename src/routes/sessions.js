@@ -54,11 +54,45 @@ function resolveSessionOwnerUserId(session, client) {
   return session?.ownerUserId || client?.ownerUserId || null;
 }
 
+function normalizeRequestString(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
+}
+
+function toEffectiveSessionTargetClient(client) {
+  const normalizedClient = withClientStatus(client);
+  return {
+    ...normalizedClient,
+    status: isClientRealtimeConnected(client.id) ? "online" : normalizedClient.status
+  };
+}
+
+function pickKioskReadyClient(kioskClients) {
+  const readyClients = (kioskClients || [])
+    .map(toEffectiveSessionTargetClient)
+    .filter(client => getClientReadiness(client) === "ready")
+    .sort((a, b) => getLastSeenMs(b) - getLastSeenMs(a));
+
+  return readyClients[0] || null;
+}
+
+function summarizeKioskClientState(kioskClients) {
+  const effectiveClients = (kioskClients || []).map(toEffectiveSessionTargetClient);
+  return {
+    onlineClientCount: effectiveClients.filter(client => client.status === "online").length,
+    readyClientCount: effectiveClients.filter(client => getClientReadiness(client) === "ready").length
+  };
+}
+
 function toSessionResponsePayload(session, availabilitySource) {
   return {
     id: session.id,
     clientId: session.clientId,
     clientName: session.clientName || null,
+    ownerUserId: session.ownerUserId || null,
+    kioskId: session.ownerUserId || null,
     alias: session.alias || null,
     createdAt: session.createdAt,
     lastSeen: session.lastSeen,
@@ -103,44 +137,103 @@ async function waitForClientConfirmation(client) {
 
 router.post("/", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
-  const clientId = typeof req.body?.clientId === "string" ? req.body.clientId : null;
-  if (!clientId) {
-    res.status(400).json({ error: "clientId is required" });
+  const clientId = normalizeRequestString(req.body?.clientId);
+  const kioskId =
+    normalizeRequestString(req.body?.kioskId) ||
+    normalizeRequestString(req.body?.ownerUserId) ||
+    normalizeRequestString(req.body?.accountId);
+
+  if (!clientId && !kioskId) {
+    res.status(400).json({ error: "kioskId or clientId is required" });
     return;
   }
 
   const clients = await getClients();
-  const client = clients.find(c => c.id === clientId);
-  if (!client) {
-    res.status(404).json({ error: "Client not found" });
-    return;
+  let client = null;
+  let sessionOwnerUserId = null;
+  let targetSource = "client-id";
+
+  if (kioskId) {
+    const kioskClients = clients.filter(item => item.ownerUserId === kioskId);
+    if (kioskClients.length === 0) {
+      res.status(404).json({
+        error: "Kios tidak ditemukan.",
+        code: "KIOSK_NOT_FOUND",
+        kioskId
+      });
+      return;
+    }
+
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    if (req.user && req.user.id !== kioskId && !isAdmin) {
+      res.status(403).json({ error: "Kiosk belongs to another account" });
+      return;
+    }
+
+    const readyClient = pickKioskReadyClient(kioskClients);
+    if (!readyClient) {
+      const summary = summarizeKioskClientState(kioskClients);
+      res.status(409).json({
+        error: "Kios belum siap menerima session.",
+        code: "KIOSK_NOT_READY",
+        kioskId,
+        onlineClientCount: summary.onlineClientCount,
+        readyClientCount: summary.readyClientCount
+      });
+      return;
+    }
+
+    client = readyClient;
+    sessionOwnerUserId = kioskId;
+    targetSource = "kiosk";
+  } else {
+    client = clients.find(c => c.id === clientId);
+    if (!client) {
+      res.status(404).json({ error: "Client not found" });
+      return;
+    }
+
+    sessionOwnerUserId = client.ownerUserId || null;
   }
 
-  const normalizedClient = withClientStatus(client);
-  const readiness = getClientReadiness({
-    ...normalizedClient,
-    status: isClientRealtimeConnected(client.id) ? "online" : normalizedClient.status
-  });
+  const effectiveClient = toEffectiveSessionTargetClient(client);
+  const readiness = getClientReadiness(effectiveClient);
 
   if (readiness === "unowned") {
-    res.status(409).json({
-      error: "Client belum login dan belum dikenali oleh akun manapun.",
-      code: "CLIENT_UNRECOGNIZED",
-      clientId: client.id
-    });
+    if (kioskId) {
+      res.status(409).json({
+        error: "Kios belum dikenali oleh akun.",
+        code: "KIOSK_UNRECOGNIZED",
+        kioskId
+      });
+    } else {
+      res.status(409).json({
+        error: "Client belum login dan belum dikenali oleh akun manapun.",
+        code: "CLIENT_UNRECOGNIZED",
+        clientId: client.id
+      });
+    }
     return;
   }
 
   if (readiness === "owned") {
-    res.status(409).json({
-      error: "Client sudah terikat akun, tetapi desktop client belum login aktif.",
-      code: "CLIENT_NOT_READY",
-      clientId: client.id
-    });
+    if (kioskId) {
+      res.status(409).json({
+        error: "Kios sudah terhubung akun, tetapi desktop client belum login aktif.",
+        code: "KIOSK_NOT_READY",
+        kioskId
+      });
+    } else {
+      res.status(409).json({
+        error: "Client sudah terikat akun, tetapi desktop client belum login aktif.",
+        code: "CLIENT_NOT_READY",
+        clientId: client.id
+      });
+    }
     return;
   }
 
-  if (isClientOwnedByAnotherUser(client, req.user)) {
+  if (!kioskId && isClientOwnedByAnotherUser(client, req.user)) {
     res.status(403).json({ error: "Client belongs to another account" });
     return;
   }
@@ -159,12 +252,22 @@ router.post("/", asyncHandler(async (req, res) => {
         );
       }
 
-      res.status(409).json({
-        error: "Client sedang offline/tidak responsif. Session tidak bisa dibuat.",
-        code: "CLIENT_UNAVAILABLE",
-        clientId: client.id,
-        reason: confirmation.reason
-      });
+      if (kioskId) {
+        res.status(409).json({
+          error: "Kios sedang offline/tidak responsif. Session tidak bisa dibuat.",
+          code: "KIOSK_UNAVAILABLE",
+          kioskId,
+          clientId: client.id,
+          reason: confirmation.reason
+        });
+      } else {
+        res.status(409).json({
+          error: "Client sedang offline/tidak responsif. Session tidak bisa dibuat.",
+          code: "CLIENT_UNAVAILABLE",
+          clientId: client.id,
+          reason: confirmation.reason
+        });
+      }
       return;
     }
 
@@ -181,7 +284,7 @@ router.post("/", asyncHandler(async (req, res) => {
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     clientId: sessionTargetClient.id,
-    ownerUserId: sessionTargetClient.ownerUserId || null,
+    ownerUserId: sessionOwnerUserId || sessionTargetClient.ownerUserId || null,
     clientName: sessionTargetClient.name,
     alias,
     createdAt: new Date().toISOString(),
@@ -201,6 +304,7 @@ router.post("/", asyncHandler(async (req, res) => {
     detail: {
       clientId: session.clientId,
       ownerUserId: session.ownerUserId || null,
+      targetSource,
       availabilitySource,
       alias: session.alias || null
     }
