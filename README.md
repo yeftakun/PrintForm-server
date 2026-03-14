@@ -160,6 +160,7 @@ Tuning env vars for upload and storage:
 - Upload jobs (A4/A5, copies).
 - Mekanisme claim/lock aktif untuk status print (`printing`/`done`/`failed`/`rejected`/`pending`/`send`) agar job yang sama tidak diproses ganda antar client akun.
 - Desktop queue dianjurkan fetch per-akun (default auth scope) via `GET /api/jobs` dengan token login akun; hindari mode lama yang hanya bergantung `clientId`.
+- Untuk kontrol lock yang lebih eksplisit, tersedia endpoint `POST /api/jobs/:id/claim` dan `POST /api/jobs/:id/release` (auth).
 - Job list with:
   - "Buat lagi" (clone job with same file/config).
   - "Batal" (cancel job, only when status is `ready`).
@@ -228,6 +229,8 @@ Tuning env vars for upload and storage:
   - `GET /api/jobs/:id/download`
   - `POST /api/jobs` (multipart upload)
   - `POST /api/jobs/:id/clone`
+  - `POST /api/jobs/:id/claim` (auth, butuh `clientId`)
+  - `POST /api/jobs/:id/release` (auth, butuh `clientId` kecuali admin)
   - `PATCH /api/jobs/:id` (status updates; claim-aware untuk status print, dapat kirim `clientId`)
 
 ## Realtime WebSocket

@@ -534,6 +534,200 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
   }
 }));
 
+router.post("/:id/claim", asyncHandler(async (req, res) => {
+  await cleanupExpiredSessions();
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const claimantClientId = getRequestClientId(req);
+  if (!claimantClientId) {
+    res.status(400).json({ error: "clientId is required" });
+    return;
+  }
+
+  const releaseLock = await acquireJobLock(req.params.id);
+  try {
+    const jobs = await getJobs();
+    const job = jobs.find(item => item.id === req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+
+    const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+    if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
+      res.status(403).json({ error: "Client belongs to another account" });
+      return;
+    }
+
+    if (job.claimedByClientId && job.claimedByClientId !== claimantClientId) {
+      res.status(409).json({
+        error: "Job sudah di-claim oleh client lain",
+        code: "JOB_ALREADY_CLAIMED",
+        jobId: job.id,
+        claimedByClientId: job.claimedByClientId
+      });
+      return;
+    }
+
+    if (String(job.status || "").toLowerCase() !== "ready") {
+      res.status(409).json({
+        error: "Job tidak siap untuk claim",
+        code: "JOB_NOT_READY",
+        jobId: job.id,
+        status: job.status
+      });
+      return;
+    }
+
+    if (job.claimedByClientId === claimantClientId) {
+      res.json({
+        ok: true,
+        alreadyClaimed: true,
+        job: toPublicJob(job)
+      });
+      return;
+    }
+
+    const previousClaimedByClientId = job.claimedByClientId || null;
+    job.claimedByClientId = claimantClientId;
+    job.claimedAt = new Date().toISOString();
+
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
+
+    const actor = getActorFromRequest(req);
+    await writeAuditLogSafe({
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "job.claimed",
+      targetType: "job",
+      targetId: job.id,
+      detail: {
+        previousClaimedByClientId,
+        claimedByClientId: claimantClientId,
+        ownerUserId: job.ownerUserId || null,
+        clientId: job.targetClientId || null,
+        sessionId: job.sessionId || null
+      }
+    });
+
+    publishRealtimeEvent({
+      type: "job.claimed",
+      channel: "jobs",
+      payload: {
+        job: toPublicJob(job),
+        previousClaimedByClientId,
+        claimedByClientId: claimantClientId
+      }
+    });
+
+    res.json({
+      ok: true,
+      alreadyClaimed: false,
+      job: toPublicJob(job)
+    });
+  } finally {
+    releaseLock();
+  }
+}));
+
+router.post("/:id/release", asyncHandler(async (req, res) => {
+  await cleanupExpiredSessions();
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+  const requesterClientId = getRequestClientId(req);
+
+  const releaseLock = await acquireJobLock(req.params.id);
+  try {
+    const jobs = await getJobs();
+    const job = jobs.find(item => item.id === req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+
+    const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+    if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
+      res.status(403).json({ error: "Client belongs to another account" });
+      return;
+    }
+
+    if (!job.claimedByClientId) {
+      res.json({
+        ok: true,
+        alreadyReleased: true,
+        job: toPublicJob(job)
+      });
+      return;
+    }
+
+    if (!isAdmin) {
+      if (!requesterClientId) {
+        res.status(400).json({ error: "clientId is required" });
+        return;
+      }
+
+      if (job.claimedByClientId !== requesterClientId) {
+        res.status(409).json({
+          error: "Job sedang diproses oleh client lain",
+          code: "JOB_CLAIM_CONFLICT",
+          jobId: job.id,
+          claimedByClientId: job.claimedByClientId
+        });
+        return;
+      }
+    }
+
+    const previousClaimedByClientId = job.claimedByClientId;
+    job.claimedByClientId = null;
+    job.claimedAt = null;
+
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
+
+    const actor = getActorFromRequest(req);
+    await writeAuditLogSafe({
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "job.claim.released",
+      targetType: "job",
+      targetId: job.id,
+      detail: {
+        previousClaimedByClientId,
+        releasedByClientId: requesterClientId || null,
+        ownerUserId: job.ownerUserId || null,
+        clientId: job.targetClientId || null,
+        sessionId: job.sessionId || null
+      }
+    });
+
+    publishRealtimeEvent({
+      type: "job.claim.released",
+      channel: "jobs",
+      payload: {
+        job: toPublicJob(job),
+        previousClaimedByClientId,
+        releasedByClientId: requesterClientId || null
+      }
+    });
+
+    res.json({
+      ok: true,
+      alreadyReleased: false,
+      job: toPublicJob(job)
+    });
+  } finally {
+    releaseLock();
+  }
+}));
+
 router.patch("/:id", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const releaseLock = await acquireJobLock(req.params.id);
