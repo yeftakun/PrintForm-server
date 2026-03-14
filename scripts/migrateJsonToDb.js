@@ -50,6 +50,8 @@ async function main() {
     id: j.id,
     sessionId: j.sessionId,
     ownerUserId: j.ownerUserId || null,
+    claimedByClientId: j.claimedByClientId || null,
+    claimedAt: j.claimedAt || null,
     targetClientId: j.targetClientId,
     targetClientName: j.targetClientName || null,
     originalName: j.originalName,

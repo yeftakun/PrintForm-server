@@ -57,6 +57,50 @@ const TERMINAL_JOB_STATUSES = new Set([
   "canceled"
 ]);
 
+const CLAIM_GUARDED_STATUSES = new Set([
+  "printing",
+  "pending",
+  "done",
+  "failed",
+  "rejected",
+  "send"
+]);
+
+const jobLockQueueById = new Map();
+
+function acquireJobLock(jobId) {
+  const key = String(jobId || "").trim();
+  if (!key) {
+    return Promise.resolve(() => {});
+  }
+
+  return new Promise(resolve => {
+    const queue = jobLockQueueById.get(key) || [];
+    const release = () => {
+      const activeQueue = jobLockQueueById.get(key);
+      if (!activeQueue || activeQueue.length === 0) {
+        return;
+      }
+
+      activeQueue.shift();
+      if (activeQueue.length === 0) {
+        jobLockQueueById.delete(key);
+        return;
+      }
+
+      const nextResolve = activeQueue[0];
+      nextResolve(release);
+    };
+
+    queue.push(resolve);
+    jobLockQueueById.set(key, queue);
+
+    if (queue.length === 1) {
+      resolve(release);
+    }
+  });
+}
+
 function isAllowedUploadFile(file) {
   const mimeType = String(file?.mimetype || "").trim().toLowerCase();
   if (mimeType && ALLOWED_MIME_TYPES.has(mimeType)) {
@@ -154,6 +198,24 @@ function getRequestSessionId(req) {
   }
 
   return null;
+}
+
+function getRequestClientId(req) {
+  const bodyClientId = typeof req.body?.clientId === "string"
+    ? req.body.clientId.trim()
+    : "";
+  if (bodyClientId) {
+    return bodyClientId;
+  }
+
+  const queryClientId = typeof req.query?.clientId === "string"
+    ? req.query.clientId.trim()
+    : "";
+  if (queryClientId) {
+    return queryClientId;
+  }
+
+  return "";
 }
 
 const upload = multer({
@@ -373,6 +435,8 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     alias: sourceJob.alias || null,
     sessionId: session.id,
     ownerUserId: session.ownerUserId || sourceJob.ownerUserId || null,
+    claimedByClientId: null,
+    claimedAt: null,
     targetClientId: session.clientId,
     targetClientName: session.clientName,
     printConfig: sourceJob.printConfig
@@ -409,92 +473,143 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
 
 router.patch("/:id", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
-  const jobs = await getJobs();
-  const job = jobs.find(j => j.id === req.params.id);
-  if (!job) {
-    res.status(404).json({ error: "Job not found" });
-    return;
-  }
-
-  const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
-  if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
-    res.status(403).json({ error: "Client belongs to another account" });
-    return;
-  }
-
-  const { status } = req.body || {};
-  if (typeof status !== "string" || status.trim().length === 0) {
-    res.status(400).json({ error: "Invalid status" });
-    return;
-  }
-
-  const normalizedStatus = status.trim().toLowerCase();
-  if (!ALLOWED_JOB_STATUSES.has(normalizedStatus)) {
-    res.status(400).json({ error: "Unsupported status" });
-    return;
-  }
-
-  const requestSessionId = getRequestSessionId(req);
-  if (!req.user) {
-    if (!requestSessionId) {
-      res.status(400).json({ error: "sessionId is required" });
+  const releaseLock = await acquireJobLock(req.params.id);
+  try {
+    const jobs = await getJobs();
+    const job = jobs.find(j => j.id === req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "Job not found" });
       return;
     }
 
-    if (requestSessionId !== job.sessionId) {
-      res.status(403).json({ error: "Job does not belong to the current session" });
+    const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
+    if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
+      res.status(403).json({ error: "Client belongs to another account" });
       return;
     }
 
-    if (normalizedStatus !== "canceled") {
-      res.status(403).json({ error: "Guest can only cancel jobs" });
+    const { status } = req.body || {};
+    if (typeof status !== "string" || status.trim().length === 0) {
+      res.status(400).json({ error: "Invalid status" });
       return;
     }
-  }
 
-  const previousStatus = job.status;
+    const normalizedStatus = status.trim().toLowerCase();
+    if (!ALLOWED_JOB_STATUSES.has(normalizedStatus)) {
+      res.status(400).json({ error: "Unsupported status" });
+      return;
+    }
 
-  const shouldDeleteDocument =
-    AUTO_DELETE_TERMINAL_JOB_FILES &&
-    TERMINAL_JOB_STATUSES.has(normalizedStatus) &&
-    job.storedPath;
+    const requestSessionId = getRequestSessionId(req);
+    if (!req.user) {
+      if (!requestSessionId) {
+        res.status(400).json({ error: "sessionId is required" });
+        return;
+      }
 
-  if (shouldDeleteDocument) {
-    await removeFileSafe(job.storedPath);
-    publishRealtimeEvent({
-      type: "job.file.removed",
-      channel: "jobs",
-      payload: {
+      if (requestSessionId !== job.sessionId) {
+        res.status(403).json({ error: "Job does not belong to the current session" });
+        return;
+      }
+
+      if (normalizedStatus !== "canceled") {
+        res.status(403).json({ error: "Guest can only cancel jobs" });
+        return;
+      }
+    }
+
+    const previousStatus = job.status;
+    const requestClientId = getRequestClientId(req);
+    const claimantClientId = requestClientId || job.targetClientId || "";
+    const isClaimGuardedStatus = CLAIM_GUARDED_STATUSES.has(normalizedStatus);
+
+    if (isClaimGuardedStatus && !claimantClientId) {
+      res.status(400).json({
+        error: "clientId is required for claim-guarded status updates",
+        code: "JOB_CLAIM_CLIENT_REQUIRED",
+        jobId: job.id
+      });
+      return;
+    }
+
+    if (isClaimGuardedStatus && job.status === "ready") {
+      if (job.claimedByClientId && job.claimedByClientId !== claimantClientId) {
+        res.status(409).json({
+          error: "Job sudah di-claim oleh client lain",
+          code: "JOB_ALREADY_CLAIMED",
+          jobId: job.id,
+          claimedByClientId: job.claimedByClientId
+        });
+        return;
+      }
+
+      if (!job.claimedByClientId) {
+        job.claimedByClientId = claimantClientId;
+        job.claimedAt = new Date().toISOString();
+      }
+    }
+
+    if (isClaimGuardedStatus && job.claimedByClientId && claimantClientId && job.claimedByClientId !== claimantClientId) {
+      res.status(409).json({
+        error: "Job sedang diproses oleh client lain",
+        code: "JOB_CLAIM_CONFLICT",
         jobId: job.id,
-        status: normalizedStatus,
-        source: "terminal-status"
+        claimedByClientId: job.claimedByClientId
+      });
+      return;
+    }
+
+    const shouldDeleteDocument =
+      AUTO_DELETE_TERMINAL_JOB_FILES &&
+      TERMINAL_JOB_STATUSES.has(normalizedStatus) &&
+      job.storedPath;
+
+    if (shouldDeleteDocument) {
+      await removeFileSafe(job.storedPath);
+      publishRealtimeEvent({
+        type: "job.file.removed",
+        channel: "jobs",
+        payload: {
+          jobId: job.id,
+          status: normalizedStatus,
+          source: "terminal-status"
+        }
+      });
+    }
+
+    job.status = normalizedStatus;
+    if (normalizedStatus === "ready") {
+      job.claimedByClientId = null;
+      job.claimedAt = null;
+    }
+
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
+
+    const actor = getActorFromRequest(req);
+    await writeAuditLogSafe({
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      action: "job.status.changed",
+      targetType: "job",
+      targetId: job.id,
+      detail: {
+        previousStatus,
+        nextStatus: normalizedStatus,
+        clientId: job.targetClientId || null,
+        ownerUserId: job.ownerUserId || null,
+        claimedByClientId: job.claimedByClientId || null,
+        requestClientId: requestClientId || null,
+        sessionId: job.sessionId || null
       }
     });
+
+    const publicJob = toPublicJob(job);
+    notifyJobStatusChanged(publicJob, previousStatus);
+    res.json(publicJob);
+  } finally {
+    releaseLock();
   }
-
-  job.status = normalizedStatus;
-  await saveJobs(jobs);
-  await refreshStorageUsageSnapshot(jobs);
-
-  const actor = getActorFromRequest(req);
-  await writeAuditLogSafe({
-    actorType: actor.actorType,
-    actorId: actor.actorId,
-    action: "job.status.changed",
-    targetType: "job",
-    targetId: job.id,
-    detail: {
-      previousStatus,
-      nextStatus: normalizedStatus,
-      clientId: job.targetClientId || null,
-      ownerUserId: job.ownerUserId || null,
-      sessionId: job.sessionId || null
-    }
-  });
-
-  const publicJob = toPublicJob(job);
-  notifyJobStatusChanged(publicJob, previousStatus);
-  res.json(publicJob);
 }));
 
 router.post("/", uploadDocument, asyncHandler(async (req, res) => {
@@ -565,6 +680,8 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     alias: session.alias || null,
     sessionId: session.id,
     ownerUserId: session.ownerUserId || null,
+    claimedByClientId: null,
+    claimedAt: null,
     targetClientId: session.clientId,
     targetClientName: session.clientName,
     printConfig: {

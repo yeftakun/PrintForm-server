@@ -11,7 +11,9 @@ function toPublicJob(job) {
     printConfig: job.printConfig,
     targetClientId: job.targetClientId,
     targetClientName: job.targetClientName,
-    sessionId: job.sessionId
+    sessionId: job.sessionId,
+    claimedByClientId: job.claimedByClientId || null,
+    claimedAt: job.claimedAt || null
   };
 }
 

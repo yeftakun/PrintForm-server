@@ -40,6 +40,16 @@ psql "$env:DATABASE_URL" -f scripts/migrations/20260314_step8a_account_queue_own
 psql "$DATABASE_URL" -f scripts/migrations/20260314_step8a_account_queue_ownership.sql
 ```
 
+Apply Step 8d job claim/lock migration:
+
+```powershell
+psql "$env:DATABASE_URL" -f scripts/migrations/20260314_step8d_job_claim_lock.sql
+```
+
+```bash
+psql "$DATABASE_URL" -f scripts/migrations/20260314_step8d_job_claim_lock.sql
+```
+
 ## .env Reference
 
 ### Core
@@ -148,6 +158,7 @@ Tuning env vars for upload and storage:
 - Create session ditolak jika client sudah bind akun tetapi desktop client belum login aktif (`409 CLIENT_NOT_READY`).
 - Jika websocket client tidak sedang connected, server menunggu confirmation window singkat untuk mendeteksi reconnect atau aktivitas terbaru client sebelum membuat session.
 - Upload jobs (A4/A5, copies).
+- Mekanisme claim/lock aktif untuk status print (`printing`/`done`/`failed`/`rejected`/`pending`/`send`) agar job yang sama tidak diproses ganda antar client akun.
 - Job list with:
   - "Buat lagi" (clone job with same file/config).
   - "Batal" (cancel job, only when status is `ready`).
@@ -159,6 +170,7 @@ Tuning env vars for upload and storage:
 - Registers to the server and sends heartbeat/ping poll.
 - `clientId` is mandatory and must be a valid GUID/UUID format.
 - Job list with Print / Reject (Reject only on `ready`).
+- Untuk update status print, client sebaiknya kirim `clientId` pada `PATCH /api/jobs/:id` agar claim/lock bisa divalidasi eksplisit.
 - If printer is offline, job becomes `pending` (not sent to spooler).
 - Prints locally on the client machine; server never prints.
 
@@ -214,7 +226,7 @@ Tuning env vars for upload and storage:
   - `GET /api/jobs/:id/download`
   - `POST /api/jobs` (multipart upload)
   - `POST /api/jobs/:id/clone`
-  - `PATCH /api/jobs/:id` (status updates)
+  - `PATCH /api/jobs/:id` (status updates; claim-aware untuk status print, dapat kirim `clientId`)
 
 ## Realtime WebSocket
 
@@ -254,6 +266,8 @@ Related realtime env vars:
 - Step 7 authentication is now available (local account + JWT access/refresh token).
 - Step 8a starts account-centric queue migration by anchoring `sessions` and `jobs` to `owner_user_id` (account ownership), with compatibility fallback while old rows are still client-centric.
   - Run migration first: `scripts/migrations/20260314_step8a_account_queue_ownership.sql`.
+- Step 8d menambahkan claim/lock pada job (`claimed_by_client_id`, `claimed_at`) untuk mencegah double print pada multi-client akun yang sama.
+  - Run migration first: `scripts/migrations/20260314_step8d_job_claim_lock.sql`.
 - Step 8 adds account PIN support (`users.pin_hash`) for sensitive client-side actions (e.g. desktop unpair verification).
   - Run migration first: `scripts/migrations/20260312_step8_account_pin.sql`.
 - `POST /api/clients/:id/unbind` bersifat idempotent: jika client sudah unbound, endpoint tetap mengembalikan `200` dengan `alreadyUnbound=true`.
