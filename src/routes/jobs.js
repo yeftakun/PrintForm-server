@@ -218,6 +218,51 @@ function getRequestClientId(req) {
   return "";
 }
 
+function getRequestOwnerUserId(req) {
+  const query = req?.query || {};
+  const candidates = [query.ownerUserId, query.kioskId, query.accountId];
+  for (const value of candidates) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const normalized = value.trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return "";
+}
+
+function shouldIncludeJobInOwnerScope(job, ownerUserId, accessibleClientIds) {
+  if (!ownerUserId) {
+    return false;
+  }
+
+  if (job.ownerUserId) {
+    return job.ownerUserId === ownerUserId;
+  }
+
+  // Legacy fallback before owner_user_id backfill is complete.
+  return canAccessClientId(accessibleClientIds, job.targetClientId);
+}
+
+function filterJobsByClaimClient(jobs, claimClientId) {
+  if (!claimClientId) {
+    return jobs;
+  }
+
+  return jobs.filter(job => {
+    const status = String(job.status || "").toLowerCase();
+    if (job.claimedByClientId) {
+      return job.claimedByClientId === claimClientId;
+    }
+
+    return status === "ready";
+  });
+}
+
 const upload = multer({
   dest: filesDir,
   limits: {
@@ -268,8 +313,26 @@ router.get("/", asyncHandler(async (req, res) => {
   let jobs = await getJobs();
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
 
-  if (accessibleClientIds) {
-    jobs = jobs.filter(job => canAccessJobForUser(job, req.user, accessibleClientIds));
+  if (req.user) {
+    const requestedOwnerUserId = getRequestOwnerUserId(req);
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    const ownerScopeUserId = requestedOwnerUserId || req.user.id;
+
+    if (requestedOwnerUserId && requestedOwnerUserId !== req.user.id && !isAdmin) {
+      res.status(403).json({ error: "Kiosk belongs to another account" });
+      return;
+    }
+
+    jobs = jobs.filter(job => {
+      if (!canAccessJobForUser(job, req.user, accessibleClientIds)) {
+        return false;
+      }
+
+      return shouldIncludeJobInOwnerScope(job, ownerScopeUserId, accessibleClientIds);
+    });
+
+    const claimClientId = getRequestClientId(req);
+    jobs = filterJobsByClaimClient(jobs, claimClientId);
   } else {
     const guestSessionId = typeof req.query.sessionId === "string"
       ? req.query.sessionId.trim()

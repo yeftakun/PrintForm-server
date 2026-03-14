@@ -4,6 +4,8 @@ const {
   saveClients,
   updateClientOwner
 } = require("../repositories/clientsRepository");
+const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
+const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getPings, savePings } = require("../repositories/pingsRepository");
 const {
   CLIENT_REGISTER_RATE_LIMIT_WINDOW_MS,
@@ -157,6 +159,94 @@ function toEffectivePublicClient(client) {
     };
   }
   return normalized;
+}
+
+async function applyQueueHandoverGuard({ clientId, previousOwnerUserId, nextOwnerUserId } = {}) {
+  const normalizedClientId = normalizeClientId(clientId) || String(clientId || "").trim();
+  if (!normalizedClientId) {
+    return {
+      sessionsReowned: 0,
+      sessionsDetached: 0,
+      jobsReowned: 0,
+      jobsDetached: 0,
+      claimsReleased: 0
+    };
+  }
+
+  const sessions = await getSessions();
+  const jobs = await getJobs();
+
+  let sessionsReowned = 0;
+  let sessionsDetached = 0;
+  for (const session of sessions) {
+    if (session.clientId !== normalizedClientId) {
+      continue;
+    }
+
+    if (!session.ownerUserId && previousOwnerUserId) {
+      session.ownerUserId = previousOwnerUserId;
+      sessionsReowned += 1;
+    }
+
+    if (!session.ownerUserId && !previousOwnerUserId && nextOwnerUserId) {
+      const detachedLastSeen = new Date(0).toISOString();
+      if (session.lastSeen !== detachedLastSeen) {
+        session.lastSeen = detachedLastSeen;
+        session.status = "expired";
+        sessionsDetached += 1;
+      }
+    }
+  }
+
+  let jobsReowned = 0;
+  let jobsDetached = 0;
+  let claimsReleased = 0;
+  for (const job of jobs) {
+    let changed = false;
+    const targetsClient = job.targetClientId === normalizedClientId;
+
+    if (targetsClient && !job.ownerUserId && previousOwnerUserId) {
+      job.ownerUserId = previousOwnerUserId;
+      jobsReowned += 1;
+      changed = true;
+    }
+
+    if (targetsClient && !job.ownerUserId && !previousOwnerUserId && nextOwnerUserId) {
+      if (job.targetClientId || job.targetClientName) {
+        job.targetClientId = null;
+        job.targetClientName = null;
+        jobsDetached += 1;
+        changed = true;
+      }
+    }
+
+    if (job.claimedByClientId === normalizedClientId) {
+      job.claimedByClientId = null;
+      job.claimedAt = null;
+      claimsReleased += 1;
+      changed = true;
+    }
+
+    if (changed) {
+      continue;
+    }
+  }
+
+  if (sessionsReowned > 0 || sessionsDetached > 0) {
+    await saveSessions(sessions);
+  }
+
+  if (jobsReowned > 0 || jobsDetached > 0 || claimsReleased > 0) {
+    await saveJobs(jobs);
+  }
+
+  return {
+    sessionsReowned,
+    sessionsDetached,
+    jobsReowned,
+    jobsDetached,
+    claimsReleased
+  };
 }
 
 const registerRateLimiter = createInMemoryRateLimiter({
@@ -520,6 +610,12 @@ router.post("/:id/pair", pairRateLimiter, asyncHandler(async (req, res) => {
     return;
   }
 
+  const handoverGuard = await applyQueueHandoverGuard({
+    clientId: client.id,
+    previousOwnerUserId: client.ownerUserId || null,
+    nextOwnerUserId: user.id
+  });
+
   const tokenBundle = await issueAuthTokens(user, req);
   const previousOwnerUserId = client.ownerUserId || null;
   const updatedClient = await updateClientOwner(client.id, user.id);
@@ -539,7 +635,8 @@ router.post("/:id/pair", pairRateLimiter, asyncHandler(async (req, res) => {
     detail: {
       previousOwnerUserId,
       nextOwnerUserId: user.id,
-      identifier
+      identifier,
+      handoverGuard
     }
   });
 
@@ -578,6 +675,12 @@ router.post("/:id/bind", requireAuth, asyncHandler(async (req, res) => {
 
   const previousOwnerUserId = client.ownerUserId || null;
   const nextOwnerUserId = req.user.id;
+  const handoverGuard = await applyQueueHandoverGuard({
+    clientId: client.id,
+    previousOwnerUserId,
+    nextOwnerUserId
+  });
+
   const updatedClient = await updateClientOwner(client.id, nextOwnerUserId);
   if (!updatedClient) {
     res.status(500).json({ error: "Failed to bind client" });
@@ -595,7 +698,8 @@ router.post("/:id/bind", requireAuth, asyncHandler(async (req, res) => {
     targetId: client.id,
     detail: {
       previousOwnerUserId,
-      nextOwnerUserId
+      nextOwnerUserId,
+      handoverGuard
     }
   });
 
@@ -625,10 +729,16 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
   }
 
   if (!client.ownerUserId) {
+    const handoverGuard = await applyQueueHandoverGuard({
+      clientId: client.id,
+      previousOwnerUserId: null,
+      nextOwnerUserId: null
+    });
     markClientRuntimeUnauthenticated(client.id);
     res.json({
       ok: true,
       alreadyUnbound: true,
+      handoverGuard,
       client: toPublicClient(withClientStatus(client))
     });
     return;
@@ -641,6 +751,12 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
   }
 
   const previousOwnerUserId = client.ownerUserId;
+  const handoverGuard = await applyQueueHandoverGuard({
+    clientId: client.id,
+    previousOwnerUserId,
+    nextOwnerUserId: null
+  });
+
   const updatedClient = await updateClientOwner(client.id, null);
   if (!updatedClient) {
     res.status(500).json({ error: "Failed to unbind client" });
@@ -657,7 +773,8 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
     targetType: "client",
     targetId: client.id,
     detail: {
-      previousOwnerUserId
+      previousOwnerUserId,
+      handoverGuard
     }
   });
 
@@ -669,6 +786,7 @@ router.post("/:id/unbind", requireAuth, asyncHandler(async (req, res) => {
   res.json({
     ok: true,
     alreadyUnbound: false,
+    handoverGuard,
     client: toPublicClient(withClientStatus(updatedClient))
   });
 }));

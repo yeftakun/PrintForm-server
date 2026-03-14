@@ -159,6 +159,7 @@ Tuning env vars for upload and storage:
 - Jika websocket client tidak sedang connected, server menunggu confirmation window singkat untuk mendeteksi reconnect atau aktivitas terbaru client sebelum membuat session.
 - Upload jobs (A4/A5, copies).
 - Mekanisme claim/lock aktif untuk status print (`printing`/`done`/`failed`/`rejected`/`pending`/`send`) agar job yang sama tidak diproses ganda antar client akun.
+- Desktop queue dianjurkan fetch per-akun (default auth scope) via `GET /api/jobs` dengan token login akun; hindari mode lama yang hanya bergantung `clientId`.
 - Job list with:
   - "Buat lagi" (clone job with same file/config).
   - "Batal" (cancel job, only when status is `ready`).
@@ -222,6 +223,7 @@ Tuning env vars for upload and storage:
   - `PATCH /api/auth/me/password`
 - Jobs:
   - `GET /api/jobs?sessionId=...` or `?clientId=...`
+  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `clientId` sebagai claim filter.
   - `GET /api/jobs/:id`
   - `GET /api/jobs/:id/download`
   - `POST /api/jobs` (multipart upload)
@@ -268,6 +270,7 @@ Related realtime env vars:
   - Run migration first: `scripts/migrations/20260314_step8a_account_queue_ownership.sql`.
 - Step 8d menambahkan claim/lock pada job (`claimed_by_client_id`, `claimed_at`) untuk mencegah double print pada multi-client akun yang sama.
   - Run migration first: `scripts/migrations/20260314_step8d_job_claim_lock.sql`.
+- Step 8e menambahkan handover guard saat pair/bind/unbind client agar antrean akun lama tidak diwariskan ke akun baru (legacy queue di-preserve/detach, claim lama dirilis).
 - Step 8 adds account PIN support (`users.pin_hash`) for sensitive client-side actions (e.g. desktop unpair verification).
   - Run migration first: `scripts/migrations/20260312_step8_account_pin.sql`.
 - `POST /api/clients/:id/unbind` bersifat idempotent: jika client sudah unbound, endpoint tetap mengembalikan `200` dengan `alreadyUnbound=true`.
