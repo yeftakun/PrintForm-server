@@ -56,6 +56,9 @@
               <th>ID</th>
               <th>Status</th>
               <th>Client</th>
+              <th>Owner User</th>
+              <th>Claimed By</th>
+              <th>Claimed At</th>
               <th>Original Name</th>
               <th>Paper</th>
               <th>Copies</th>
@@ -79,6 +82,7 @@
             <tr>
               <th>ID</th>
               <th>Client</th>
+              <th>Owner User</th>
               <th>Alias</th>
               <th>Status</th>
               <th>Created</th>
@@ -229,8 +233,9 @@
       const items = [
         { label: 'Clients Online', value: `${summary.clientsOnline}/${summary.clientsTotal}` },
         { label: 'Clients Recognized', value: summary.clientsRecognized || 0 },
-        { label: 'Sessions', value: summary.sessionsTotal },
-        { label: 'Jobs', value: summary.jobsTotal },
+        { label: 'Sessions', value: `${summary.sessionsTotal} (${summary.sessionsOwned || 0} owned)` },
+        { label: 'Jobs', value: `${summary.jobsTotal} (${summary.jobsOwned || 0} owned)` },
+        { label: 'Jobs Claimed', value: summary.jobsClaimed || 0 },
         { label: 'Refresh Tokens Active', value: `${summary.refreshTokensActive || 0}/${summary.refreshTokensTotal || 0}` },
         { label: 'Generated', value: formatter.format(new Date(generatedAt)) }
       ];
@@ -264,6 +269,9 @@
           <td title="${j.id}">${j.id}</td>
           <td>${j.status || ''}</td>
           <td title="${j.targetClientId || ''}">${j.targetClientName || j.targetClientId || ''}</td>
+          <td title="${j.ownerUserId || ''}">${j.ownerUserId || ''}</td>
+          <td title="${j.claimedByClientId || ''}">${j.claimedByClientId || ''}</td>
+          <td>${formatDateSafe(j.claimedAt)}</td>
           <td>${j.originalName || ''}</td>
           <td>${j.paperSize || ''}</td>
           <td>${j.copies || ''}</td>
@@ -279,6 +287,7 @@
         <tr>
           <td title="${s.id}">${s.id}</td>
           <td title="${s.clientId || ''}">${s.clientId || ''}</td>
+          <td title="${s.ownerUserId || ''}">${s.ownerUserId || ''}</td>
           <td>${s.alias || ''}</td>
           <td><span class="badge ${s.status === 'active' ? 'green' : 'gray'}">${s.status || ''}</span></td>
           <td>${formatDateSafe(s.createdAt)}</td>

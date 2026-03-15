@@ -16,6 +16,10 @@ if (!DATABASE_URL) {
 const pool = new Pool({ connectionString: DATABASE_URL });
 const app = express();
 let hasPinHashColumnCache = null;
+let hasSessionOwnerUserIdColumnCache = null;
+let hasJobOwnerUserIdColumnCache = null;
+let hasJobClaimedByClientIdColumnCache = null;
+let hasJobClaimedAtColumnCache = null;
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -100,6 +104,98 @@ async function hasPinHashColumn() {
   return exists;
 }
 
+async function hasSessionOwnerUserIdColumn() {
+  if (hasSessionOwnerUserIdColumnCache === true) {
+    return true;
+  }
+
+  const res = await queryOrEmpty(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'sessions'
+        AND column_name = 'owner_user_id'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasSessionOwnerUserIdColumnCache = true;
+  }
+
+  return exists;
+}
+
+async function hasJobOwnerUserIdColumn() {
+  if (hasJobOwnerUserIdColumnCache === true) {
+    return true;
+  }
+
+  const res = await queryOrEmpty(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'jobs'
+        AND column_name = 'owner_user_id'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasJobOwnerUserIdColumnCache = true;
+  }
+
+  return exists;
+}
+
+async function hasJobClaimedByClientIdColumn() {
+  if (hasJobClaimedByClientIdColumnCache === true) {
+    return true;
+  }
+
+  const res = await queryOrEmpty(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'jobs'
+        AND column_name = 'claimed_by_client_id'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasJobClaimedByClientIdColumnCache = true;
+  }
+
+  return exists;
+}
+
+async function hasJobClaimedAtColumn() {
+  if (hasJobClaimedAtColumnCache === true) {
+    return true;
+  }
+
+  const res = await queryOrEmpty(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'jobs'
+        AND column_name = 'claimed_at'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasJobClaimedAtColumnCache = true;
+  }
+
+  return exists;
+}
+
 function deriveClientStatus(row, nowMs) {
   const cachedStatus = String(row?.status || "").toLowerCase();
   if (cachedStatus === "offline") {
@@ -117,7 +213,34 @@ function deriveClientStatus(row, nowMs) {
 }
 
 async function fetchSnapshot() {
-  const hasPinHash = await hasPinHashColumn();
+  const [
+    hasPinHash,
+    hasSessionOwnerUserId,
+    hasJobOwnerUserId,
+    hasJobClaimedByClientId,
+    hasJobClaimedAt
+  ] = await Promise.all([
+    hasPinHashColumn(),
+    hasSessionOwnerUserIdColumn(),
+    hasJobOwnerUserIdColumn(),
+    hasJobClaimedByClientIdColumn(),
+    hasJobClaimedAtColumn()
+  ]);
+
+  const sessionOwnerUserIdSelect = hasSessionOwnerUserId
+    ? "owner_user_id"
+    : "NULL::text AS owner_user_id";
+
+  const jobOwnerUserIdSelect = hasJobOwnerUserId
+    ? "owner_user_id"
+    : "NULL::text AS owner_user_id";
+  const jobClaimedByClientIdSelect = hasJobClaimedByClientId
+    ? "claimed_by_client_id"
+    : "NULL::text AS claimed_by_client_id";
+  const jobClaimedAtSelect = hasJobClaimedAt
+    ? "claimed_at"
+    : "NULL::timestamptz AS claimed_at";
+
   const usersQuery = hasPinHash
     ? `select id,
               username,
@@ -161,7 +284,13 @@ async function fetchSnapshot() {
          limit 50`
     ),
     queryOrEmpty(
-      `select id, client_id, alias, status, created_at, last_seen_at
+      `select id,
+              client_id,
+              ${sessionOwnerUserIdSelect},
+              alias,
+              status,
+              created_at,
+              last_seen_at
          from sessions
          order by created_at desc
          limit 100`
@@ -170,6 +299,9 @@ async function fetchSnapshot() {
       `select id,
               status,
               session_id,
+              ${jobOwnerUserIdSelect},
+              ${jobClaimedByClientIdSelect},
+              ${jobClaimedAtSelect},
               target_client_id,
               target_client_name,
               original_name,
@@ -234,6 +366,9 @@ async function fetchSnapshot() {
   const refreshSummaryRow = refreshTokenSummaryRows[0] || {};
   const refreshTokensTotal = Number(refreshSummaryRow.total || 0);
   const refreshTokensActive = Number(refreshSummaryRow.active || 0);
+  const jobsClaimed = jobRows.filter(row => Boolean(row.claimed_by_client_id)).length;
+  const sessionsOwned = sessionRows.filter(row => Boolean(row.owner_user_id)).length;
+  const jobsOwned = jobRows.filter(row => Boolean(row.owner_user_id)).length;
 
   const storage = storageRows[0]
     ? {
@@ -251,7 +386,10 @@ async function fetchSnapshot() {
       clientsOnline: onlineClients,
       clientsRecognized: recognizedClients,
       sessionsTotal: sessionRows.length,
+      sessionsOwned,
       jobsTotal: jobRows.length,
+      jobsOwned,
+      jobsClaimed,
       eventsTotal: eventRows.length,
       auditTotal: auditRows.length,
       refreshTokensTotal,
@@ -273,6 +411,7 @@ async function fetchSnapshot() {
     sessions: sessionRows.map(row => ({
       id: row.id,
       clientId: row.client_id,
+      ownerUserId: row.owner_user_id || null,
       alias: row.alias || null,
       status: row.status,
       createdAt: row.created_at,
@@ -282,6 +421,9 @@ async function fetchSnapshot() {
       id: row.id,
       status: row.status,
       sessionId: row.session_id,
+      ownerUserId: row.owner_user_id || null,
+      claimedByClientId: row.claimed_by_client_id || null,
+      claimedAt: row.claimed_at || null,
       targetClientId: row.target_client_id,
       targetClientName: row.target_client_name,
       originalName: row.original_name,
