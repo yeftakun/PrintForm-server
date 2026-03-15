@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QhfEoWa54g2r2EWIDjOI3nedSZbv0g0nGgUN9pMKs7j31s76FLnoWUThdTXX7eA
+\restrict 1E01U8tbXHK25InUtplZesiJ8cTxkRcRuCUiF4khl47Vo647SLLQRPkJZiJWPTg
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -178,7 +178,10 @@ CREATE TABLE public.jobs (
     paper_size character varying(8) NOT NULL,
     copies integer NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    owner_user_id text,
+    claimed_by_client_id text,
+    claimed_at timestamp with time zone
 );
 
 
@@ -213,7 +216,8 @@ CREATE TABLE public.sessions (
     alias character varying(80),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_seen_at timestamp with time zone NOT NULL,
-    status character varying(16) DEFAULT 'active'::character varying NOT NULL
+    status character varying(16) DEFAULT 'active'::character varying NOT NULL,
+    owner_user_id text
 );
 
 
@@ -315,7 +319,7 @@ COPY public.events (id, client_id, session_id, job_id, type, payload, created_at
 -- Data for Name: jobs; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.jobs (id, session_id, target_client_id, target_client_name, original_name, stored_path, size_bytes, status, alias, paper_size, copies, created_at, updated_at) FROM stdin;
+COPY public.jobs (id, session_id, target_client_id, target_client_name, original_name, stored_path, size_bytes, status, alias, paper_size, copies, created_at, updated_at, owner_user_id, claimed_by_client_id, claimed_at) FROM stdin;
 \.
 
 
@@ -331,7 +335,7 @@ COPY public.refresh_tokens (id, user_id, token_hash, user_agent, ip_address, cre
 -- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.sessions (id, client_id, alias, created_at, last_seen_at, status) FROM stdin;
+COPY public.sessions (id, client_id, alias, created_at, last_seen_at, status, owner_user_id) FROM stdin;
 \.
 
 
@@ -340,7 +344,7 @@ COPY public.sessions (id, client_id, alias, created_at, last_seen_at, status) FR
 --
 
 COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
-t	0	0	2026-03-14 21:42:30.451745+08
+t	0	0	2026-03-15 22:28:39.724811+08
 \.
 
 
@@ -364,7 +368,7 @@ COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 4595, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 4999, true);
 
 
 --
@@ -521,10 +525,31 @@ CREATE INDEX idx_events_type_created ON public.events USING btree (type, created
 
 
 --
+-- Name: idx_jobs_claimed_by_client_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_jobs_claimed_by_client_id ON public.jobs USING btree (claimed_by_client_id);
+
+
+--
 -- Name: idx_jobs_created_desc; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_jobs_created_desc ON public.jobs USING btree (created_at DESC);
+
+
+--
+-- Name: idx_jobs_owner_status_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_jobs_owner_status_created ON public.jobs USING btree (owner_user_id, status, created_at DESC);
+
+
+--
+-- Name: idx_jobs_owner_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_jobs_owner_user ON public.jobs USING btree (owner_user_id);
 
 
 --
@@ -591,6 +616,13 @@ CREATE INDEX idx_sessions_last_seen ON public.sessions USING btree (last_seen_at
 
 
 --
+-- Name: idx_sessions_owner_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_sessions_owner_user ON public.sessions USING btree (owner_user_id);
+
+
+--
 -- Name: idx_users_username_unique; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -638,6 +670,22 @@ ALTER TABLE ONLY public.events
 
 
 --
+-- Name: jobs jobs_claimed_by_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.jobs
+    ADD CONSTRAINT jobs_claimed_by_client_id_fkey FOREIGN KEY (claimed_by_client_id) REFERENCES public.clients(id) ON DELETE SET NULL;
+
+
+--
+-- Name: jobs jobs_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.jobs
+    ADD CONSTRAINT jobs_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: jobs jobs_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -678,6 +726,14 @@ ALTER TABLE ONLY public.sessions
 
 
 --
+-- Name: sessions sessions_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: websocket_subscriptions websocket_subscriptions_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -697,5 +753,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QhfEoWa54g2r2EWIDjOI3nedSZbv0g0nGgUN9pMKs7j31s76FLnoWUThdTXX7eA
+\unrestrict 1E01U8tbXHK25InUtplZesiJ8cTxkRcRuCUiF4khl47Vo647SLLQRPkJZiJWPTg
 
