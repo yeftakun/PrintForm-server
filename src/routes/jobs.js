@@ -375,15 +375,15 @@ router.get("/", asyncHandler(async (req, res) => {
 
   if (legacyClientFilter) {
     if (!JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER) {
-      res.status(400).json({
-        error: "clientId query filter is disabled in account-centric mode. Use claimClientId.",
-        code: "LEGACY_CLIENT_FILTER_DISABLED"
-      });
-      return;
+      if (req.user) {
+        // Compatibility bridge: old desktop builds may still send `clientId` in query.
+        // In strict mode, keep account-scope behavior and ignore this legacy filter.
+        res.set("Warning", "299 PrintForm API: query clientId is legacy and ignored; use claimClientId");
+      }
+    } else {
+      res.set("Warning", "299 PrintForm API: query clientId is legacy; prefer claimClientId");
+      jobs = jobs.filter(job => job.targetClientId === legacyClientFilter);
     }
-
-    res.set("Warning", "299 PrintForm API: query clientId is legacy; prefer claimClientId");
-    jobs = jobs.filter(job => job.targetClientId === legacyClientFilter);
   }
   if (req.query.sessionId) {
     jobs = jobs.filter(job => job.sessionId === req.query.sessionId);

@@ -164,6 +164,7 @@ Tuning env vars for upload and storage:
 - Upload jobs (A4/A5, copies).
 - Mekanisme claim/lock aktif untuk status print (`printing`/`done`/`failed`/`rejected`/`pending`/`send`) agar job yang sama tidak diproses ganda antar client akun.
 - Desktop queue dianjurkan fetch per-akun (default auth scope) via `GET /api/jobs` dengan token login akun; hindari mode lama yang hanya bergantung `clientId`.
+- Jika desktop lama masih mengirim query `clientId`, server mode strict akan mengabaikan filter itu (bukan fail), lalu tetap mengembalikan queue per-akun.
 - Untuk kontrol lock yang lebih eksplisit, tersedia endpoint `POST /api/jobs/:id/claim` dan `POST /api/jobs/:id/release` (auth).
 - Job list with:
   - "Buat lagi" (clone job with same file/config).
@@ -228,7 +229,7 @@ Tuning env vars for upload and storage:
   - `PATCH /api/auth/me/password`
 - Jobs:
   - `GET /api/jobs?sessionId=...`
-  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `claimClientId` untuk view claim-aware.
+  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `claimClientId` untuk view claim-aware (`clientId` query legacy diabaikan pada mode strict default).
   - `GET /api/jobs/:id`
   - `GET /api/jobs/:id/download`
   - `POST /api/jobs` (multipart upload)
