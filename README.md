@@ -90,6 +90,8 @@ psql "$DATABASE_URL" -f scripts/migrations/20260314_step8d_job_claim_lock.sql
 - `REALTIME_PING_INTERVAL_MS`: interval ping keepalive websocket (ms).
 - `REALTIME_CLIENT_OFFLINE_GRACE_MS`: grace disconnect WS sebelum client dipaksa offline (ms).
 - `CLIENT_LIST_INCLUDE_UNRECOGNIZED`: tampilkan semua client di daftar guest (`/`) untuk mode development.
+- `ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE`: fallback sementara agar `POST /api/sessions` masih menerima `clientId` tanpa `kioskId` (default `false`).
+- `JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER`: fallback sementara agar `GET /api/jobs?clientId=...` tetap diterima (default `false`, mode account-centric ketat).
 
 ### Cleanup and retention
 
@@ -152,8 +154,9 @@ Tuning env vars for upload and storage:
 
 - Create session untuk kios terpilih (dengan optional sender alias).
 - Halaman pelanggan (`/`) menampilkan daftar kios berbasis akun lewat `GET /api/clients/kiosks` (hanya akun dengan minimal 1 client recognized).
-- Kios ditandai siap jika memiliki minimal 1 client `ready`; `POST /api/sessions` kini menerima `kioskId` (dengan fallback legacy `clientId`) dan server memilih target client siap milik akun tersebut.
-- Respons `POST /api/sessions` menyertakan metadata transisi (`targetSource`, `requestedKioskId`, `compatibility.legacyClientTarget`) untuk observability rollout.
+- Kios ditandai siap jika memiliki minimal 1 client `ready`; `POST /api/sessions` pada mode default mewajibkan `kioskId` dan server memilih target client siap milik akun tersebut.
+- Legacy target berbasis `clientId` dinonaktifkan default; dapat diaktifkan sementara dengan env `ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE=true`.
+- Respons `POST /api/sessions` menyertakan metadata transisi (`targetSource`, `requestedKioskId`, `compatibility.legacyClientTarget`, `compatibility.legacyClientTargetAllowed`).
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).
 - Create session ditolak jika target client belum recognized/login owner (`409 CLIENT_UNRECOGNIZED`).
 - Create session ditolak jika client sudah bind akun tetapi desktop client belum login aktif (`409 CLIENT_NOT_READY`).
@@ -209,7 +212,7 @@ Tuning env vars for upload and storage:
   - `POST /api/clients/:id/unbind` (auth owner/admin)
   - `POST /api/clients/unregister`
 - Sessions:
-  - `POST /api/sessions` (`kioskId` untuk flow account-centric, `clientId` masih didukung sementara untuk kompatibilitas)
+  - `POST /api/sessions` (`kioskId` wajib pada mode default; fallback `clientId` hanya jika `ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE=true`)
   - `POST /api/sessions/heartbeat`
   - `POST /api/sessions/close`
 - Auth:
@@ -224,7 +227,7 @@ Tuning env vars for upload and storage:
   - `PATCH /api/auth/me/pin`
   - `PATCH /api/auth/me/password`
 - Jobs:
-  - `GET /api/jobs?sessionId=...` or `?clientId=...`
+  - `GET /api/jobs?sessionId=...`
   - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `claimClientId` untuk view claim-aware.
   - `GET /api/jobs/:id`
   - `GET /api/jobs/:id/download`
@@ -270,6 +273,8 @@ Related realtime env vars:
 ## Notes
 
 - Step 7 authentication is now available (local account + JWT access/refresh token).
+- Step 8 account-centric queue is now default on server scope (kiosk-first session create + claim-aware queue + handover guard).
+- Legacy fallback path tetap tersedia sementara via env toggle (`ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE`, `JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER`) untuk rollback terkontrol jika diperlukan.
 - Step 8a starts account-centric queue migration by anchoring `sessions` and `jobs` to `owner_user_id` (account ownership), with compatibility fallback while old rows are still client-centric.
   - Run migration first: `scripts/migrations/20260314_step8a_account_queue_ownership.sql`.
 - Step 8d menambahkan claim/lock pada job (`claimed_by_client_id`, `claimed_at`) untuk mencegah double print pada multi-client akun yang sama.

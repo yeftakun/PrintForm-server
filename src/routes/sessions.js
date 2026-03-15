@@ -5,7 +5,8 @@ const { getClients, updateClientPresence } = require("../repositories/clientsRep
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const {
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
-  SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS
+  SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS,
+  ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE
 } = require("../config");
 const { normalizeAlias } = require("../utils/normalize");
 const { isClientOnline, withClientStatus, getClientReadiness } = require("../services/status");
@@ -88,7 +89,8 @@ function summarizeKioskClientState(kioskClients) {
 
 function toSessionResponsePayload(session, availabilitySource, {
   targetSource = "client-id",
-  requestedKioskId = null
+  requestedKioskId = null,
+  legacyClientTargetAllowed = ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE
 } = {}) {
   const legacyClientTarget = targetSource === "client-id";
   return {
@@ -100,7 +102,8 @@ function toSessionResponsePayload(session, availabilitySource, {
     requestedKioskId: requestedKioskId || null,
     targetSource,
     compatibility: {
-      legacyClientTarget
+      legacyClientTarget,
+      legacyClientTargetAllowed
     },
     alias: session.alias || null,
     createdAt: session.createdAt,
@@ -151,6 +154,25 @@ router.post("/", asyncHandler(async (req, res) => {
     normalizeRequestString(req.body?.kioskId) ||
     normalizeRequestString(req.body?.ownerUserId) ||
     normalizeRequestString(req.body?.accountId);
+
+  if (!kioskId && !ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE) {
+    if (clientId) {
+      res.status(410).json({
+        error: "Legacy clientId target is disabled. Use kioskId.",
+        code: "LEGACY_CLIENT_TARGET_DISABLED",
+        compatibility: {
+          legacyClientTargetAllowed: false
+        }
+      });
+      return;
+    }
+
+    res.status(400).json({
+      error: "kioskId is required",
+      code: "KIOSK_ID_REQUIRED"
+    });
+    return;
+  }
 
   if (!clientId && !kioskId) {
     res.status(400).json({ error: "kioskId or clientId is required" });
@@ -321,7 +343,8 @@ router.post("/", asyncHandler(async (req, res) => {
 
   res.json(toSessionResponsePayload(session, availabilitySource, {
     targetSource,
-    requestedKioskId: kioskId || null
+    requestedKioskId: kioskId || null,
+    legacyClientTargetAllowed: ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE
   }));
 }));
 

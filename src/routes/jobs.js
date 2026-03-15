@@ -8,7 +8,8 @@ const {
   MAX_UPLOAD_BYTES,
   ALLOWED_UPLOAD_MIME_TYPES,
   ALLOWED_UPLOAD_EXTENSIONS,
-  AUTO_DELETE_TERMINAL_JOB_FILES
+  AUTO_DELETE_TERMINAL_JOB_FILES,
+  JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER
 } = require("../config");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions } = require("../repositories/sessionsRepository");
@@ -368,8 +369,21 @@ router.get("/", asyncHandler(async (req, res) => {
     jobs = jobs.filter(job => job.sessionId === guestSessionId);
   }
 
-  if (req.query.clientId) {
-    jobs = jobs.filter(job => job.targetClientId === req.query.clientId);
+  const legacyClientFilter = typeof req.query?.clientId === "string"
+    ? req.query.clientId.trim()
+    : "";
+
+  if (legacyClientFilter) {
+    if (!JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER) {
+      res.status(400).json({
+        error: "clientId query filter is disabled in account-centric mode. Use claimClientId.",
+        code: "LEGACY_CLIENT_FILTER_DISABLED"
+      });
+      return;
+    }
+
+    res.set("Warning", "299 PrintForm API: query clientId is legacy; prefer claimClientId");
+    jobs = jobs.filter(job => job.targetClientId === legacyClientFilter);
   }
   if (req.query.sessionId) {
     jobs = jobs.filter(job => job.sessionId === req.query.sessionId);

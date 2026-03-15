@@ -29,9 +29,9 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 5. File storage & privacy controls — enforce kuota 1GB, validasi MIME/size, cleanup orphan, pencatatan usage, dan mekanisme penghapusan aman pasca-cetak. **Selesai.**
 6. Realtime channel — implement WebSocket endpoint untuk push event (job masuk, status job berubah, client online/offline) ke Web UI dan .NET client. **Selesai — server + .NET client + Web UI utama realtime aktif (polling fallback tetap ada).**
 7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download, dan fondasi akun user (username/password) untuk Web UI + desktop client. **Selesai untuk scope `PrintForm-server` (JWT + refresh token, ownership guard, hardening endpoint, audit log, dashboard mitra `/mitra`, self-service akun). Integrasi login/logout desktop dieksekusi di repo client terpisah.**
-8. Kios berbasis akun (account-centric queue) — rombak alur agar sesi/job berorientasi akun (kios), bukan client device. Root page menampilkan daftar akun kios (hanya akun dengan minimal 1 client), dan job akun tersinkron ke semua client yang login pada akun tersebut. **Progress aktif: core server 8a-8e selesai, 8f-8g fase hardening/rollout.**
+8. Kios berbasis akun (account-centric queue) — rombak alur agar sesi/job berorientasi akun (kios), bukan client device. Root page menampilkan daftar akun kios (hanya akun dengan minimal 1 client), dan job akun tersinkron ke semua client yang login pada akun tersebut. **Selesai untuk scope `PrintForm-server` (mode account-centric ketat default + fallback legacy opsional via env).**
 9. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik.
-10. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai untuk model client-centric lama; perlu penyesuaian lanjutan setelah Step 8 account-centric.**
+10. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai untuk scope `PrintForm-server`; adaptasi desktop lanjutan dieksekusi di repo client terpisah.**
 11. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
 
 ## Detail Step 7 (Akun dan Auth)
@@ -75,23 +75,24 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 - **8f. Penyesuaian desktop & web**
 	- Desktop tidak lagi fetch list job murni berdasar `clientId`; query harus terikat akun login + mekanisme claim.
 	- Web pelanggan (`/`) memilih kios berbasis akun, bukan device client.
-	- Status implementasi server + web pelanggan: **Selesai untuk scope repo ini**; adaptasi desktop client di repo desktop masih berjalan.
+	- Status implementasi server + web pelanggan: **Selesai**.
 
 - **8g. Rollout aman**
 	- Lakukan migration + compatibility layer (sementara) agar transisi dari model client-centric ke account-centric tidak memutus flow yang sedang berjalan.
-	- Status implementasi server: **In progress (hardening akhir)**.
+	- Status implementasi server: **Selesai** (mode strict default; fallback legacy dikontrol via env untuk rollback terbatas).
 
 ### Snapshot Progress Step 8 (Server)
 
 - Migration aktif: `20260314_step8a_account_queue_ownership.sql`, `20260314_step8d_job_claim_lock.sql`.
 - Endpoint baru/transisi:
 	- `GET /api/clients/kiosks`
-	- `POST /api/sessions` berbasis `kioskId` (fallback `clientId` sementara)
+	- `POST /api/sessions` berbasis `kioskId` (strict default)
 	- `POST /api/jobs/:id/claim`, `POST /api/jobs/:id/release`
 - Guard transisi:
 	- ownership guard berbasis `owner_user_id`
 	- claim conflict guard multi-client akun sama
 	- handover guard saat pair/bind/unbind
+	- legacy fallback dikontrol env (`ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE`, `JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER`)
 
 ### Acceptance & UAT Step 8e/8f/8g
 
@@ -137,9 +138,9 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 
 1. Jalankan migration 8a lalu 8d pada semua environment.
 2. Verifikasi endpoint baru (`/api/clients/kiosks`, claim/release) lewat smoke test.
-3. Aktifkan desktop fetch queue per-akun (repo desktop) sambil mempertahankan fallback lama.
+3. Aktifkan mode strict default (tanpa fallback legacy).
 4. Pantau conflict claim + audit log handover minimal 3-7 hari.
-5. Setelah desktop cutover stabil, rencanakan penghentian input legacy `clientId` pada create session.
+5. Jika rollback darurat diperlukan, aktifkan fallback env secara sementara lalu nonaktifkan kembali setelah insiden selesai.
 
 ## Pra-Realtime Stabilization
 
