@@ -32,7 +32,8 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 8. Kios berbasis akun (account-centric queue) — rombak alur agar sesi/job berorientasi akun (kios), bukan client device. Root page menampilkan daftar akun kios (hanya akun dengan minimal 1 client), dan job akun tersinkron ke semua client yang login pada akun tersebut. **Selesai untuk scope `PrintForm-server` (mode account-centric ketat default + fallback legacy opsional via env).**
 9. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik. **Selesai untuk scope `PrintForm-server` (scheduler internal terpusat + lifecycle start/stop).**
 10. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai untuk scope `PrintForm-server`; adaptasi desktop lanjutan dieksekusi di repo client terpisah.**
-11. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
+11. Penyesuaian print-job lanjutan — Konfigurasi lanjutan, penambahan ukuran kertas, dan print preview.
+12. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
 
 ## Detail Step 7 (Akun dan Auth)
 
