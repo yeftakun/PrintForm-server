@@ -96,6 +96,7 @@ psql "$DATABASE_URL" -f scripts/migrations/20260314_step8d_job_claim_lock.sql
 ### Cleanup and retention
 
 - `ORPHAN_GRACE_MS`: usia minimum file orphan agar boleh dihapus (ms).
+- `SESSION_CLEANUP_INTERVAL_MS`: interval scheduler untuk cleanup session expired (ms).
 - `FILE_CLEANUP_INTERVAL_MS`: interval scanner cleanup orphan file (ms).
 - `CLIENT_RETENTION_DAYS`: retensi stale client (hari).
 - `RETENTION_CLEANUP_INTERVAL_MS`: interval cleanup retensi stale data (ms).

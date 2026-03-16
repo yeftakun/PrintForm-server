@@ -1,15 +1,11 @@
 const http = require("http");
 const { createApp } = require("./src/app");
 const { ensureStorage } = require("./src/storage/jsonStore");
-const { port, FILE_CLEANUP_INTERVAL_MS, RETENTION_CLEANUP_INTERVAL_MS } = require("./src/config");
-const {
-  cleanupExpiredSessions,
-  cleanupOrphanFiles,
-  cleanupStaleClients
-} = require("./src/services/cleanup");
+const { port } = require("./src/config");
 const { getJobs } = require("./src/repositories/jobsRepository");
 const { refreshStorageUsageSnapshot } = require("./src/services/storageUsage");
 const { initializeRealtime, shutdownRealtime } = require("./src/services/realtime");
+const { startInternalScheduler, stopInternalScheduler } = require("./src/services/scheduler");
 
 ensureStorage()
   .then(() => {
@@ -28,7 +24,10 @@ ensureStorage()
       console.log(`PrintForm server running on http://localhost:${port}`);
     });
 
+    startInternalScheduler({ runOnStart: true });
+
     const shutdownHandler = () => {
+      stopInternalScheduler();
       shutdownRealtime();
       server.close(() => {
         process.exit(0);
@@ -37,24 +36,6 @@ ensureStorage()
 
     process.once("SIGINT", shutdownHandler);
     process.once("SIGTERM", shutdownHandler);
-
-    setInterval(() => {
-      cleanupExpiredSessions().catch(err => {
-        console.warn("Cleanup sessions failed:", err.message);
-      });
-    }, 10000);
-
-    setInterval(() => {
-      cleanupOrphanFiles().catch(err => {
-        console.warn("Cleanup orphan files failed:", err.message);
-      });
-    }, FILE_CLEANUP_INTERVAL_MS);
-
-    setInterval(() => {
-      cleanupStaleClients().catch(err => {
-        console.warn("Cleanup stale clients failed:", err.message);
-      });
-    }, RETENTION_CLEANUP_INTERVAL_MS);
   })
   .catch(err => {
     console.error("Failed to initialize storage:", err);

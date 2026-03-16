@@ -42,6 +42,7 @@ const sessionsFile = path.join(storageDir, "sessions.json");
 
 const CLIENT_TTL_MS = Number(process.env.CLIENT_TTL_MS) || 2 * 60 * 1000;
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS) || 30 * 1000;
+const SESSION_CLEANUP_INTERVAL_MS = Number(process.env.SESSION_CLEANUP_INTERVAL_MS) || 10 * 1000;
 const SESSION_CREATE_CONFIRM_TIMEOUT_MS = Number(process.env.SESSION_CREATE_CONFIRM_TIMEOUT_MS) || 6500;
 const SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS = Number(process.env.SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS) || 300;
 const ORPHAN_GRACE_MS = Number(process.env.ORPHAN_GRACE_MS) || 2 * 60 * 1000;
@@ -114,6 +115,7 @@ module.exports = {
   databaseUrl,
   CLIENT_TTL_MS,
   SESSION_TTL_MS,
+  SESSION_CLEANUP_INTERVAL_MS,
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
   SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS,
   ORPHAN_GRACE_MS,

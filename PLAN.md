@@ -30,7 +30,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 6. Realtime channel — implement WebSocket endpoint untuk push event (job masuk, status job berubah, client online/offline) ke Web UI dan .NET client. **Selesai — server + .NET client + Web UI utama realtime aktif (polling fallback tetap ada).**
 7. Security baseline — API key/JWT minimal untuk web & print client, audit log perubahan status, hardening endpoint upload/download, dan fondasi akun user (username/password) untuk Web UI + desktop client. **Selesai untuk scope `PrintForm-server` (JWT + refresh token, ownership guard, hardening endpoint, audit log, dashboard mitra `/mitra`, self-service akun). Integrasi login/logout desktop dieksekusi di repo client terpisah.**
 8. Kios berbasis akun (account-centric queue) — rombak alur agar sesi/job berorientasi akun (kios), bukan client device. Root page menampilkan daftar akun kios (hanya akun dengan minimal 1 client), dan job akun tersinkron ke semua client yang login pada akun tersebut. **Selesai untuk scope `PrintForm-server` (mode account-centric ketat default + fallback legacy opsional via env).**
-9. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik.
+9. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik. **Selesai untuk scope `PrintForm-server` (scheduler internal terpusat + lifecycle start/stop).**
 10. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai untuk scope `PrintForm-server`; adaptasi desktop lanjutan dieksekusi di repo client terpisah.**
 11. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
 
@@ -60,7 +60,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 - **8c. Session creation berbasis akun**
 	- Endpoint create session menerima identitas kios/akun (bukan `clientId` langsung).
 	- Server memilih/menilai client aktif milik akun tersebut untuk eksekusi, tanpa mengubah fakta bahwa owner session adalah akun.
-	- Status implementasi server: **Selesai** (mendukung `kioskId` + fallback kompatibilitas `clientId`).
+	- Status implementasi server: **Selesai** (mode strict default mewajibkan `kioskId`; fallback `clientId` dapat diaktifkan sementara via env).
 
 - **8d. Queue sinkron lintas client dalam akun**
 	- Semua client yang login pada akun yang sama melihat antrean job akun yang sama.
@@ -123,9 +123,10 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 4. **Compatibility behavior (8g)**
 	- Aksi:
 		- Flow baru: create session pakai `kioskId`.
-		- Flow lama: create session pakai `clientId` (sementara).
+		- Flow lama: create session pakai `clientId` hanya jika fallback env diaktifkan.
 	- Ekspektasi:
-		- Keduanya tetap bekerja pada fase transisi.
+		- Mode strict default menolak flow lama dengan kode kompatibilitas yang jelas.
+		- Jika fallback env diaktifkan sementara, flow lama tetap bekerja selama fase transisi.
 		- Respons session menyertakan metadata transisi (`targetSource`, `compatibility.legacyClientTarget`) untuk monitoring cutover.
 
 5. **Guest flow non-regression**
