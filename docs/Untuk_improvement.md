@@ -2,6 +2,4 @@ Jadi terkait kapasitas saya sebagai mahasiswa yang mengerjakan proyek ini untuk 
 
 **Beberapa pertimbangan yang akan didiskusikan kepada dosen pembimbing:**
 
-1. Terkait penggunaan penyimpanan untuk dokumen yang dikirim pelanggan percetakan, apakah dapat dilakukan pada direktori penyimpanan server? Atau harus menggunakan penyimpanan seperti AWS S3?
-
-Untuk AI Agent, cukup sampai sini, jangan dibaca setelah ini.
+1. Untuk sesi cetak, idealnya ketika sudah selesai (pelanggan mengakhiri sesi) apakah sesi cetak tersebut dihapus (seperti penerapan sekarang) atau dibiarkan namun dengan status `closed`?

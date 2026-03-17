@@ -34,8 +34,9 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 [Detail Step 8](detail_step8.md)
 9. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik. **Selesai untuk scope `PrintForm-server` (scheduler internal terpusat + lifecycle start/stop).**
 10. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai untuk scope `PrintForm-server`; adaptasi desktop lanjutan dieksekusi di repo client terpisah.**
-11. Penyesuaian print-job lanjutan — Konfigurasi lanjutan, penambahan ukuran kertas, dan print preview.
-12. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
+11. Perancangan mockup pada [UI_MOCKUP_CONCEPT.md](UI_MOCKUP_CONCEPT.md).
+12. Penyesuaian role akun: Admin, Mitra, Pelanggan.
+13. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
 
 
 
