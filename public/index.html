@@ -82,7 +82,7 @@
               <th>ID</th>
               <th>Dokumen</th>
               <th>Alias</th>
-              <th>Client</th>
+              <th>Claimed By</th>
               <th>Ukuran</th>
               <th>Salinan</th>
               <th>Status</th>
@@ -108,7 +108,7 @@
               <th>Client Terdaftar</th>
               <th>Client Online</th>
               <th>Client Siap</th>
-              <th>Target Aktif</th>
+              <th>Bisa Mulai Session</th>
             </tr>
           </thead>
           <tbody id="clientsBody">
@@ -286,8 +286,7 @@
           const options = kiosks.map(kiosk => {
             const canSelect = Boolean(kiosk.canStartSession);
             const readinessLabel = toReadinessLabel(kiosk.readiness);
-            const activeTargetLabel = kiosk.targetClientName ? ` via ${kiosk.targetClientName}` : "";
-            const label = `${kiosk.displayName} (${readinessLabel}; ${kiosk.clientCount} client)${activeTargetLabel}`;
+            const label = `${kiosk.displayName} (${readinessLabel}; ${kiosk.readyClientCount}/${kiosk.clientCount} client siap)`;
             return `<option value="${kiosk.id}" data-kiosk-name="${kiosk.displayName}"${canSelect ? "" : " disabled"}>${label}</option>`;
           }).join("");
 
@@ -318,7 +317,7 @@
               <td>${kiosk.clientCount}</td>
               <td>${kiosk.onlineClientCount}</td>
               <td>${kiosk.readyClientCount}</td>
-              <td>${kiosk.targetClientName || "-"}</td>
+              <td>${kiosk.canStartSession ? "Ya" : "Belum"}</td>
             </tr>
           `).join("");
           clientsStatus.textContent = "";
@@ -369,7 +368,7 @@
               <td>${job.id}</td>
               <td>${job.originalName}</td>
               <td>${job.alias || "-"}</td>
-              <td>${job.targetClientName || job.targetClientId || "-"}</td>
+              <td>${job.claimedByClientId || "-"}</td>
               <td>${job.printConfig.paperSize}</td>
               <td>${job.printConfig.copies}</td>
               <td>${formatStatus(job.status)}</td>
