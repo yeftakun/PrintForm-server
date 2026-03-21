@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aIu0uFobCzsHcIFI3XTQY6ikfwDFWvZvXkPfjwRlT5wBnHgxVXfz5IUshu73bjZ
+\restrict van7OPWFzi7raG6wmGctXkuIUgntkte3cAjbaT8o37GOkCbYi49UzTNWIdz4tzi
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -168,8 +168,6 @@ ALTER SEQUENCE public.events_id_seq OWNED BY public.events.id;
 CREATE TABLE public.jobs (
     id text NOT NULL,
     session_id text NOT NULL,
-    target_client_id text,
-    target_client_name character varying(120),
     original_name character varying(255) NOT NULL,
     stored_path text NOT NULL,
     size_bytes bigint NOT NULL,
@@ -2041,7 +2039,7 @@ COPY public.events (id, client_id, session_id, job_id, type, payload, created_at
 -- Data for Name: jobs; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.jobs (id, session_id, target_client_id, target_client_name, original_name, stored_path, size_bytes, status, alias, paper_size, copies, created_at, updated_at, owner_user_id, claimed_by_client_id, claimed_at) FROM stdin;
+COPY public.jobs (id, session_id, original_name, stored_path, size_bytes, status, alias, paper_size, copies, created_at, updated_at, owner_user_id, claimed_by_client_id, claimed_at) FROM stdin;
 \.
 
 
@@ -2340,13 +2338,6 @@ CREATE INDEX idx_jobs_status ON public.jobs USING btree (status);
 
 
 --
--- Name: idx_jobs_target_client; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_jobs_target_client ON public.jobs USING btree (target_client_id);
-
-
---
 -- Name: idx_refresh_tokens_expires; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2460,14 +2451,6 @@ ALTER TABLE ONLY public.jobs
 
 
 --
--- Name: jobs jobs_target_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.jobs
-    ADD CONSTRAINT jobs_target_client_id_fkey FOREIGN KEY (target_client_id) REFERENCES public.clients(id) ON DELETE SET NULL;
-
-
---
 -- Name: refresh_tokens refresh_tokens_replaced_by_token_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2519,5 +2502,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aIu0uFobCzsHcIFI3XTQY6ikfwDFWvZvXkPfjwRlT5wBnHgxVXfz5IUshu73bjZ
+\unrestrict van7OPWFzi7raG6wmGctXkuIUgntkte3cAjbaT8o37GOkCbYi49UzTNWIdz4tzi
 
