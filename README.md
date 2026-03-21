@@ -185,7 +185,7 @@ Tuning env vars for upload and storage:
 - Upload jobs (A4/A5, copies).
 - Mekanisme claim/lock aktif untuk status print (`printing`/`done`/`failed`/`rejected`/`pending`/`send`) agar job yang sama tidak diproses ganda antar client akun.
 - Desktop queue dianjurkan fetch per-akun (default auth scope) via `GET /api/jobs` dengan token login akun; hindari mode lama yang hanya bergantung `clientId`.
-- Jika desktop lama masih mengirim query `clientId`, server mode strict akan mengabaikan filter itu (bukan fail), lalu tetap mengembalikan queue per-akun.
+- Setelah cleanup kolom legacy (`target_client_id`), query `clientId` pada `GET /api/jobs` selalu diabaikan; gunakan `claimClientId` bila butuh view claim-aware.
 - Untuk kontrol lock yang lebih eksplisit, tersedia endpoint `POST /api/jobs/:id/claim` dan `POST /api/jobs/:id/release` (auth).
 - Job list with:
   - "Buat lagi" (clone job with same file/config).
@@ -198,7 +198,7 @@ Tuning env vars for upload and storage:
 - Registers to the server and sends heartbeat/ping poll.
 - `clientId` is mandatory and must be a valid GUID/UUID format.
 - Job list with Print / Reject (Reject only on `ready`).
-- Untuk update status print, client sebaiknya kirim `clientId` pada `PATCH /api/jobs/:id` agar claim/lock bisa divalidasi eksplisit.
+- Untuk update status print claim-guarded (`printing`/`pending`/`done`/`failed`/`rejected`/`send`), client wajib kirim `clientId` pada `PATCH /api/jobs/:id`.
 - If printer is offline, job becomes `pending` (not sent to spooler).
 - Prints locally on the client machine; server never prints.
 
@@ -250,14 +250,14 @@ Tuning env vars for upload and storage:
   - `PATCH /api/auth/me/password`
 - Jobs:
   - `GET /api/jobs?sessionId=...`
-  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `claimClientId` untuk view claim-aware (`clientId` query legacy diabaikan pada mode strict default).
+  - `GET /api/jobs` (auth default account scope); optional query: `kioskId`/`ownerUserId`/`accountId`, dan `claimClientId` untuk view claim-aware (`clientId` query legacy diabaikan).
   - `GET /api/jobs/:id`
   - `GET /api/jobs/:id/download`
   - `POST /api/jobs` (multipart upload)
   - `POST /api/jobs/:id/clone`
   - `POST /api/jobs/:id/claim` (auth, butuh `clientId`)
   - `POST /api/jobs/:id/release` (auth, butuh `clientId` kecuali admin)
-  - `PATCH /api/jobs/:id` (status updates; claim-aware untuk status print, dapat kirim `clientId`)
+  - `PATCH /api/jobs/:id` (status updates; claim-aware untuk status print guarded, wajib `clientId`)
 
 ## Realtime WebSocket
 

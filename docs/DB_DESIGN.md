@@ -26,8 +26,9 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 - **jobs**
 	- id (text, pk)
 	- session_id (text, fk -> sessions.id, on delete cascade)
-	- target_client_id (text, fk -> clients.id, on delete set null)
-	- target_client_name (varchar(120), snapshot)
+	- owner_user_id (text, fk -> users.id, on delete set null)
+	- claimed_by_client_id (text, fk -> clients.id, on delete set null)
+	- claimed_at (timestamptz, null)
 	- original_name (varchar(255), not null)
 	- stored_path (text, not null) -- filesystem path; for future object storage store key/url
 	- size_bytes (bigint, not null)
@@ -37,7 +38,7 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 	- copies (int, not null)
 	- created_at (timestamptz, not null default now())
 	- updated_at (timestamptz, not null default now())
-	- indexes: (session_id), (target_client_id), (status), (created_at desc)
+	- indexes: (session_id), (owner_user_id), (claimed_by_client_id), (status), (created_at desc)
 
 - **events** (for ping and status changes)
 	- id (bigserial, pk)

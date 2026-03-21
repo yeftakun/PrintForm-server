@@ -10,8 +10,6 @@ function toPublicJob(job) {
     alias: job.alias || null,
     printConfig: job.printConfig,
     ownerUserId: job.ownerUserId || null,
-    targetClientId: job.targetClientId,
-    targetClientName: job.targetClientName,
     sessionId: job.sessionId,
     claimedByClientId: job.claimedByClientId || null,
     claimedAt: job.claimedAt || null

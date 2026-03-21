@@ -106,7 +106,7 @@ async function getJobs() {
     : "NULL::timestamptz AS claimed_at";
 
   const res = await query(
-    `select id, session_id, target_client_id, target_client_name, original_name, stored_path, size_bytes,
+    `select id, session_id, original_name, stored_path, size_bytes,
             status, alias, paper_size, copies, ${ownerUserIdSelect}, ${claimedByClientIdSelect}, ${claimedAtSelect}, created_at, updated_at
        from jobs
        order by created_at desc`
@@ -117,8 +117,6 @@ async function getJobs() {
     ownerUserId: row.owner_user_id || null,
     claimedByClientId: row.claimed_by_client_id || null,
     claimedAt: row.claimed_at?.toISOString?.() || row.claimed_at || null,
-    targetClientId: row.target_client_id,
-    targetClientName: row.target_client_name,
     originalName: row.original_name,
     storedPath: row.stored_path,
     size: Number(row.size_bytes),
@@ -152,8 +150,6 @@ async function saveJobs(jobs) {
       const insertColumns = [
         "id",
         "session_id",
-        "target_client_id",
-        "target_client_name",
         "original_name",
         "stored_path",
         "size_bytes",
@@ -165,8 +161,6 @@ async function saveJobs(jobs) {
       const values = [
         j.id,
         j.sessionId,
-        j.targetClientId || null,
-        j.targetClientName || null,
         j.originalName,
         j.storedPath,
         j.size,
@@ -209,8 +203,6 @@ async function saveJobs(jobs) {
 
       const updateSetClauses = [
         "session_id = EXCLUDED.session_id",
-        "target_client_id = EXCLUDED.target_client_id",
-        "target_client_name = EXCLUDED.target_client_name",
         "original_name = EXCLUDED.original_name",
         "stored_path = EXCLUDED.stored_path",
         "size_bytes = EXCLUDED.size_bytes",

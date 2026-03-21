@@ -176,7 +176,7 @@ function canAccessJobForUser(job, user, accessibleClientIds) {
   return canAccessOwnedResource(
     {
       ownerUserId: job?.ownerUserId || null,
-      clientId: job?.targetClientId || null
+      clientId: null
     },
     user,
     accessibleClientIds
@@ -247,17 +247,12 @@ function getRequestOwnerUserId(req) {
   return "";
 }
 
-function shouldIncludeJobInOwnerScope(job, ownerUserId, accessibleClientIds) {
+function shouldIncludeJobInOwnerScope(job, ownerUserId) {
   if (!ownerUserId) {
     return false;
   }
 
-  if (job.ownerUserId) {
-    return job.ownerUserId === ownerUserId;
-  }
-
-  // Legacy fallback before owner_user_id backfill is complete.
-  return canAccessClientId(accessibleClientIds, job.targetClientId);
+  return job.ownerUserId === ownerUserId;
 }
 
 function filterJobsByClaimClient(jobs, claimClientId) {
@@ -340,7 +335,7 @@ router.get("/", asyncHandler(async (req, res) => {
         return false;
       }
 
-      return shouldIncludeJobInOwnerScope(job, ownerScopeUserId, accessibleClientIds);
+      return shouldIncludeJobInOwnerScope(job, ownerScopeUserId);
     });
 
     const claimClientId = getRequestClaimClientId(req);
@@ -374,15 +369,12 @@ router.get("/", asyncHandler(async (req, res) => {
     : "";
 
   if (legacyClientFilter) {
-    if (!JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER) {
-      if (req.user) {
-        // Compatibility bridge: old desktop builds may still send `clientId` in query.
-        // In strict mode, keep account-scope behavior and ignore this legacy filter.
-        res.set("Warning", "299 PrintForm API: query clientId is legacy and ignored; use claimClientId");
-      }
-    } else {
-      res.set("Warning", "299 PrintForm API: query clientId is legacy; prefer claimClientId");
-      jobs = jobs.filter(job => job.targetClientId === legacyClientFilter);
+    if (req.user) {
+      // target_client_id has been removed from schema; legacy query filter is ignored.
+      const warningMessage = JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER
+        ? "299 PrintForm API: query clientId is legacy and ignored after target_client_id removal; use claimClientId"
+        : "299 PrintForm API: query clientId is legacy and ignored; use claimClientId";
+      res.set("Warning", warningMessage);
     }
   }
   if (req.query.sessionId) {
@@ -530,8 +522,6 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     ownerUserId: session.ownerUserId || sourceJob.ownerUserId || null,
     claimedByClientId: null,
     claimedAt: null,
-    targetClientId: session.clientId,
-    targetClientName: session.clientName,
     printConfig: sourceJob.printConfig
   };
 
@@ -549,7 +539,6 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
       targetId: clonedJob.id,
       detail: {
         sourceJobId: sourceJob.id,
-        clientId: clonedJob.targetClientId || null,
         ownerUserId: clonedJob.ownerUserId || null,
         sessionId: clonedJob.sessionId || null
       }
@@ -639,7 +628,7 @@ router.post("/:id/claim", asyncHandler(async (req, res) => {
         previousClaimedByClientId,
         claimedByClientId: claimantClientId,
         ownerUserId: job.ownerUserId || null,
-        clientId: job.targetClientId || null,
+        requestClientId: claimantClientId,
         sessionId: job.sessionId || null
       }
     });
@@ -733,7 +722,6 @@ router.post("/:id/release", asyncHandler(async (req, res) => {
         previousClaimedByClientId,
         releasedByClientId: requesterClientId || null,
         ownerUserId: job.ownerUserId || null,
-        clientId: job.targetClientId || null,
         sessionId: job.sessionId || null
       }
     });
@@ -807,7 +795,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
 
     const previousStatus = job.status;
     const requestClientId = getRequestClientId(req);
-    const claimantClientId = requestClientId || job.targetClientId || "";
+    const claimantClientId = requestClientId;
     const isClaimGuardedStatus = CLAIM_GUARDED_STATUSES.has(normalizedStatus);
 
     if (isClaimGuardedStatus && !claimantClientId) {
@@ -883,7 +871,6 @@ router.patch("/:id", asyncHandler(async (req, res) => {
       detail: {
         previousStatus,
         nextStatus: normalizedStatus,
-        clientId: job.targetClientId || null,
         ownerUserId: job.ownerUserId || null,
         claimedByClientId: job.claimedByClientId || null,
         requestClientId: requestClientId || null,
@@ -969,8 +956,6 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     ownerUserId: session.ownerUserId || null,
     claimedByClientId: null,
     claimedAt: null,
-    targetClientId: session.clientId,
-    targetClientName: session.clientName,
     printConfig: {
       paperSize,
       copies
@@ -990,7 +975,6 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
       targetType: "job",
       targetId: job.id,
       detail: {
-        clientId: job.targetClientId || null,
         ownerUserId: job.ownerUserId || null,
         sessionId: job.sessionId || null,
         originalName: job.originalName || null

@@ -199,25 +199,14 @@ async function applyQueueHandoverGuard({ clientId, previousOwnerUserId, nextOwne
   }
 
   let jobsReowned = 0;
-  let jobsDetached = 0;
   let claimsReleased = 0;
   for (const job of jobs) {
     let changed = false;
-    const targetsClient = job.targetClientId === normalizedClientId;
 
-    if (targetsClient && !job.ownerUserId && previousOwnerUserId) {
+    if (!job.ownerUserId && previousOwnerUserId) {
       job.ownerUserId = previousOwnerUserId;
       jobsReowned += 1;
       changed = true;
-    }
-
-    if (targetsClient && !job.ownerUserId && !previousOwnerUserId && nextOwnerUserId) {
-      if (job.targetClientId || job.targetClientName) {
-        job.targetClientId = null;
-        job.targetClientName = null;
-        jobsDetached += 1;
-        changed = true;
-      }
     }
 
     if (job.claimedByClientId === normalizedClientId) {
@@ -236,7 +225,7 @@ async function applyQueueHandoverGuard({ clientId, previousOwnerUserId, nextOwne
     await saveSessions(sessions);
   }
 
-  if (jobsReowned > 0 || jobsDetached > 0 || claimsReleased > 0) {
+  if (jobsReowned > 0 || claimsReleased > 0) {
     await saveJobs(jobs);
   }
 
@@ -244,7 +233,7 @@ async function applyQueueHandoverGuard({ clientId, previousOwnerUserId, nextOwne
     sessionsReowned,
     sessionsDetached,
     jobsReowned,
-    jobsDetached,
+    jobsDetached: 0,
     claimsReleased
   };
 }

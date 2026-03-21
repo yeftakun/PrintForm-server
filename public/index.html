@@ -450,7 +450,7 @@
 
           sessionId = body.id;
           sessionClient = selectedKioskName || body.clientName || "";
-          sessionClientId = body.clientId || body.targetClientId || "";
+          sessionClientId = body.clientId || "";
           sessionAlias = body.alias || senderAlias || "";
           sessionHeartbeatFailures = 0;
           sessionStorage.setItem("printformSessionId", sessionId);
