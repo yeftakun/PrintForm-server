@@ -50,6 +50,26 @@ psql "$env:DATABASE_URL" -f scripts/migrations/20260314_step8d_job_claim_lock.sq
 psql "$DATABASE_URL" -f scripts/migrations/20260314_step8d_job_claim_lock.sql
 ```
 
+Apply Step 8h legacy cleanup (drop `jobs.target_client_name`) after UI/monitoring no longer depends on target client label:
+
+```powershell
+psql "$env:DATABASE_URL" -f scripts/migrations/20260321_step8h_drop_target_client_name.sql
+```
+
+```bash
+psql "$DATABASE_URL" -f scripts/migrations/20260321_step8h_drop_target_client_name.sql
+```
+
+Apply Step 8i final cleanup (drop `jobs.target_client_id`) only after runtime fallback is fully removed:
+
+```powershell
+psql "$env:DATABASE_URL" -f scripts/migrations/20260321_step8i_drop_target_client_id.sql
+```
+
+```bash
+psql "$DATABASE_URL" -f scripts/migrations/20260321_step8i_drop_target_client_id.sql
+```
+
 ## .env Reference
 
 ### Core
