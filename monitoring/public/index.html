@@ -55,7 +55,6 @@
             <tr>
               <th>ID</th>
               <th>Status</th>
-              <th>Client</th>
               <th>Owner User</th>
               <th>Claimed By</th>
               <th>Claimed At</th>
@@ -268,7 +267,6 @@
         <tr>
           <td title="${j.id}">${j.id}</td>
           <td>${j.status || ''}</td>
-          <td title="${j.targetClientId || ''}">${j.targetClientName || j.targetClientId || ''}</td>
           <td title="${j.ownerUserId || ''}">${j.ownerUserId || ''}</td>
           <td title="${j.claimedByClientId || ''}">${j.claimedByClientId || ''}</td>
           <td>${formatDateSafe(j.claimedAt)}</td>

@@ -29,7 +29,7 @@ Secara default akan jalan di `http://localhost:3100` (ubah via `MONITORING_PORT`
 - Ringkasan: total/online/recognized clients, total sessions/jobs, status distribusi, serta token refresh aktif.
 - Tabel Clients: id, name, status (TTL + cached status), owner user, recognized flag, selected printer, last seen.
 - Tabel Sessions: id, client, owner user, alias, status, created, last seen.
-- Tabel Jobs: id, status, target client, owner user, claimed by, claimed at, nama file, paper size, copies, size, created.
+- Tabel Jobs: id, status, owner user, claimed by, claimed at, nama file, paper size, copies, size, created.
 - Tabel Events dan Audit Logs (latest 50).
 - Tabel Refresh Tokens (latest 50): user, created, expires, revoked, replaced_by.
 - Tabel Users (latest 50): username/email/role + indikator PIN set/unset.

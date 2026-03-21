@@ -78,3 +78,39 @@
 3. Aktifkan mode strict default (tanpa fallback legacy).
 4. Pantau conflict claim + audit log handover minimal 3-7 hari.
 5. Jika rollback darurat diperlukan, aktifkan fallback env secara sementara lalu nonaktifkan kembali setelah insiden selesai.
+
+### Rencana Migrasi Bertahap Kolom Legacy `target_client_*`
+
+Tujuan: mempertahankan model account-centric (`owner_user_id`) sebagai sumber otoritas, sambil tetap menjaga kompatibilitas desktop lama sampai fallback benar-benar dimatikan.
+
+#### Tahap 0 - Prasyarat observability dan kompatibilitas
+
+1. Pastikan mode strict tetap aktif: `ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE=false` dan `JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER=false`.
+2. Pantau 7-14 hari untuk indikator: error `LEGACY_CLIENT_TARGET_DISABLED`, warning query `clientId` legacy, dan conflict claim (`JOB_ALREADY_CLAIMED`, `JOB_CLAIM_CONFLICT`).
+3. Pastikan UI customer/monitoring tidak lagi bergantung pada `targetClientName`.
+
+#### Tahap 1 - Deprecate `target_client_name` (drop lebih dulu)
+
+1. Hentikan pemakaian field `targetClientName` pada UI customer dan monitoring.
+2. Tetap biarkan server read/write `target_client_id` untuk fallback internal.
+3. Jalankan migration: `ALTER TABLE jobs DROP COLUMN IF EXISTS target_client_name;`.
+4. Hilangkan select/insert/update mapping `target_client_name` di repository jobs.
+5. Validasi: UAT Step 8 (terutama TC-05 s.d. TC-08) tetap lulus dan monitoring jobs tetap menampilkan `owner_user_id`, `claimed_by_client_id`, `claimed_at`.
+
+#### Tahap 2 - Sunset fallback `target_client_id` di runtime
+
+1. Ubah guard status update claim-aware agar tidak fallback ke `job.targetClientId`; wajib `clientId` eksplisit dari actor saat claim/patch status guarded.
+2. Pastikan semua desktop client sudah versi baru yang selalu kirim `clientId`.
+3. Bekukan dependency handover guard yang masih merujuk `targetClientId` dan ganti ke relasi owner/claim/session yang setara.
+
+#### Tahap 3 - Drop `target_client_id`
+
+1. Jalankan migration: `ALTER TABLE jobs DROP COLUMN IF EXISTS target_client_id;`.
+2. Bersihkan kode repository, mapper public, monitoring payload, dan audit detail yang masih menyertakan target client.
+3. Lakukan UAT regresi penuh: TC-01 s.d. TC-12, pairing/unbind/rebind antar akun, serta guest flow dan monitoring summary.
+
+#### Rollback Strategy
+
+1. Tahap 1 rollback: tambahkan kembali `target_client_name` nullable jika diperlukan tampilan historis.
+1. Tahap 2 rollback: aktifkan sementara logika fallback `targetClientId` di runtime sambil patch desktop lama.
+1. Tahap 3 rollback: harus melalui forward-fix (re-introduce kolom + backfill terbatas) sehingga eksekusi drop kolom dilakukan hanya setelah freeze window dan backup tervalidasi.
