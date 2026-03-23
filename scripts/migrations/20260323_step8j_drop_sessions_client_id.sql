@@ -8,24 +8,38 @@
 
 BEGIN;
 
-ALTER TABLE public.sessions
-  ADD COLUMN IF NOT EXISTS owner_user_id text;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'sessions_owner_user_id_fkey'
-  ) THEN
+  IF to_regclass('public.sessions') IS NULL THEN
+    RAISE NOTICE 'Skipping step8j: table public.sessions does not exist in current database.';
+  ELSE
     ALTER TABLE public.sessions
-      ADD CONSTRAINT sessions_owner_user_id_fkey
-      FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+      ADD COLUMN IF NOT EXISTS owner_user_id text;
   END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_sessions_owner_user
-  ON public.sessions (owner_user_id);
+DO $$
+BEGIN
+  IF to_regclass('public.sessions') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'sessions_owner_user_id_fkey'
+    ) THEN
+      ALTER TABLE public.sessions
+        ADD CONSTRAINT sessions_owner_user_id_fkey
+        FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+    END IF;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF to_regclass('public.sessions') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_sessions_owner_user
+      ON public.sessions (owner_user_id);
+  END IF;
+END $$;
 
 -- Backfill owner for legacy rows while client_id still exists.
 DO $$
@@ -91,7 +105,12 @@ BEGIN
   END LOOP;
 END $$;
 
-ALTER TABLE public.sessions
-  DROP COLUMN IF EXISTS client_id;
+DO $$
+BEGIN
+  IF to_regclass('public.sessions') IS NOT NULL THEN
+    ALTER TABLE public.sessions
+      DROP COLUMN IF EXISTS client_id;
+  END IF;
+END $$;
 
 COMMIT;

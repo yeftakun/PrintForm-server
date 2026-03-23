@@ -58,13 +58,22 @@ const TERMINAL_JOB_STATUSES = new Set([
   "canceled"
 ]);
 
+const GUEST_ALLOWED_STATUS_UPDATES = new Set([
+  "canceled",
+  "rejected"
+]);
+
 const CLAIM_GUARDED_STATUSES = new Set([
   "printing",
   "pending",
   "done",
   "failed",
-  "rejected",
   "send"
+]);
+
+const STATUS_ALIASES = new Map([
+  ["reject", "rejected"],
+  ["cancelled", "canceled"]
 ]);
 
 const jobLockQueueById = new Map();
@@ -794,7 +803,8 @@ router.patch("/:id", asyncHandler(async (req, res) => {
       return;
     }
 
-    const normalizedStatus = status.trim().toLowerCase();
+    const normalizedStatusInput = status.trim().toLowerCase();
+    const normalizedStatus = STATUS_ALIASES.get(normalizedStatusInput) || normalizedStatusInput;
     if (!ALLOWED_JOB_STATUSES.has(normalizedStatus)) {
       res.status(400).json({ error: "Unsupported status" });
       return;
@@ -812,8 +822,8 @@ router.patch("/:id", asyncHandler(async (req, res) => {
         return;
       }
 
-      if (normalizedStatus !== "canceled") {
-        res.status(403).json({ error: "Guest can only cancel jobs" });
+      if (!GUEST_ALLOWED_STATUS_UPDATES.has(normalizedStatus)) {
+        res.status(403).json({ error: "Guest can only cancel or reject jobs" });
         return;
       }
     }
@@ -823,12 +833,30 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     let claimantClientId = requestClientId;
     const isClaimGuardedStatus = CLAIM_GUARDED_STATUSES.has(normalizedStatus);
 
+    if (isClaimGuardedStatus && !claimantClientId && job.claimedByClientId) {
+      claimantClientId = String(job.claimedByClientId || "").trim();
+    }
+
+    if (isClaimGuardedStatus && !claimantClientId && job.sessionId) {
+      // Legacy desktop payloads may omit clientId on PATCH; infer from owning session target.
+      const sessions = await getSessions();
+      const activeSession = sessions.find(item => item.id === job.sessionId);
+      claimantClientId = String(activeSession?.clientId || "").trim();
+    }
+
     if (isClaimGuardedStatus && !claimantClientId) {
       // Account-centric fallback: only resolve implicitly when account has exactly one client.
       claimantClientId = await resolveImplicitClaimClientId(req.user, accessibleClientIds);
     }
 
     if (isClaimGuardedStatus && !claimantClientId) {
+      console.warn("job.patch claim-guarded rejected: missing claimant client", {
+        jobId: job.id,
+        status: normalizedStatus,
+        ownerUserId: job.ownerUserId || null,
+        sessionId: job.sessionId || null,
+        hasAuthenticatedUser: Boolean(req.user)
+      });
       res.status(400).json({
         error: "clientId is required for claim-guarded status updates (required for multi-client accounts)",
         code: "JOB_CLAIM_CLIENT_REQUIRED",

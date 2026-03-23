@@ -312,6 +312,8 @@ router.post("/", asyncHandler(async (req, res) => {
   const sessions = await getSessions();
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    // Keep legacy compatibility when DB schema still requires sessions.client_id.
+    clientId: sessionTargetClient.id,
     ownerUserId: sessionOwnerUserId || sessionTargetClient.ownerUserId || null,
     alias,
     createdAt: new Date().toISOString(),
