@@ -1,7 +1,7 @@
-## Detail Step 12 (Konfigurasi Cetak Dasar + Driver-Aware Resolution di Desktop)
+## Detail Step 13 (Konfigurasi Cetak Dasar + Driver-Aware Resolution di Desktop)
 [Kembali](PLAN.md)
 
-Tujuan Step 12 adalah menjaga input pelanggan di Web UI tetap sederhana, tetapi tetap kompatibel dengan realita lapangan bahwa setiap kios (akun) bisa memiliki banyak client desktop dan printer dengan kemampuan driver yang berbeda.
+Tujuan Step 13 adalah menjaga input pelanggan di Web UI tetap sederhana, tetapi tetap kompatibel dengan realita lapangan bahwa setiap kios (akun) bisa memiliki banyak client desktop dan printer dengan kemampuan driver yang berbeda.
 
 ### Prinsip Arsitektur
 
@@ -12,11 +12,11 @@ Tujuan Step 12 adalah menjaga input pelanggan di Web UI tetap sederhana, tetapi 
 
 ---
 
-### 12a. Scope Konfigurasi Dasar di Web UI (Pelanggan)
+### 13a. Scope Konfigurasi Dasar di Web UI (Pelanggan)
 
 Input yang direkomendasikan untuk fase ini:
 
-- paperSize (A4, A5 pada fase awal)
+- paperSize (A4, A5 F4)
 - copies (1-999)
 - colorMode (bw atau color)
 - orientation (portrait atau landscape, opsional)
@@ -30,7 +30,7 @@ Catatan implementasi awal:
 
 ---
 
-### 12b. Konfigurasi Kios di Level Akun Mitra
+### 13b. Konfigurasi Kios di Level Akun Mitra
 
 Setiap akun kios memiliki policy dasar layanan cetak, bukan policy per browser pelanggan. Policy ini dipakai server untuk memvalidasi request sebelum job masuk antrean.
 
@@ -50,7 +50,7 @@ Aturan validasi:
 
 ---
 
-### 12c. Tanggung Jawab Server
+### 13c. Tanggung Jawab Server
 
 Server tetap fokus pada kontrak dan orkestrasi, bukan detail driver printer.
 
@@ -69,7 +69,7 @@ Catatan kompatibilitas schema:
 
 ---
 
-### 12d. Tanggung Jawab Desktop Client (Driver-Aware Resolution)
+### 13d. Tanggung Jawab Desktop Client (Driver-Aware Resolution)
 
 Desktop client adalah tempat yang paling tepat untuk meniru perilaku seperti dialog print browser (driver-aware).
 
@@ -93,7 +93,7 @@ Contoh atribut yang ditentukan di desktop (bukan di web):
 
 ---
 
-### 12e. Aturan Merge Konfigurasi (Disarankan)
+### 13e. Aturan Merge Konfigurasi (Disarankan)
 
 Urutan prioritas nilai:
 
@@ -114,7 +114,7 @@ Perilaku saat tidak didukung printer:
 
 ---
 
-### 12f. Dampak untuk Multi-Client Satu Akun
+### 13f. Dampak untuk Multi-Client Satu Akun
 
 Model ini mendukung satu akun dengan banyak client/printer berbeda:
 
@@ -124,25 +124,25 @@ Model ini mendukung satu akun dengan banyak client/printer berbeda:
 
 ---
 
-### 12g. Rencana Implementasi Bertahap
+### 13g. Rencana Implementasi Bertahap
 
-1. Fase 12.1 (Server + Web dasar)
+1. Fase 13.1 (Server + Web dasar)
   - Tambah field konfigurasi dasar bertahap di form web.
   - Validasi field dasar di server.
   - Pastikan tetap kompatibel dengan client lama.
 
-1. Fase 12.2 (Desktop resolver)
+1. Fase 13.2 (Desktop resolver)
   - Tambah modul resolver konfigurasi berbasis printer profile/driver.
   - Terapkan fallback hard vs soft rule.
   - Kirim status dan reason secara konsisten ke server.
 
-1. Fase 12.3 (Observability dan hardening)
+1. Fase 13.3 (Observability dan hardening)
   - Tambah audit detail untuk kasus fallback, pending, failed.
   - Tambah metrik sederhana: jumlah fallback, job gagal karena unsupported capability.
 
 ---
 
-### Acceptance dan UAT Step 12
+### Acceptance dan UAT Step 13
 
 1. Input pelanggan tetap sederhana dan dapat dipahami tanpa harus memilih atribut teknis printer.
 2. Job dengan konfigurasi dasar valid berhasil dibuat untuk kios yang ready.
@@ -153,7 +153,7 @@ Model ini mendukung satu akun dengan banyak client/printer berbeda:
 
 ---
 
-### Out of Scope Step 12
+### Out of Scope Step 13
 
 - Menampilkan seluruh atribut driver printer secara dinamis di Web UI pelanggan seperti native print dialog browser.
 - Menyamakan 100 persen perilaku semua jenis driver printer lintas OS.
@@ -161,7 +161,7 @@ Model ini mendukung satu akun dengan banyak client/printer berbeda:
 
 ---
 
-### Ringkasan Keputusan Step 12
+### Ringkasan Keputusan Step 13
 
 - Web UI pelanggan tetap basic-first.
 - Server bertanggung jawab pada kontrak, validasi, dan orkestrasi antrean akun.
