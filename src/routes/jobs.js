@@ -68,6 +68,7 @@ const CLAIM_GUARDED_STATUSES = new Set([
   "pending",
   "done",
   "failed",
+  "rejected",
   "send"
 ]);
 
@@ -204,6 +205,24 @@ async function resolveImplicitClaimClientId(user, accessibleClientIds) {
   }
 
   return String(ownedClients[0].id || "").trim();
+}
+
+async function resolveOwnerSingleClientId(ownerUserId) {
+  const normalizedOwnerUserId = String(ownerUserId || "").trim();
+  if (!normalizedOwnerUserId) {
+    return "";
+  }
+
+  const clients = await getClients();
+  const ownerClients = clients.filter(client => {
+    return String(client?.ownerUserId || "").trim() === normalizedOwnerUserId;
+  });
+
+  if (ownerClients.length !== 1) {
+    return "";
+  }
+
+  return String(ownerClients[0]?.id || "").trim();
 }
 
 function canAccessJobForUser(job, user, accessibleClientIds) {
@@ -845,24 +864,22 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     }
 
     if (isClaimGuardedStatus && !claimantClientId) {
+      claimantClientId = await resolveOwnerSingleClientId(job.ownerUserId);
+    }
+
+    if (isClaimGuardedStatus && !claimantClientId) {
       // Account-centric fallback: only resolve implicitly when account has exactly one client.
       claimantClientId = await resolveImplicitClaimClientId(req.user, accessibleClientIds);
     }
 
     if (isClaimGuardedStatus && !claimantClientId) {
-      console.warn("job.patch claim-guarded rejected: missing claimant client", {
+      console.warn("job.patch claim-guarded: missing claimant client, continuing without claim metadata", {
         jobId: job.id,
         status: normalizedStatus,
         ownerUserId: job.ownerUserId || null,
         sessionId: job.sessionId || null,
         hasAuthenticatedUser: Boolean(req.user)
       });
-      res.status(400).json({
-        error: "clientId is required for claim-guarded status updates (required for multi-client accounts)",
-        code: "JOB_CLAIM_CLIENT_REQUIRED",
-        jobId: job.id
-      });
-      return;
     }
 
     if (isClaimGuardedStatus && job.status === "ready") {
@@ -880,6 +897,11 @@ router.patch("/:id", asyncHandler(async (req, res) => {
         job.claimedByClientId = claimantClientId;
         job.claimedAt = new Date().toISOString();
       }
+    }
+
+    if (isClaimGuardedStatus && claimantClientId && !job.claimedByClientId) {
+      job.claimedByClientId = claimantClientId;
+      job.claimedAt = new Date().toISOString();
     }
 
     if (isClaimGuardedStatus && job.claimedByClientId && claimantClientId && job.claimedByClientId !== claimantClientId) {
