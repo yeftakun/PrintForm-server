@@ -16,6 +16,10 @@ Ceritanya ini pelanggan yang mau ngeprint dokumennya di kois percetakan (aplikas
 1.  Operator cukup menginstall aplikasi client PrintForm.
 2. Lalu login (dengan akun yang sudah dibuat sebelumnya)
 3. komputer percetakan yang sudah terinstall aplikasi client menerima job tersebut di aplikasinya itu.
-4. Operator percetakan tinggal menekan print untuk melakukan print karena file ataupun segala konfigurasinya sudah diatur pelanggan.
-5. Selesai.
+4. Operator memilih aksi pada job (Print atau Tolak).
+5. Setelah aksi dipilih, status job berubah sesuai aksi dan tombol aksi pada item job menjadi non-aktif agar tidak dieksekusi ganda.
+6. Sistem menyimpan metadata claim pada job untuk audit operasional:
+	- `claimed_by_client_id`
+	- `claimed_at`
+7. Selesai.
 

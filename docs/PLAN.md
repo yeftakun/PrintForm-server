@@ -69,6 +69,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 - Customer kiosk list check: halaman `/` menampilkan kios berbasis akun (hanya akun dengan minimal 1 client).
 - Claim/release conflict check: endpoint `POST /api/jobs/:id/claim` dan `POST /api/jobs/:id/release` menolak actor yang tidak valid atau beda akun dengan status error yang sesuai (`403/409`).
 - Compatibility rollout check: `POST /api/sessions` mode `kioskId` dan fallback `clientId` sama-sama berjalan selama masa transisi; payload menyertakan metadata sumber target.
+- Claim metadata check: pada aksi print/reject dari desktop, `jobs.claimed_by_client_id` dan `jobs.claimed_at` harus terisi konsisten; `claimed_at` tidak boleh terisi jika `claimed_by_client_id` kosong.
 
 ## Decisions
 

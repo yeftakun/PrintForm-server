@@ -47,6 +47,24 @@
   - handover guard saat pair/bind/unbind
   - legacy fallback dikontrol env (`ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE`, `JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER`)
 
+### Update Implementasi (2026-03-23)
+
+Perbaikan stabilisasi untuk alur operator desktop (Print/Tolak):
+
+1. Status update job tetap kompatibel dengan payload legacy desktop.
+2. Normalisasi alias status didukung (`reject` -> `rejected`, `cancelled` -> `canceled`).
+3. Inferensi `clientId` saat payload tidak menyertakan field standar mendukung beberapa alias payload (`clientId`, `claimClientId`, `claimedByClientId`, `targetClientId`) dari body/query.
+4. Fallback client untuk metadata claim:
+  - prioritas `job.claimedByClientId` (jika sudah ada),
+  - fallback session target client,
+  - fallback client owner yang paling aktif (`lastSeen` terbaru).
+5. Invariant metadata claim: `claimed_at` hanya boleh diisi bila `claimed_by_client_id` terisi.
+
+Dampak operasional:
+
+1. Tombol aksi Print/Tolak di desktop tidak lagi terjebak pada status yang tidak bergerak karena validasi payload lama.
+2. Kolom `jobs.claimed_by_client_id` dan `jobs.claimed_at` terisi konsisten pada alur claim-aware (print/reject).
+
 ### Acceptance & UAT Step 8e/8f/8g
 
 1. **Handover isolation (8e)**

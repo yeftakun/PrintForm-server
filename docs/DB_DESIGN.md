@@ -29,6 +29,7 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 	- owner_user_id (text, fk -> users.id, on delete set null)
 	- claimed_by_client_id (text, fk -> clients.id, on delete set null)
 	- claimed_at (timestamptz, null)
+	- invariant: `claimed_at` harus `null` jika `claimed_by_client_id` `null`
 	- original_name (varchar(255), not null)
 	- stored_path (text, not null) -- filesystem path; for future object storage store key/url
 	- size_bytes (bigint, not null)
