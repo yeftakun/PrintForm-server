@@ -207,7 +207,12 @@ async function resolveImplicitClaimClientId(user, accessibleClientIds) {
   return String(ownedClients[0].id || "").trim();
 }
 
-async function resolveOwnerSingleClientId(ownerUserId) {
+function toTimestampMs(value) {
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+async function resolveOwnerPreferredClientId(ownerUserId) {
   const normalizedOwnerUserId = String(ownerUserId || "").trim();
   if (!normalizedOwnerUserId) {
     return "";
@@ -218,9 +223,11 @@ async function resolveOwnerSingleClientId(ownerUserId) {
     return String(client?.ownerUserId || "").trim() === normalizedOwnerUserId;
   });
 
-  if (ownerClients.length !== 1) {
+  if (ownerClients.length === 0) {
     return "";
   }
+
+  ownerClients.sort((a, b) => toTimestampMs(b?.lastSeen) - toTimestampMs(a?.lastSeen));
 
   return String(ownerClients[0]?.id || "").trim();
 }
@@ -255,18 +262,28 @@ function getRequestSessionId(req) {
 }
 
 function getRequestClientId(req) {
-  const bodyClientId = typeof req.body?.clientId === "string"
-    ? req.body.clientId.trim()
-    : "";
-  if (bodyClientId) {
-    return bodyClientId;
-  }
+  const body = req?.body || {};
+  const query = req?.query || {};
+  const candidates = [
+    body.clientId,
+    body.claimClientId,
+    body.claimedByClientId,
+    body.targetClientId,
+    query.clientId,
+    query.claimClientId,
+    query.claimedByClientId,
+    query.targetClientId
+  ];
 
-  const queryClientId = typeof req.query?.clientId === "string"
-    ? req.query.clientId.trim()
-    : "";
-  if (queryClientId) {
-    return queryClientId;
+  for (const value of candidates) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const normalized = value.trim();
+    if (normalized) {
+      return normalized;
+    }
   }
 
   return "";
@@ -864,7 +881,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     }
 
     if (isClaimGuardedStatus && !claimantClientId) {
-      claimantClientId = await resolveOwnerSingleClientId(job.ownerUserId);
+      claimantClientId = await resolveOwnerPreferredClientId(job.ownerUserId);
     }
 
     if (isClaimGuardedStatus && !claimantClientId) {
@@ -893,7 +910,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
         return;
       }
 
-      if (!job.claimedByClientId) {
+      if (!job.claimedByClientId && claimantClientId) {
         job.claimedByClientId = claimantClientId;
         job.claimedAt = new Date().toISOString();
       }
