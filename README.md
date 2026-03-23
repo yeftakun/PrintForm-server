@@ -70,6 +70,16 @@ psql "$env:DATABASE_URL" -f scripts/migrations/20260321_step8i_drop_target_clien
 psql "$DATABASE_URL" -f scripts/migrations/20260321_step8i_drop_target_client_id.sql
 ```
 
+Apply Step 8j session cleanup (drop `sessions.client_id`) to fully enforce account-centric sessions:
+
+```powershell
+psql "$env:DATABASE_URL" -f scripts/migrations/20260323_step8j_drop_sessions_client_id.sql
+```
+
+```bash
+psql "$DATABASE_URL" -f scripts/migrations/20260323_step8j_drop_sessions_client_id.sql
+```
+
 ## .env Reference
 
 ### Core
@@ -176,6 +186,7 @@ Tuning env vars for upload and storage:
 - Create session untuk kios terpilih (dengan optional sender alias).
 - Halaman pelanggan (`/`) menampilkan daftar kios berbasis akun lewat `GET /api/clients/kiosks` (hanya akun dengan minimal 1 client recognized).
 - Kios ditandai siap jika memiliki minimal 1 client `ready`; `POST /api/sessions` pada mode default mewajibkan `kioskId` dan server memilih target client siap milik akun tersebut.
+- Session disimpan berbasis akun (`owner_user_id`) dan tidak lagi membutuhkan `sessions.client_id`.
 - Legacy target berbasis `clientId` dinonaktifkan default; dapat diaktifkan sementara dengan env `ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE=true`.
 - Respons `POST /api/sessions` menyertakan metadata transisi (`targetSource`, `requestedKioskId`, `compatibility.legacyClientTarget`, `compatibility.legacyClientTargetAllowed`).
 - Create session ditolak jika target client offline/tidak responsif (`409 CLIENT_UNAVAILABLE`).

@@ -80,7 +80,6 @@
           <thead>
             <tr>
               <th>ID</th>
-              <th>Client</th>
               <th>Owner User</th>
               <th>Alias</th>
               <th>Status</th>
@@ -284,7 +283,6 @@
       sessionsBody.innerHTML = list.map(s => `
         <tr>
           <td title="${s.id}">${s.id}</td>
-          <td title="${s.clientId || ''}">${s.clientId || ''}</td>
           <td title="${s.ownerUserId || ''}">${s.ownerUserId || ''}</td>
           <td>${s.alias || ''}</td>
           <td><span class="badge ${s.status === 'active' ? 'green' : 'gray'}">${s.status || ''}</span></td>

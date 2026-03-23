@@ -165,11 +165,36 @@ function canAccessSessionForUser(session, user, accessibleClientIds) {
   return canAccessOwnedResource(
     {
       ownerUserId: session?.ownerUserId || null,
-      clientId: session?.clientId || null
+      clientId: null
     },
     user,
     accessibleClientIds
   );
+}
+
+async function resolveImplicitClaimClientId(user, accessibleClientIds) {
+  if (!user) {
+    return "";
+  }
+
+  const clients = await getClients();
+  const ownedClients = clients.filter(client => {
+    if (!canAccessClientId(accessibleClientIds, client.id)) {
+      return false;
+    }
+
+    if (!client?.ownerUserId) {
+      return false;
+    }
+
+    return client.ownerUserId === user.id;
+  });
+
+  if (ownedClients.length !== 1) {
+    return "";
+  }
+
+  return String(ownedClients[0].id || "").trim();
 }
 
 function canAccessJobForUser(job, user, accessibleClientIds) {
@@ -795,12 +820,17 @@ router.patch("/:id", asyncHandler(async (req, res) => {
 
     const previousStatus = job.status;
     const requestClientId = getRequestClientId(req);
-    const claimantClientId = requestClientId;
+    let claimantClientId = requestClientId;
     const isClaimGuardedStatus = CLAIM_GUARDED_STATUSES.has(normalizedStatus);
 
     if (isClaimGuardedStatus && !claimantClientId) {
+      // Account-centric fallback: only resolve implicitly when account has exactly one client.
+      claimantClientId = await resolveImplicitClaimClientId(req.user, accessibleClientIds);
+    }
+
+    if (isClaimGuardedStatus && !claimantClientId) {
       res.status(400).json({
-        error: "clientId is required for claim-guarded status updates",
+        error: "clientId is required for claim-guarded status updates (required for multi-client accounts)",
         code: "JOB_CLAIM_CLIENT_REQUIRED",
         jobId: job.id
       });
@@ -874,6 +904,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
         ownerUserId: job.ownerUserId || null,
         claimedByClientId: job.claimedByClientId || null,
         requestClientId: requestClientId || null,
+        effectiveClientId: claimantClientId || null,
         sessionId: job.sessionId || null
       }
     });

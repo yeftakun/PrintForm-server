@@ -3,6 +3,34 @@ const { readSessions, writeSessions } = require("../storage/jsonStore");
 const { query, withTransaction } = require("../db");
 
 let hasSessionOwnerUserIdColumnCache = null;
+let hasSessionClientIdColumnCache = null;
+
+async function hasSessionClientIdColumn() {
+  if (!useDb) {
+    return false;
+  }
+
+  if (hasSessionClientIdColumnCache === true) {
+    return true;
+  }
+
+  const res = await query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'sessions'
+        AND column_name = 'client_id'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasSessionClientIdColumnCache = true;
+  }
+
+  return exists;
+}
 
 async function hasSessionOwnerUserIdColumn() {
   if (!useDb) {
@@ -36,15 +64,25 @@ async function getSessions() {
     return readSessions();
   }
 
+  const hasClientIdColumn = await hasSessionClientIdColumn();
   const hasOwnerUserIdColumn = await hasSessionOwnerUserIdColumn();
+  const clientIdSelect = hasClientIdColumn
+    ? "s.client_id"
+    : "NULL::text AS client_id";
+  const clientNameSelect = hasClientIdColumn
+    ? "c.name as client_name"
+    : "NULL::text AS client_name";
+  const clientJoin = hasClientIdColumn
+    ? "left join clients c on c.id = s.client_id"
+    : "";
   const ownerUserIdSelect = hasOwnerUserIdColumn
     ? "s.owner_user_id"
     : "NULL::text AS owner_user_id";
 
   const res = await query(
-    `select s.id, s.client_id, ${ownerUserIdSelect}, s.alias, s.created_at, s.last_seen_at, s.status, c.name as client_name
+    `select s.id, ${clientIdSelect}, ${ownerUserIdSelect}, s.alias, s.created_at, s.last_seen_at, s.status, ${clientNameSelect}
      from sessions s
-     left join clients c on c.id = s.client_id
+     ${clientJoin}
      order by s.created_at desc`
   );
   return res.rows.map(row => ({
@@ -64,6 +102,7 @@ async function saveSessions(sessions) {
     return writeSessions(sessions);
   }
 
+  const hasClientIdColumn = await hasSessionClientIdColumn();
   const hasOwnerUserIdColumn = await hasSessionOwnerUserIdColumn();
   const ids = sessions.map(s => s.id);
   return withTransaction(async client => {
@@ -74,7 +113,7 @@ async function saveSessions(sessions) {
     }
 
     for (const s of sessions) {
-      if (hasOwnerUserIdColumn) {
+      if (hasClientIdColumn && hasOwnerUserIdColumn) {
         await client.query(
           `INSERT INTO sessions (id, client_id, owner_user_id, alias, created_at, last_seen_at, status)
            VALUES ($1,$2,$3,$4,COALESCE($5, now()),$6,$7)
@@ -95,7 +134,7 @@ async function saveSessions(sessions) {
             s.status || "active"
           ]
         );
-      } else {
+      } else if (hasClientIdColumn) {
         await client.query(
           `INSERT INTO sessions (id, client_id, alias, created_at, last_seen_at, status)
            VALUES ($1,$2,$3,COALESCE($4, now()),$5,$6)
@@ -108,6 +147,42 @@ async function saveSessions(sessions) {
           [
             s.id,
             s.clientId,
+            s.alias || null,
+            s.createdAt ? new Date(s.createdAt) : null,
+            s.lastSeen ? new Date(s.lastSeen) : new Date(),
+            s.status || "active"
+          ]
+        );
+      } else if (hasOwnerUserIdColumn) {
+        await client.query(
+          `INSERT INTO sessions (id, owner_user_id, alias, created_at, last_seen_at, status)
+           VALUES ($1,$2,$3,COALESCE($4, now()),$5,$6)
+           ON CONFLICT (id) DO UPDATE SET
+             owner_user_id = COALESCE(EXCLUDED.owner_user_id, sessions.owner_user_id),
+             alias = EXCLUDED.alias,
+             created_at = LEAST(sessions.created_at, EXCLUDED.created_at),
+             last_seen_at = EXCLUDED.last_seen_at,
+             status = EXCLUDED.status`,
+          [
+            s.id,
+            s.ownerUserId || null,
+            s.alias || null,
+            s.createdAt ? new Date(s.createdAt) : null,
+            s.lastSeen ? new Date(s.lastSeen) : new Date(),
+            s.status || "active"
+          ]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO sessions (id, alias, created_at, last_seen_at, status)
+           VALUES ($1,$2,COALESCE($3, now()),$4,$5)
+           ON CONFLICT (id) DO UPDATE SET
+             alias = EXCLUDED.alias,
+             created_at = LEAST(sessions.created_at, EXCLUDED.created_at),
+             last_seen_at = EXCLUDED.last_seen_at,
+             status = EXCLUDED.status`,
+          [
+            s.id,
             s.alias || null,
             s.createdAt ? new Date(s.createdAt) : null,
             s.lastSeen ? new Date(s.lastSeen) : new Date(),

@@ -51,8 +51,8 @@ function isOwnerUserDifferent(ownerUserId, user) {
   return ownerUserId !== user.id;
 }
 
-function resolveSessionOwnerUserId(session, client) {
-  return session?.ownerUserId || client?.ownerUserId || null;
+function resolveSessionOwnerUserId(session) {
+  return session?.ownerUserId || null;
 }
 
 function normalizeRequestString(value) {
@@ -95,8 +95,6 @@ function toSessionResponsePayload(session, availabilitySource, {
   const legacyClientTarget = targetSource === "client-id";
   return {
     id: session.id,
-    clientId: session.clientId,
-    clientName: session.clientName || null,
     ownerUserId: session.ownerUserId || null,
     kioskId: session.ownerUserId || null,
     requestedKioskId: requestedKioskId || null,
@@ -314,9 +312,7 @@ router.post("/", asyncHandler(async (req, res) => {
   const sessions = await getSessions();
   const session = {
     id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    clientId: sessionTargetClient.id,
     ownerUserId: sessionOwnerUserId || sessionTargetClient.ownerUserId || null,
-    clientName: sessionTargetClient.name,
     alias,
     createdAt: new Date().toISOString(),
     lastSeen: new Date().toISOString()
@@ -333,7 +329,7 @@ router.post("/", asyncHandler(async (req, res) => {
     targetType: "session",
     targetId: session.id,
     detail: {
-      clientId: session.clientId,
+      selectedClientId: sessionTargetClient.id,
       ownerUserId: session.ownerUserId || null,
       targetSource,
       availabilitySource,
@@ -364,12 +360,7 @@ router.post("/heartbeat", asyncHandler(async (req, res) => {
   }
 
   if (req.user) {
-    let ownerUserId = resolveSessionOwnerUserId(session, null);
-    if (!ownerUserId) {
-      const clients = await getClients();
-      const sessionClient = clients.find(c => c.id === session.clientId);
-      ownerUserId = resolveSessionOwnerUserId(session, sessionClient);
-    }
+    const ownerUserId = resolveSessionOwnerUserId(session);
 
     if (isOwnerUserDifferent(ownerUserId, req.user)) {
       res.status(403).json({ error: "Client belongs to another account" });
@@ -393,12 +384,7 @@ router.post("/close", asyncHandler(async (req, res) => {
   const targetSession = sessions.find(s => s.id === sessionId);
 
   if (req.user && targetSession) {
-    let ownerUserId = resolveSessionOwnerUserId(targetSession, null);
-    if (!ownerUserId) {
-      const clients = await getClients();
-      const sessionClient = clients.find(c => c.id === targetSession.clientId);
-      ownerUserId = resolveSessionOwnerUserId(targetSession, sessionClient);
-    }
+    const ownerUserId = resolveSessionOwnerUserId(targetSession);
 
     if (isOwnerUserDifferent(ownerUserId, req.user)) {
       res.status(403).json({ error: "Client belongs to another account" });
@@ -452,7 +438,6 @@ router.post("/close", asyncHandler(async (req, res) => {
     targetType: "session",
     targetId: sessionId,
     detail: {
-      clientId: targetSession?.clientId || null,
       ownerUserId: targetSession?.ownerUserId || null,
       removedJobs: removedJobIds.length
     }

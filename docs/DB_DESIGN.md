@@ -16,12 +16,12 @@ Target: Postgres (can map to MySQL if needed). Core tables cover clients, sessio
 
 - **sessions**
 	- id (text, pk)
-	- client_id (text, fk -> clients.id, on delete cascade)
+	- owner_user_id (text, fk -> users.id, on delete set null)
 	- alias (varchar(80), null)
 	- created_at (timestamptz, not null default now())
 	- last_seen_at (timestamptz, not null)
 	- status (varchar(16), not null default 'active') -- active | closed | expired
-	- indexes: (client_id), (last_seen_at)
+	- indexes: (owner_user_id), (last_seen_at)
 
 - **jobs**
 	- id (text, pk)

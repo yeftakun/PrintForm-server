@@ -176,27 +176,9 @@ async function applyQueueHandoverGuard({ clientId, previousOwnerUserId, nextOwne
   const sessions = await getSessions();
   const jobs = await getJobs();
 
-  let sessionsReowned = 0;
-  let sessionsDetached = 0;
-  for (const session of sessions) {
-    if (session.clientId !== normalizedClientId) {
-      continue;
-    }
-
-    if (!session.ownerUserId && previousOwnerUserId) {
-      session.ownerUserId = previousOwnerUserId;
-      sessionsReowned += 1;
-    }
-
-    if (!session.ownerUserId && !previousOwnerUserId && nextOwnerUserId) {
-      const detachedLastSeen = new Date(0).toISOString();
-      if (session.lastSeen !== detachedLastSeen) {
-        session.lastSeen = detachedLastSeen;
-        session.status = "expired";
-        sessionsDetached += 1;
-      }
-    }
-  }
+  // Session ownership is account-centric; no per-client reassignment is needed here.
+  const sessionsReowned = 0;
+  const sessionsDetached = 0;
 
   let jobsReowned = 0;
   let claimsReleased = 0;
@@ -219,10 +201,6 @@ async function applyQueueHandoverGuard({ clientId, previousOwnerUserId, nextOwne
     if (changed) {
       continue;
     }
-  }
-
-  if (sessionsReowned > 0 || sessionsDetached > 0) {
-    await saveSessions(sessions);
   }
 
   if (jobsReowned > 0 || claimsReleased > 0) {

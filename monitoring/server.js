@@ -17,6 +17,7 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 const app = express();
 let hasPinHashColumnCache = null;
 let hasSessionOwnerUserIdColumnCache = null;
+let hasSessionClientIdColumnCache = null;
 let hasJobOwnerUserIdColumnCache = null;
 let hasJobClaimedByClientIdColumnCache = null;
 let hasJobClaimedAtColumnCache = null;
@@ -127,6 +128,29 @@ async function hasSessionOwnerUserIdColumn() {
   return exists;
 }
 
+async function hasSessionClientIdColumn() {
+  if (hasSessionClientIdColumnCache === true) {
+    return true;
+  }
+
+  const res = await queryOrEmpty(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'sessions'
+        AND column_name = 'client_id'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasSessionClientIdColumnCache = true;
+  }
+
+  return exists;
+}
+
 async function hasJobOwnerUserIdColumn() {
   if (hasJobOwnerUserIdColumnCache === true) {
     return true;
@@ -215,18 +239,23 @@ function deriveClientStatus(row, nowMs) {
 async function fetchSnapshot() {
   const [
     hasPinHash,
+    hasSessionClientId,
     hasSessionOwnerUserId,
     hasJobOwnerUserId,
     hasJobClaimedByClientId,
     hasJobClaimedAt
   ] = await Promise.all([
     hasPinHashColumn(),
+    hasSessionClientIdColumn(),
     hasSessionOwnerUserIdColumn(),
     hasJobOwnerUserIdColumn(),
     hasJobClaimedByClientIdColumn(),
     hasJobClaimedAtColumn()
   ]);
 
+  const sessionClientIdSelect = hasSessionClientId
+    ? "client_id"
+    : "NULL::text AS client_id";
   const sessionOwnerUserIdSelect = hasSessionOwnerUserId
     ? "owner_user_id"
     : "NULL::text AS owner_user_id";
@@ -285,7 +314,7 @@ async function fetchSnapshot() {
     ),
     queryOrEmpty(
       `select id,
-              client_id,
+              ${sessionClientIdSelect},
               ${sessionOwnerUserIdSelect},
               alias,
               status,
@@ -408,7 +437,6 @@ async function fetchSnapshot() {
     })),
     sessions: sessionRows.map(row => ({
       id: row.id,
-      clientId: row.client_id,
       ownerUserId: row.owner_user_id || null,
       alias: row.alias || null,
       status: row.status,

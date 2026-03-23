@@ -145,7 +145,6 @@
       const requiresSessionSections = document.querySelectorAll(".requires-session");
       let sessionId = sessionStorage.getItem("printformSessionId") || "";
       let sessionClient = sessionStorage.getItem("printformSessionClientName") || "";
-      let sessionClientId = sessionStorage.getItem("printformSessionClientId") || "";
       let sessionAlias = sessionStorage.getItem("printformSessionAlias") || "";
       let sessionHeartbeatFailures = 0;
       const aliasStorageKey = "printformAlias";
@@ -220,12 +219,10 @@
       function clearSessionState() {
         sessionId = "";
         sessionClient = "";
-        sessionClientId = "";
         sessionAlias = "";
         sessionHeartbeatFailures = 0;
         sessionStorage.removeItem("printformSessionId");
         sessionStorage.removeItem("printformSessionClientName");
-        sessionStorage.removeItem("printformSessionClientId");
         sessionStorage.removeItem("printformSessionAlias");
         setSessionUi(false);
       }
@@ -450,12 +447,10 @@
 
           sessionId = body.id;
           sessionClient = selectedKioskName || body.clientName || "";
-          sessionClientId = body.clientId || "";
           sessionAlias = body.alias || senderAlias || "";
           sessionHeartbeatFailures = 0;
           sessionStorage.setItem("printformSessionId", sessionId);
           sessionStorage.setItem("printformSessionClientName", sessionClient);
-          sessionStorage.setItem("printformSessionClientId", sessionClientId);
           sessionStorage.setItem("printformSessionAlias", sessionAlias);
           setSessionUi(true);
           sessionStatus.textContent = "";

@@ -36,7 +36,7 @@
 
 ### Snapshot Progress Step 8 (Server)
 
-- Migration aktif: `20260314_step8a_account_queue_ownership.sql`, `20260314_step8d_job_claim_lock.sql`.
+- Migration aktif: `20260314_step8a_account_queue_ownership.sql`, `20260314_step8d_job_claim_lock.sql`, `20260323_step8j_drop_sessions_client_id.sql`.
 - Endpoint baru/transisi:
   - `GET /api/clients/kiosks`
   - `POST /api/sessions` berbasis `kioskId` (strict default)
