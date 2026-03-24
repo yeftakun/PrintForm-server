@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PrintForm Server</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
   </head>
   <body>
     <main class="page">
@@ -44,30 +48,68 @@
         </div>
       </section>
 
-      <section class="card requires-session">
+      <section class="card requires-session" id="uploadSection">
         <h2>Upload Print Job</h2>
-        <form id="uploadForm">
-          <label class="field">
-            <span>Dokumen</span>
-            <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
-          </label>
+        <div class="upload-section-grid">
+          <div class="upload-form-column">
+            <form id="uploadForm">
+              <label class="field">
+                <span>Dokumen</span>
+                <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+              </label>
 
-          <label class="field">
-            <span>Ukuran Kertas</span>
-            <select name="paperSize">
-              <option value="A4" selected>A4</option>
-              <option value="A5">A5</option>
-            </select>
-          </label>
+              <label class="field">
+                <span>Ukuran Kertas</span>
+                <select name="paperSize">
+                  <option value="A4" selected>A4</option>
+                  <option value="A5">A5</option>
+                </select>
+              </label>
 
-          <label class="field">
-            <span>Banyak Salinan</span>
-            <input type="number" name="copies" min="1" max="999" value="1">
-          </label>
+              <label class="field">
+                <span>Banyak Salinan</span>
+                <input type="number" name="copies" min="1" max="999" value="1">
+              </label>
 
-          <button type="submit">Kirim Job</button>
-          <div id="uploadStatus" class="status"></div>
-        </form>
+              <button type="submit">Kirim Job</button>
+              <div id="uploadStatus" class="status"></div>
+            </form>
+
+            <div id="printPreviewPanel" class="print-preview print-preview-empty" aria-live="polite">
+              <h3>Metadate Dokumen</h3>
+              <div class="print-preview-grid">
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Dokumen</span>
+                  <span id="previewFileName" class="print-preview-value">-</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Ukuran File</span>
+                  <span id="previewFileSize" class="print-preview-value">-</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Ukuran Kertas</span>
+                  <span id="previewPaperSize" class="print-preview-value">A4</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Salinan</span>
+                  <span id="previewCopies" class="print-preview-value">1</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Total Impresi</span>
+                  <span id="previewImpressions" class="print-preview-value">-</span>
+                </div>
+              </div>
+              <p id="previewWarning" class="print-preview-warning hidden"></p>
+            </div>
+          </div>
+          
+          <div class="visual-preview-column">
+            <h3>Visual Preview</h3>
+            <div id="visualPreviewArea" class="visual-preview-area">
+              <div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="card requires-session">
@@ -137,12 +179,22 @@
       const sessionClientName = document.getElementById("sessionClientName");
       const sessionIdText = document.getElementById("sessionIdText");
       const sessionAliasText = document.getElementById("sessionAliasText");
+      const printPreviewPanel = document.getElementById("printPreviewPanel");
+      const previewFileName = document.getElementById("previewFileName");
+      const previewFileSize = document.getElementById("previewFileSize");
+      const previewPaperSize = document.getElementById("previewPaperSize");
+      const previewCopies = document.getElementById("previewCopies");
+      const previewImpressions = document.getElementById("previewImpressions");
+      const previewWarning = document.getElementById("previewWarning");
       const sessionInactive = document.getElementById("sessionInactive");
       const sessionActive = document.getElementById("sessionActive");
       const realtimeStatus = document.getElementById("realtimeStatus");
       const clientsBody = document.getElementById("clientsBody");
       const clientsStatus = document.getElementById("clientsStatus");
       const requiresSessionSections = document.querySelectorAll(".requires-session");
+      const uploadFileInput = uploadForm.querySelector('input[name="document"]');
+      const uploadPaperSizeInput = uploadForm.querySelector('select[name="paperSize"]');
+      const uploadCopiesInput = uploadForm.querySelector('input[name="copies"]');
       let sessionId = sessionStorage.getItem("printformSessionId") || "";
       let sessionClient = sessionStorage.getItem("printformSessionClientName") || "";
       let sessionAlias = sessionStorage.getItem("printformSessionAlias") || "";
@@ -155,6 +207,15 @@
       let loadClientsTimer = null;
       let loadJobsTimer = null;
       let realtimeManualClose = false;
+      let previewDebounceTimer = null;
+
+      const previewState = {
+        fileName: "",
+        fileSizeBytes: 0,
+        paperSize: "A4",
+        copies: 1,
+        hasFile: false
+      };
 
       async function apiFetch(input, init = {}, options = {}) {
         return fetch(input, init);
@@ -198,6 +259,175 @@
         }, delayMs);
       }
 
+      function formatPreviewFileSize(bytes) {
+        const safeBytes = Number(bytes) || 0;
+        if (safeBytes <= 0) {
+          return "-";
+        }
+
+        const kb = safeBytes / 1024;
+        if (kb < 1024) {
+          return `${kb.toFixed(1)} KB`;
+        }
+
+        return `${(kb / 1024).toFixed(1)} MB`;
+      }
+
+      let currentVisualPreviewFile = null;
+      let currentPdfDocument = null;
+
+      async function renderVisualPreview(file, paperSize) {
+        const visualArea = document.getElementById("visualPreviewArea");
+        
+        if (!file) {
+          visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>';
+          currentVisualPreviewFile = null;
+          currentPdfDocument = null;
+          return;
+        }
+
+        // If paper size changed but file is same, just update CSS class on existing containers
+        if (file === currentVisualPreviewFile) {
+          const containers = visualArea.querySelectorAll('.preview-page-container');
+          containers.forEach(container => {
+            if (paperSize === "A5") {
+              container.classList.add("preview-scale-A5");
+            } else {
+              container.classList.remove("preview-scale-A5");
+            }
+          });
+          return;
+        }
+
+        currentVisualPreviewFile = file;
+        visualArea.innerHTML = '<div class="visual-preview-placeholder">Memuat preview...</div>';
+
+        const scaleClass = paperSize === "A5" ? "preview-scale-A5" : "";
+        
+        try {
+          if (file.type === "application/pdf") {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            currentPdfDocument = pdf;
+            visualArea.innerHTML = '';
+            
+            // Limit to max 20 pages for performance
+            const pagesToRender = Math.min(pdf.numPages, 20);
+            
+            for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              const viewport = page.getViewport({ scale: 1.2 }); // Scale down relative to typical screen
+              
+              const container = document.createElement('div');
+              container.className = `preview-page-container ${scaleClass}`;
+              
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              
+              container.appendChild(canvas);
+              visualArea.appendChild(container);
+              
+              const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+              };
+              await page.render(renderContext).promise;
+            }
+            
+            if (pdf.numPages > 20) {
+              const note = document.createElement('div');
+              note.className = "visual-preview-placeholder";
+              note.textContent = `(+ ${pdf.numPages - 20} halaman lainnya tidak ditampilkan untuk menghemat memori...)`;
+              visualArea.appendChild(note);
+            }
+
+          } else if (file.type.startsWith("image/")) {
+            visualArea.innerHTML = '';
+            const container = document.createElement('div');
+            container.className = `preview-page-container ${scaleClass}`;
+            container.style.padding = "20px"; // to look like page bounds
+            
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.onload = () => URL.revokeObjectURL(img.src);
+            
+            container.appendChild(img);
+            visualArea.appendChild(container);
+
+          } else if (file.type === "text/plain") {
+            const text = await file.text();
+            visualArea.innerHTML = '';
+            const container = document.createElement('div');
+            container.className = `preview-page-container ${scaleClass}`;
+            
+            const pre = document.createElement('pre');
+            pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
+            
+            container.appendChild(pre);
+            visualArea.appendChild(container);
+
+          } else {
+            visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview visual tidak didukung untuk format ini.</div>';
+          }
+        } catch (e) {
+          console.error("Preview render error:", e);
+          visualArea.innerHTML = '<div class="visual-preview-placeholder" style="color:red">Terjadi kesalahan memuat preview.</div>';
+        }
+      }
+
+      function renderPreviewState() {
+        previewFileName.textContent = previewState.fileName || "-";
+        previewFileSize.textContent = formatPreviewFileSize(previewState.fileSizeBytes);
+        previewPaperSize.textContent = previewState.paperSize || "-";
+        previewCopies.textContent = String(previewState.copies || "-");
+        previewImpressions.textContent = previewState.hasFile ? String(Math.max(1, previewState.copies || 1)) : "-";
+
+        printPreviewPanel.classList.toggle("print-preview-empty", !previewState.hasFile);
+
+        const showCopiesWarning = previewState.hasFile && previewState.copies > 100;
+        if (showCopiesWarning) {
+          previewWarning.textContent = "Perhatian: jumlah salinan sangat besar. Pastikan konfigurasi sudah benar.";
+          previewWarning.classList.remove("hidden");
+        } else {
+          previewWarning.textContent = "";
+          previewWarning.classList.add("hidden");
+        }
+        
+        const selectedFile = uploadFileInput?.files?.[0] || null;
+        renderVisualPreview(selectedFile, previewState.paperSize);
+      }
+
+      function resetPreviewState() {
+        previewState.fileName = "";
+        previewState.fileSizeBytes = 0;
+        previewState.paperSize = uploadPaperSizeInput?.value || "A4";
+        previewState.copies = Math.max(1, Number.parseInt(uploadCopiesInput?.value || "1", 10) || 1);
+        previewState.hasFile = false;
+        renderPreviewState();
+      }
+
+      function updatePreviewStateFromForm() {
+        const selectedFile = uploadFileInput?.files?.[0] || null;
+        previewState.hasFile = Boolean(selectedFile);
+        previewState.fileName = selectedFile?.name || "";
+        previewState.fileSizeBytes = Number(selectedFile?.size || 0);
+        previewState.paperSize = uploadPaperSizeInput?.value || "A4";
+        previewState.copies = Math.max(1, Number.parseInt(uploadCopiesInput?.value || "1", 10) || 1);
+        renderPreviewState();
+      }
+
+      function schedulePreviewStateUpdate() {
+        if (previewDebounceTimer) {
+          clearTimeout(previewDebounceTimer);
+        }
+
+        previewDebounceTimer = setTimeout(() => {
+          updatePreviewStateFromForm();
+        }, 80);
+      }
+
       function setSessionUi(active) {
         sessionInactive.classList.toggle("hidden", active);
         sessionActive.classList.toggle("hidden", !active);
@@ -225,6 +455,7 @@
         sessionStorage.removeItem("printformSessionClientName");
         sessionStorage.removeItem("printformSessionAlias");
         setSessionUi(false);
+        resetPreviewState();
       }
 
       async function closeSessionRemote() {
@@ -405,12 +636,24 @@
           uploadStatus.textContent = "Job berhasil dikirim.";
           uploadStatus.className = "status success";
           uploadForm.reset();
+          resetPreviewState();
           await loadJobs();
         } catch (err) {
           uploadStatus.textContent = "Gagal terhubung ke server.";
           uploadStatus.className = "status error";
         }
       });
+
+      if (uploadFileInput) {
+        uploadFileInput.addEventListener("change", schedulePreviewStateUpdate);
+      }
+      if (uploadPaperSizeInput) {
+        uploadPaperSizeInput.addEventListener("change", schedulePreviewStateUpdate);
+      }
+      if (uploadCopiesInput) {
+        uploadCopiesInput.addEventListener("input", schedulePreviewStateUpdate);
+        uploadCopiesInput.addEventListener("change", schedulePreviewStateUpdate);
+      }
 
       startSessionBtn.addEventListener("click", async () => {
         const kioskId = clientSelect.value;
@@ -802,6 +1045,7 @@
 
       setSessionUi(Boolean(sessionId));
       aliasInput.value = senderAlias;
+      resetPreviewState();
       if (sessionId) {
         heartbeatSession();
       }

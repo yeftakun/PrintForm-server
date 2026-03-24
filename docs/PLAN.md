@@ -34,7 +34,8 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 [Detail Step 8](detail_step8.md)
 9. Internal scheduler — gunakan `setInterval`/`node-cron` dalam process Node utama untuk cleanup retention, orphan scan, dan housekeeping periodik. **Selesai untuk scope `PrintForm-server` (scheduler internal terpusat + lifecycle start/stop).**
 10. Frontend/client update — Web UI dan .NET client pindah dari polling berat ke subscribe realtime (REST tetap fallback). **Selesai untuk scope `PrintForm-server`; adaptasi desktop lanjutan dieksekusi di repo client terpisah.**
-11. Penambahan print preview pada form print job pada web ui (realtime preview setiap kali pelanggan merubah konfigurasi cetak).
+11. Penambahan print preview (bagaimana tampilan dokumen ketika dicetak nanti
+) pada form print job pada web ui (realtime preview setiap kali pelanggan merubah konfigurasi cetak). **Selesai.**
 12. Perancangan mockup pada [UI_MOCKUP_CONCEPT.md](UI_MOCKUP_CONCEPT.md).
 13. Lengkapi konfigurasi cetak pada tugas cetak (konfigurasi akan dieksekusi pelanggan di web). [Detail Step 13](detail_step12.md)
 14. Penyesuaian role akun: Admin, Mitra, Pelanggan.
