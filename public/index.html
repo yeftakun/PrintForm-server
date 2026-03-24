@@ -286,23 +286,14 @@
           return;
         }
 
-        // If paper size changed but file is same, just update CSS class on existing containers
+        // Jika file sama, tidak perlu merender ulang
+        // Karena ukuran kertas di preview sekarang tetap/fixed, kita abaikan perubahan paperSize untuk visual
         if (file === currentVisualPreviewFile) {
-          const containers = visualArea.querySelectorAll('.preview-page-container');
-          containers.forEach(container => {
-            if (paperSize === "A5") {
-              container.classList.add("preview-scale-A5");
-            } else {
-              container.classList.remove("preview-scale-A5");
-            }
-          });
           return;
         }
 
         currentVisualPreviewFile = file;
         visualArea.innerHTML = '<div class="visual-preview-placeholder">Memuat preview...</div>';
-
-        const scaleClass = paperSize === "A5" ? "preview-scale-A5" : "";
         
         try {
           if (file.type === "application/pdf") {
@@ -319,7 +310,7 @@
               const viewport = page.getViewport({ scale: 1.2 }); // Scale down relative to typical screen
               
               const container = document.createElement('div');
-              container.className = `preview-page-container ${scaleClass}`;
+              container.className = `preview-page-container`;
               
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
@@ -346,7 +337,7 @@
           } else if (file.type.startsWith("image/")) {
             visualArea.innerHTML = '';
             const container = document.createElement('div');
-            container.className = `preview-page-container ${scaleClass}`;
+            container.className = `preview-page-container`;
             container.style.padding = "20px"; // to look like page bounds
             
             const img = document.createElement('img');
@@ -360,7 +351,7 @@
             const text = await file.text();
             visualArea.innerHTML = '';
             const container = document.createElement('div');
-            container.className = `preview-page-container ${scaleClass}`;
+            container.className = `preview-page-container`;
             
             const pre = document.createElement('pre');
             pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");

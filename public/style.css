@@ -263,11 +263,6 @@ th {
   box-sizing: border-box;
 }
 
-.preview-scale-A5 {
-  transform: scale(0.7);
-  margin-bottom: -15%; /* adjust margin for scaled element */
-}
-
 @media (max-width: 720px) {
   .row {
     flex-direction: column;
