@@ -69,7 +69,7 @@
 
               <label class="field">
                 <span>Warna</span>
-                <select name="colorMode">
+                <select name="colorMode" id="colorMode">
                   <option value="color" selected>Warna</option>
                   <option value="bw">Hitam Putih</option>
                 </select>
@@ -78,30 +78,30 @@
               <div class="row">
                 <label class="field" style="flex: 1;">
                   <span>Orientasi</span>
-                  <select name="orientation">
+                  <select name="orientation" id="orientation">
                     <option value="portrait" selected>Portrait</option>
                     <option value="landscape">Landscape</option>
                   </select>
                 </label>
                 <label class="field" style="flex: 1;">
                   <span>Skala (%)</span>
-                  <input type="number" name="contentScale" min="10" max="500" value="100">
+                  <input type="number" name="contentScale" id="contentScale" min="10" max="500" value="100">
                 </label>
               </div>
 
               <label class="field">
                 <span>Rentang Halaman (Opsional)</span>
-                <input type="text" name="pageRange" placeholder="Contoh: 1, 3-5, 8">
+                <input type="text" name="pageRange" id="pageRange" placeholder="Contoh: 1, 3-5, 8">
               </label>
 
               <label class="field">
                 <span>Banyak Salinan</span>
-                <input type="number" name="copies" min="1" max="999" value="1">
+                <input type="number" name="copies" id="copies" min="1" max="999" value="1">
               </label>
 
               <label class="field">
                 <span>Catatan (Opsional)</span>
-                <textarea name="notes" placeholder="Catatan tambahan untuk operator..."></textarea>
+                <textarea name="notes" id="notes" placeholder="Catatan tambahan untuk operator..."></textarea>
               </label>
 
               <button type="submit">Kirim Job</button>
@@ -365,6 +365,27 @@
       });
 
       let lastRenderedFile = null;
+      let lastTotalPages = 1;
+
+      function updatePageRangeInput(totalPages) {
+        lastTotalPages = totalPages;
+        const pageRangeInput = document.getElementById("pageRange");
+        if (!pageRangeInput) return;
+        
+        const pageRangeContainer = pageRangeInput.closest(".field");
+        if (pageRangeContainer) {
+           if (totalPages <= 1) {
+             pageRangeInput.disabled = true;
+             pageRangeInput.placeholder = "Semua (hanya 1 halaman)";
+             pageRangeInput.value = ""; // clear value if disabled
+             pageRangeContainer.style.opacity = "0.5";
+           } else {
+             pageRangeInput.disabled = false;
+             pageRangeInput.placeholder = `Contoh: 1, 3-${Math.min(5, totalPages)}`;
+             pageRangeContainer.style.opacity = "1";
+           }
+        }
+      }
 
       async function renderVisualPreview(file) {
         const visualArea = document.getElementById("visualPreviewArea");
@@ -372,11 +393,12 @@
         if (!file) {
           visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>';
           lastRenderedFile = null;
+          updatePageRangeInput(1);
           return;
         }
 
         const isNewFile = file !== lastRenderedFile;
-
+        // Logic to clear existing if new file
         if (isNewFile) {
           lastRenderedFile = file;
           visualArea.innerHTML = '<div class="visual-preview-placeholder">Memuat preview...</div>';
@@ -385,34 +407,54 @@
             if (file.type === "application/pdf") {
               const arrayBuffer = await file.arrayBuffer();
               const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              updatePageRangeInput(pdf.numPages);
+
               visualArea.innerHTML = '';
               
               const pagesToRender = Math.min(pdf.numPages, 20);
+              const scale = 1.5; // High resolution base
               
               for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
                 const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 1.0 }); // Base scale
+                const viewport = page.getViewport({ scale });
                 
-                // Determine scale to fit width
-                if (pageNum === 1) {
-                  const availableWidth = visualArea.clientWidth - 40;
-                  const availableHeight = visualArea.clientHeight - 40;
-                  if (availableWidth > 0 && availableHeight > 0) {
-                      const ar = viewport.width / viewport.height;
-                      const fitZoom = availableWidth / (availableHeight * ar);
-                      setPreviewZoom(fitZoom);
-                  }
-                }
-
+                // Determine container size based on paper size aspect ratio?
+                // Actually, for visual preview of PDF, we render the PDF as is, 
+                // but we should wrapper it to simulate "Paper".
+                
                 const container = document.createElement('div');
                 container.className = `preview-page-container`;
                 
+                // Add inner wrapper for content scaling
+                const wrapper = document.createElement('div');
+                wrapper.className = 'preview-content-wrapper';
+
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
-                container.appendChild(canvas);
+                // Avoid stretching/distortion by fitting within wrapper
+                canvas.style.maxWidth = "100%";
+                canvas.style.maxHeight = "100%";
+                canvas.style.objectFit = "contain";
+                
+                wrapper.appendChild(canvas);
+                container.appendChild(wrapper);
                 visualArea.appendChild(container);
+
+                // Initialize zoom to fit width relative to A4
+                if (pageNum === 1) {
+                  const availableWidth = visualArea.clientWidth - 40;
+                  const availableHeight = visualArea.clientHeight - 40;
+                  // Approx A4 ratio
+                  const targetRatio = 210/297;
+                  if (availableWidth > 0 && availableHeight > 0) {
+                      const fitZoom = (availableWidth) / (availableHeight * targetRatio); 
+                      // Normalize zoom based on rendered viewport width vs "Paper Width" logic
+                      // Simplified: just ensure it fits nicely
+                      setPreviewZoom(fitZoom < 0.5 ? 0.6 : fitZoom);
+                  }
+                }
 
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
               }
@@ -425,45 +467,41 @@
               }
 
             } else if (file.type.startsWith("image/")) {
+              updatePageRangeInput(1);
               visualArea.innerHTML = '';
               const container = document.createElement('div');
               container.className = `preview-page-container`;
-              container.style.padding = "20px";
               
+              const wrapper = document.createElement('div');
+              wrapper.className = 'preview-content-wrapper';
+
               const img = document.createElement('img');
               const objectUrl = URL.createObjectURL(file);
               img.src = objectUrl;
               img.onload = () => {
-                  const availableWidth = visualArea.clientWidth - 40;
-                  const availableHeight = visualArea.clientHeight - 40;
-                  if (img.naturalHeight > 0 && availableWidth > 0 && availableHeight > 0) {
-                     const ar = img.naturalWidth / img.naturalHeight;
-                     const fitZoom = availableWidth / (availableHeight * ar);
-                     setPreviewZoom(fitZoom);
-                  }
                   URL.revokeObjectURL(objectUrl);
               };
-              container.appendChild(img);
+              wrapper.appendChild(img);
+              container.appendChild(wrapper);
               visualArea.appendChild(container);
 
             } else if (file.type === "text/plain") {
+              updatePageRangeInput(1);
               const text = await file.text();
               visualArea.innerHTML = '';
               const container = document.createElement('div');
               container.className = `preview-page-container`;
+              
+              const wrapper = document.createElement('div');
+              wrapper.className = 'preview-content-wrapper';
+              
               const pre = document.createElement('pre');
               pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
-              container.appendChild(pre);
+              wrapper.appendChild(pre);
+              container.appendChild(wrapper);
               visualArea.appendChild(container);
-              
-              // Set initial zoom for text (A4 assumption)
-              const availableWidth = visualArea.clientWidth - 40;
-              const availableHeight = visualArea.clientHeight - 40;
-              if (availableWidth > 0 && availableHeight > 0) {
-                 const fitZoom = availableWidth / (availableHeight * 1.414);
-                 setPreviewZoom(fitZoom);
-              }
             } else {
+              updatePageRangeInput(1);
               visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview tidak didukung.</div>';
             }
           } catch (e) {
@@ -482,26 +520,42 @@
                container.classList.remove('preview-bw');
            }
 
-           // Orientation (CSS Rotate)
-           if (previewState.orientation === 'landscape') {
-               container.classList.add('preview-landscape');
-           } else {
-               container.classList.remove('preview-landscape');
+           // Orientation (CSS Rotate) - Moved to transform for robust layout
+           // Actually, changing Paper Size should change aspect ratio.
+           // Orientation "Landscape" should rotate the PAPER, not just the content.
+           
+           // Calculate Aspect Ratio
+           let widthMm = 210;
+           let heightMm = 297; // A4
+           
+           if (previewState.paperSize === 'A5') {
+               widthMm = 148;
+               heightMm = 210;
+           } else if (previewState.paperSize === 'F4') {
+               widthMm = 215;
+               heightMm = 330;
            }
            
-           // Text Aspect Ratio Update
-           if (file.type === 'text/plain') {
-               const pre = container.querySelector('pre');
-               if (pre) {
-                   let ratio = 1 / 1.414; // A4/A5 default
-                   if (previewState.paperSize === 'F4') {
-                       ratio = 215 / 330; 
-                   }
-                   if (previewState.orientation === 'landscape') {
-                       ratio = 1 / ratio;
-                   }
-                   pre.style.aspectRatio = String(ratio);
-               }
+           if (previewState.orientation === 'landscape') {
+               // Swap
+               [widthMm, heightMm] = [heightMm, widthMm];
+           }
+
+           const ratio = widthMm / heightMm;
+           container.style.aspectRatio = String(ratio);
+
+           // Content Scale logic
+           const wrapper = container.querySelector('.preview-content-wrapper');
+           if (wrapper) {
+               const scaleVal = (previewState.contentScale || 100) / 100;
+               wrapper.style.transform = `scale(${scaleVal})`;
+               wrapper.style.transformOrigin = "center center";
+               wrapper.style.width = "100%";
+               wrapper.style.height = "100%";
+               wrapper.style.display = "flex";
+               wrapper.style.justifyContent = "center";
+               wrapper.style.alignItems = "center";
+               wrapper.style.overflow = "hidden";
            }
         });
       }
@@ -529,7 +583,7 @@
         }
         
         const selectedFile = uploadFileInput?.files?.[0] || null;
-        renderVisualPreview(selectedFile, previewState.paperSize);
+        renderVisualPreview(selectedFile);
       }
 
       function resetPreviewState() {
