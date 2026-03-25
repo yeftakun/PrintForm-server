@@ -60,9 +60,10 @@
 
               <label class="field">
                 <span>Ukuran Kertas</span>
-                <select name="paperSize">
+                <select name="paperSize" id="paperSize">
                   <option value="A4" selected>A4</option>
                   <option value="A5">A5</option>
+                  <option value="F4">F4 (Folio)</option>
                 </select>
               </label>
 
@@ -363,133 +364,146 @@
         setPreviewZoom(1);
       });
 
-      async function renderVisualPreview(file, paperSize) {
+      let lastRenderedFile = null;
+
+      async function renderVisualPreview(file) {
         const visualArea = document.getElementById("visualPreviewArea");
         
         if (!file) {
           visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>';
-          currentVisualPreviewFile = null;
-          currentPdfDocument = null;
+          lastRenderedFile = null;
           return;
         }
 
-        // Jika file sama, tidak perlu merender ulang
-        // Karena ukuran kertas di preview sekarang tetap/fixed, kita abaikan perubahan paperSize untuk visual
-        if (file === currentVisualPreviewFile) {
-          return;
-        }
+        const isNewFile = file !== lastRenderedFile;
 
-        currentVisualPreviewFile = file;
-        visualArea.innerHTML = '<div class="visual-preview-placeholder">Memuat preview...</div>';
-        
-        try {
-          if (file.type === "application/pdf") {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            currentPdfDocument = pdf;
-            visualArea.innerHTML = '';
-            
-            // Limit to max 20 pages for performance
-            const pagesToRender = Math.min(pdf.numPages, 20);
-            
-            for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
-              const page = await pdf.getPage(pageNum);
-              const viewport = page.getViewport({ scale: 1.2 }); // Scale down relative to typical screen
+        if (isNewFile) {
+          lastRenderedFile = file;
+          visualArea.innerHTML = '<div class="visual-preview-placeholder">Memuat preview...</div>';
 
-              if (pageNum === 1) {
-                  // Fit to width logic
-                  const availableWidth = visualArea.clientWidth - 40; // padding 20px * 2
-                  const availableHeight = visualArea.clientHeight - 40; // padding 20px * 2
-                  
+          try {
+            if (file.type === "application/pdf") {
+              const arrayBuffer = await file.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              visualArea.innerHTML = '';
+              
+              const pagesToRender = Math.min(pdf.numPages, 20);
+              
+              for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.0 }); // Base scale
+                
+                // Determine scale to fit width
+                if (pageNum === 1) {
+                  const availableWidth = visualArea.clientWidth - 40;
+                  const availableHeight = visualArea.clientHeight - 40;
                   if (availableWidth > 0 && availableHeight > 0) {
                       const ar = viewport.width / viewport.height;
-                      // Target: width = availableWidth
-                      // Derived height = availableWidth / ar
-                      // Zoom = derived height / availableHeight (since height at zoom 1 is 100% of availableHeight)
-                      
                       const fitZoom = availableWidth / (availableHeight * ar);
                       setPreviewZoom(fitZoom);
                   }
+                }
+
+                const container = document.createElement('div');
+                container.className = `preview-page-container`;
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                container.appendChild(canvas);
+                visualArea.appendChild(container);
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
               }
               
+              if (pdf.numPages > 20) {
+                const note = document.createElement('div');
+                note.className = "visual-preview-placeholder";
+                note.textContent = `(+ ${pdf.numPages - 20} halaman lainnya...)`;
+                visualArea.appendChild(note);
+              }
+
+            } else if (file.type.startsWith("image/")) {
+              visualArea.innerHTML = '';
               const container = document.createElement('div');
               container.className = `preview-page-container`;
+              container.style.padding = "20px";
               
-              const canvas = document.createElement('canvas');
-              const context = canvas.getContext('2d');
-              canvas.height = viewport.height;
-              canvas.width = viewport.width;
-              
-              container.appendChild(canvas);
+              const img = document.createElement('img');
+              const objectUrl = URL.createObjectURL(file);
+              img.src = objectUrl;
+              img.onload = () => {
+                  const availableWidth = visualArea.clientWidth - 40;
+                  const availableHeight = visualArea.clientHeight - 40;
+                  if (img.naturalHeight > 0 && availableWidth > 0 && availableHeight > 0) {
+                     const ar = img.naturalWidth / img.naturalHeight;
+                     const fitZoom = availableWidth / (availableHeight * ar);
+                     setPreviewZoom(fitZoom);
+                  }
+                  URL.revokeObjectURL(objectUrl);
+              };
+              container.appendChild(img);
+              visualArea.appendChild(container);
+
+            } else if (file.type === "text/plain") {
+              const text = await file.text();
+              visualArea.innerHTML = '';
+              const container = document.createElement('div');
+              container.className = `preview-page-container`;
+              const pre = document.createElement('pre');
+              pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
+              container.appendChild(pre);
               visualArea.appendChild(container);
               
-              const renderContext = {
-                canvasContext: context,
-                viewport: viewport
-              };
-              await page.render(renderContext).promise;
+              // Set initial zoom for text (A4 assumption)
+              const availableWidth = visualArea.clientWidth - 40;
+              const availableHeight = visualArea.clientHeight - 40;
+              if (availableWidth > 0 && availableHeight > 0) {
+                 const fitZoom = availableWidth / (availableHeight * 1.414);
+                 setPreviewZoom(fitZoom);
+              }
+            } else {
+              visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview tidak didukung.</div>';
             }
-            
-            if (pdf.numPages > 20) {
-              const note = document.createElement('div');
-              note.className = "visual-preview-placeholder";
-              note.textContent = `(+ ${pdf.numPages - 20} halaman lainnya tidak ditampilkan untuk menghemat memori...)`;
-              visualArea.appendChild(note);
-            }
-
-          } else if (file.type.startsWith("image/")) {
-            visualArea.innerHTML = '';
-            const container = document.createElement('div');
-            container.className = `preview-page-container`;
-            container.style.padding = "20px"; // to look like page bounds
-            
-            const img = document.createElement('img');
-            const objectUrl = URL.createObjectURL(file);
-            img.src = objectUrl;
-            img.onload = () => {
-                const availableWidth = visualArea.clientWidth - 40;
-                const availableHeight = visualArea.clientHeight - 40;
-                if (img.naturalHeight > 0 && availableWidth > 0 && availableHeight > 0) {
-                   const ar = img.naturalWidth / img.naturalHeight;
-                   const fitZoom = availableWidth / (availableHeight * ar);
-                   setPreviewZoom(fitZoom);
-                }
-                URL.revokeObjectURL(objectUrl);
-            };
-            
-            container.appendChild(img);
-            visualArea.appendChild(container);
-
-          } else if (file.type === "text/plain") {
-            const text = await file.text();
-            visualArea.innerHTML = '';
-            
-            // Assume A4 Portrait for Text
-            const availableWidth = visualArea.clientWidth - 40;
-            const availableHeight = visualArea.clientHeight - 40;
-            const ar = 1 / 1.414; // A4 aspect ratio
-
-            if (availableWidth > 0 && availableHeight > 0) {
-                const fitZoom = availableWidth / (availableHeight * ar);
-                setPreviewZoom(fitZoom);
-            }
-            
-            const container = document.createElement('div');
-            container.className = `preview-page-container`;
-            
-            const pre = document.createElement('pre');
-            pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
-            
-            container.appendChild(pre);
-            visualArea.appendChild(container);
-
-          } else {
-            visualArea.innerHTML = '<div class="visual-preview-placeholder">Preview visual tidak didukung untuk format ini.</div>';
+          } catch (e) {
+            console.error(e);
+            visualArea.innerHTML = '<div class="visual-preview-placeholder" style="color:red">Error memuat preview.</div>';
           }
-        } catch (e) {
-          console.error("Preview render error:", e);
-          visualArea.innerHTML = '<div class="visual-preview-placeholder" style="color:red">Terjadi kesalahan memuat preview.</div>';
         }
+
+        // UPDATE STYLES (Run every time)
+        const containers = visualArea.querySelectorAll('.preview-page-container');
+        containers.forEach(container => {
+           // Color Mode
+           if (previewState.colorMode === 'bw') {
+               container.classList.add('preview-bw');
+           } else {
+               container.classList.remove('preview-bw');
+           }
+
+           // Orientation (CSS Rotate)
+           if (previewState.orientation === 'landscape') {
+               container.classList.add('preview-landscape');
+           } else {
+               container.classList.remove('preview-landscape');
+           }
+           
+           // Text Aspect Ratio Update
+           if (file.type === 'text/plain') {
+               const pre = container.querySelector('pre');
+               if (pre) {
+                   let ratio = 1 / 1.414; // A4/A5 default
+                   if (previewState.paperSize === 'F4') {
+                       ratio = 215 / 330; 
+                   }
+                   if (previewState.orientation === 'landscape') {
+                       ratio = 1 / ratio;
+                   }
+                   pre.style.aspectRatio = String(ratio);
+               }
+           }
+        });
       }
 
       function renderPreviewState() {

@@ -309,3 +309,6 @@ th {
     height: 360px;
   }
 }
+
+.preview-bw { filter: grayscale(100%); }
+.preview-landscape { transform: rotate(90deg); transform-origin: center; }

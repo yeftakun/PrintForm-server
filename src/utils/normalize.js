@@ -1,6 +1,6 @@
 function normalizePaperSize(value) {
   const v = String(value || "").toUpperCase().trim();
-  if (v === "A4" || v === "A5") {
+  if (v === "A4" || v === "A5" || v === "F4") {
     return v;
   }
   return null;
