@@ -21,6 +21,7 @@ Input yang direkomendasikan untuk fase ini:
 - colorMode (bw atau color)
 - orientation (portrait atau landscape, opsional)
 - pageRange (opsional, format sederhana seperti 1-3,5,8)
+- Content scale (100% adalah defaultnya/sesuai dengan pdf asli; dapat naik-turunkan scale). (Sebenarnya saya ingin tambahkan `fit to printable area`, tapi setiap driver printer memiliki printable area berbeda, jadi sampai sini hanya mengatur scalenya saja).
 - notes (opsional, catatan pelanggan untuk operator)
 
 Catatan implementasi awal:
