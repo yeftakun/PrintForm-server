@@ -342,7 +342,6 @@
               
               const container = document.createElement('div');
               container.className = `preview-page-container`;
-              container.style.transform = `scale(var(--preview-zoom, 1))`;
               
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
@@ -370,7 +369,6 @@
             visualArea.innerHTML = '';
             const container = document.createElement('div');
             container.className = `preview-page-container`;
-            container.style.transform = `scale(var(--preview-zoom, 1))`;
             container.style.padding = "20px"; // to look like page bounds
             
             const img = document.createElement('img');
@@ -385,7 +383,6 @@
             visualArea.innerHTML = '';
             const container = document.createElement('div');
             container.className = `preview-page-container`;
-            container.style.transform = `scale(var(--preview-zoom, 1))`;
             
             const pre = document.createElement('pre');
             pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
