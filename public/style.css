@@ -240,11 +240,12 @@ th {
   display: flex;
   justify-content: center;
   align-items: center;
-  transition: transform 0.2s ease-in-out, width 0.3s ease;
+  transition: transform 0.25s cubic-bezier(.4,1.6,.4,1), width 0.3s ease;
   transform-origin: top center;
   height: 100%;
   flex-shrink: 0;
   box-sizing: border-box;
+  overflow: auto;
 }
 
 .preview-page-container canvas, 

@@ -276,6 +276,37 @@
       let currentVisualPreviewFile = null;
       let currentPdfDocument = null;
 
+      let previewZoom = 1;
+      const MIN_ZOOM = 0.3;
+      const MAX_ZOOM = 3;
+      const ZOOM_STEP = 0.1;
+
+      function setPreviewZoom(newZoom) {
+        previewZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+        const visualArea = document.getElementById("visualPreviewArea");
+        if (!visualArea) return;
+        visualArea.style.setProperty('--preview-zoom', previewZoom);
+      }
+
+      function handlePreviewWheel(e) {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          if (e.deltaY < 0) {
+            setPreviewZoom(previewZoom + ZOOM_STEP);
+          } else if (e.deltaY > 0) {
+            setPreviewZoom(previewZoom - ZOOM_STEP);
+          }
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const visualArea = document.getElementById("visualPreviewArea");
+        if (visualArea) {
+          visualArea.addEventListener('wheel', handlePreviewWheel, { passive: false });
+        }
+        setPreviewZoom(1);
+      });
+
       async function renderVisualPreview(file, paperSize) {
         const visualArea = document.getElementById("visualPreviewArea");
         
@@ -311,6 +342,7 @@
               
               const container = document.createElement('div');
               container.className = `preview-page-container`;
+              container.style.transform = `scale(var(--preview-zoom, 1))`;
               
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
@@ -338,6 +370,7 @@
             visualArea.innerHTML = '';
             const container = document.createElement('div');
             container.className = `preview-page-container`;
+            container.style.transform = `scale(var(--preview-zoom, 1))`;
             container.style.padding = "20px"; // to look like page bounds
             
             const img = document.createElement('img');
@@ -352,6 +385,7 @@
             visualArea.innerHTML = '';
             const container = document.createElement('div');
             container.className = `preview-page-container`;
+            container.style.transform = `scale(var(--preview-zoom, 1))`;
             
             const pre = document.createElement('pre');
             pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
