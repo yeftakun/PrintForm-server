@@ -5,13 +5,18 @@ const { query, withTransaction } = require("../db");
 let hasJobOwnerUserIdColumnCache = null;
 let hasJobClaimedByClientIdColumnCache = null;
 let hasJobClaimedAtColumnCache = null;
+let hasJobColorModeColumnCache = null;
+let hasJobOrientationColumnCache = null;
+let hasJobPageRangeColumnCache = null;
+let hasJobContentScaleColumnCache = null;
+let hasJobNotesColumnCache = null;
 
-async function hasJobOwnerUserIdColumn() {
+async function hasColumn(columnName, cacheVar, setCacheVar) {
   if (!useDb) {
     return false;
   }
 
-  if (hasJobOwnerUserIdColumnCache === true) {
+  if (cacheVar === true) {
     return true;
   }
 
@@ -21,70 +26,49 @@ async function hasJobOwnerUserIdColumn() {
       FROM information_schema.columns
       WHERE table_schema = 'public'
         AND table_name = 'jobs'
-        AND column_name = 'owner_user_id'
-    ) AS exists`
+        AND column_name = $1
+    ) AS exists`,
+    [columnName]
   );
 
   const exists = Boolean(res.rows[0]?.exists);
   if (exists) {
-    hasJobOwnerUserIdColumnCache = true;
+    setCacheVar(true);
   }
 
   return exists;
+}
+
+async function hasJobOwnerUserIdColumn() {
+  return hasColumn("owner_user_id", hasJobOwnerUserIdColumnCache, (val) => { hasJobOwnerUserIdColumnCache = val; });
 }
 
 async function hasJobClaimedByClientIdColumn() {
-  if (!useDb) {
-    return false;
-  }
-
-  if (hasJobClaimedByClientIdColumnCache === true) {
-    return true;
-  }
-
-  const res = await query(
-    `SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'jobs'
-        AND column_name = 'claimed_by_client_id'
-    ) AS exists`
-  );
-
-  const exists = Boolean(res.rows[0]?.exists);
-  if (exists) {
-    hasJobClaimedByClientIdColumnCache = true;
-  }
-
-  return exists;
+  return hasColumn("claimed_by_client_id", hasJobClaimedByClientIdColumnCache, (val) => { hasJobClaimedByClientIdColumnCache = val; });
 }
 
 async function hasJobClaimedAtColumn() {
-  if (!useDb) {
-    return false;
-  }
+  return hasColumn("claimed_at", hasJobClaimedAtColumnCache, (val) => { hasJobClaimedAtColumnCache = val; });
+}
 
-  if (hasJobClaimedAtColumnCache === true) {
-    return true;
-  }
+async function hasJobColorModeColumn() {
+  return hasColumn("color_mode", hasJobColorModeColumnCache, (val) => { hasJobColorModeColumnCache = val; });
+}
 
-  const res = await query(
-    `SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'jobs'
-        AND column_name = 'claimed_at'
-    ) AS exists`
-  );
+async function hasJobOrientationColumn() {
+  return hasColumn("orientation", hasJobOrientationColumnCache, (val) => { hasJobOrientationColumnCache = val; });
+}
 
-  const exists = Boolean(res.rows[0]?.exists);
-  if (exists) {
-    hasJobClaimedAtColumnCache = true;
-  }
+async function hasJobPageRangeColumn() {
+  return hasColumn("page_range", hasJobPageRangeColumnCache, (val) => { hasJobPageRangeColumnCache = val; });
+}
 
-  return exists;
+async function hasJobContentScaleColumn() {
+  return hasColumn("content_scale", hasJobContentScaleColumnCache, (val) => { hasJobContentScaleColumnCache = val; });
+}
+
+async function hasJobNotesColumn() {
+  return hasColumn("notes", hasJobNotesColumnCache, (val) => { hasJobNotesColumnCache = val; });
 }
 
 async function getJobs() {
@@ -92,25 +76,35 @@ async function getJobs() {
     return readJobs();
   }
 
-  const hasOwnerUserIdColumn = await hasJobOwnerUserIdColumn();
-  const hasClaimedByClientIdColumn = await hasJobClaimedByClientIdColumn();
-  const hasClaimedAtColumn = await hasJobClaimedAtColumn();
-  const ownerUserIdSelect = hasOwnerUserIdColumn
-    ? "owner_user_id"
-    : "NULL::text AS owner_user_id";
-  const claimedByClientIdSelect = hasClaimedByClientIdColumn
-    ? "claimed_by_client_id"
-    : "NULL::text AS claimed_by_client_id";
-  const claimedAtSelect = hasClaimedAtColumn
-    ? "claimed_at"
-    : "NULL::timestamptz AS claimed_at";
+  const hasOwnerUserId = await hasJobOwnerUserIdColumn();
+  const hasClaimedByClientId = await hasJobClaimedByClientIdColumn();
+  const hasClaimedAt = await hasJobClaimedAtColumn();
+  const hasColorMode = await hasJobColorModeColumn();
+  const hasOrientation = await hasJobOrientationColumn();
+  const hasPageRange = await hasJobPageRangeColumn();
+  const hasContentScale = await hasJobContentScaleColumn();
+  const hasNotes = await hasJobNotesColumn();
+
+  const selectColumns = [
+    "id", "session_id", "original_name", "stored_path", "size_bytes",
+    "status", "alias", "paper_size", "copies", "created_at", "updated_at"
+  ];
+
+  selectColumns.push(hasOwnerUserId ? "owner_user_id" : "NULL::text AS owner_user_id");
+  selectColumns.push(hasClaimedByClientId ? "claimed_by_client_id" : "NULL::text AS claimed_by_client_id");
+  selectColumns.push(hasClaimedAt ? "claimed_at" : "NULL::timestamptz AS claimed_at");
+  selectColumns.push(hasColorMode ? "color_mode" : "NULL::text AS color_mode");
+  selectColumns.push(hasOrientation ? "orientation" : "NULL::text AS orientation");
+  selectColumns.push(hasPageRange ? "page_range" : "NULL::text AS page_range");
+  selectColumns.push(hasContentScale ? "content_scale" : "NULL::text AS content_scale");
+  selectColumns.push(hasNotes ? "notes" : "NULL::text AS notes");
 
   const res = await query(
-    `select id, session_id, original_name, stored_path, size_bytes,
-            status, alias, paper_size, copies, ${ownerUserIdSelect}, ${claimedByClientIdSelect}, ${claimedAtSelect}, created_at, updated_at
-       from jobs
-       order by created_at desc`
+    `SELECT ${selectColumns.join(", ")}
+     FROM jobs
+     ORDER BY created_at DESC`
   );
+
   return res.rows.map(row => ({
     id: row.id,
     sessionId: row.session_id,
@@ -123,9 +117,14 @@ async function getJobs() {
     createdAt: row.created_at?.toISOString?.() || row.created_at,
     status: row.status,
     alias: row.alias || null,
+    notes: row.notes || null,
     printConfig: {
       paperSize: row.paper_size,
-      copies: row.copies
+      copies: row.copies,
+      colorMode: row.color_mode || null,
+      orientation: row.orientation || null,
+      pageRange: row.page_range || null,
+      contentScale: row.content_scale || null
     }
   }));
 }
@@ -135,9 +134,15 @@ async function saveJobs(jobs) {
     return writeJobs(jobs);
   }
 
-  const hasOwnerUserIdColumn = await hasJobOwnerUserIdColumn();
-  const hasClaimedByClientIdColumn = await hasJobClaimedByClientIdColumn();
-  const hasClaimedAtColumn = await hasJobClaimedAtColumn();
+  const hasOwnerUserId = await hasJobOwnerUserIdColumn();
+  const hasClaimedByClientId = await hasJobClaimedByClientIdColumn();
+  const hasClaimedAt = await hasJobClaimedAtColumn();
+  const hasColorMode = await hasJobColorModeColumn();
+  const hasOrientation = await hasJobOrientationColumn();
+  const hasPageRange = await hasJobPageRangeColumn();
+  const hasContentScale = await hasJobContentScaleColumn();
+  const hasNotes = await hasJobNotesColumn();
+
   const ids = jobs.map(j => j.id);
   return withTransaction(async client => {
     if (ids.length > 0) {
@@ -170,37 +175,6 @@ async function saveJobs(jobs) {
         j.printConfig?.copies
       ];
 
-      if (hasOwnerUserIdColumn) {
-        insertColumns.push("owner_user_id");
-        values.push(j.ownerUserId || null);
-      }
-
-      if (hasClaimedByClientIdColumn) {
-        insertColumns.push("claimed_by_client_id");
-        values.push(j.claimedByClientId || null);
-      }
-
-      if (hasClaimedAtColumn) {
-        insertColumns.push("claimed_at");
-        values.push(j.claimedAt ? new Date(j.claimedAt) : null);
-      }
-
-      insertColumns.push("created_at", "updated_at");
-      values.push(
-        j.createdAt ? new Date(j.createdAt) : null,
-        new Date()
-      );
-
-      const createdAtIndex = values.length - 1;
-      const updatedAtIndex = values.length;
-      const valuePlaceholders = values.map((_, index) => {
-        const placeholder = `$${index + 1}`;
-        if (index + 1 === createdAtIndex || index + 1 === updatedAtIndex) {
-          return `COALESCE(${placeholder}, now())`;
-        }
-        return placeholder;
-      });
-
       const updateSetClauses = [
         "session_id = EXCLUDED.session_id",
         "original_name = EXCLUDED.original_name",
@@ -212,19 +186,70 @@ async function saveJobs(jobs) {
         "copies = EXCLUDED.copies"
       ];
 
-      if (hasOwnerUserIdColumn) {
+      if (hasOwnerUserId) {
+        insertColumns.push("owner_user_id");
+        values.push(j.ownerUserId || null);
         updateSetClauses.push("owner_user_id = COALESCE(EXCLUDED.owner_user_id, jobs.owner_user_id)");
       }
 
-      if (hasClaimedByClientIdColumn) {
+      if (hasClaimedByClientId) {
+        insertColumns.push("claimed_by_client_id");
+        values.push(j.claimedByClientId || null);
         updateSetClauses.push("claimed_by_client_id = EXCLUDED.claimed_by_client_id");
       }
 
-      if (hasClaimedAtColumn) {
+      if (hasClaimedAt) {
+        insertColumns.push("claimed_at");
+        values.push(j.claimedAt ? new Date(j.claimedAt) : null);
         updateSetClauses.push("claimed_at = EXCLUDED.claimed_at");
       }
 
+      if (hasColorMode) {
+        insertColumns.push("color_mode");
+        values.push(j.printConfig?.colorMode || null);
+        updateSetClauses.push("color_mode = EXCLUDED.color_mode");
+      }
+
+      if (hasOrientation) {
+        insertColumns.push("orientation");
+        values.push(j.printConfig?.orientation || null);
+        updateSetClauses.push("orientation = EXCLUDED.orientation");
+      }
+
+      if (hasPageRange) {
+        insertColumns.push("page_range");
+        values.push(j.printConfig?.pageRange || null);
+        updateSetClauses.push("page_range = EXCLUDED.page_range");
+      }
+
+      if (hasContentScale) {
+        insertColumns.push("content_scale");
+        values.push(j.printConfig?.contentScale || null);
+        updateSetClauses.push("content_scale = EXCLUDED.content_scale");
+      }
+
+      if (hasNotes) {
+        insertColumns.push("notes");
+        values.push(j.notes || null);
+        updateSetClauses.push("notes = EXCLUDED.notes");
+      }
+
+      insertColumns.push("created_at", "updated_at");
+      values.push(
+        j.createdAt ? new Date(j.createdAt) : null,
+        new Date()
+      );
       updateSetClauses.push("updated_at = EXCLUDED.updated_at");
+
+      const createdAtIndex = values.length - 1;
+      const updatedAtIndex = values.length;
+      const valuePlaceholders = values.map((_, index) => {
+        const placeholder = `$${index + 1}`;
+        if (index + 1 === createdAtIndex || index + 1 === updatedAtIndex) {
+          return `COALESCE(${placeholder}, now())`;
+        }
+        return placeholder;
+      });
 
       await client.query(
         `INSERT INTO jobs (${insertColumns.join(", ")})

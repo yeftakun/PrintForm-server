@@ -14,7 +14,15 @@ const {
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions } = require("../repositories/sessionsRepository");
 const { getClients } = require("../repositories/clientsRepository");
-const { normalizePaperSize, normalizeCopies } = require("../utils/normalize");
+const {
+  normalizePaperSize,
+  normalizeCopies,
+  normalizeColorMode,
+  normalizeOrientation,
+  normalizePageRange,
+  normalizeContentScale,
+  normalizeNotes
+} = require("../utils/normalize");
 const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
 const { cleanupExpiredSessions } = require("../services/cleanup");
@@ -992,6 +1000,12 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
 
   const paperSize = normalizePaperSize(req.body.paperSize);
   const copies = normalizeCopies(req.body.copies);
+  const colorMode = normalizeColorMode(req.body.colorMode);
+  const orientation = normalizeOrientation(req.body.orientation);
+  const pageRange = normalizePageRange(req.body.pageRange);
+  const contentScale = normalizeContentScale(req.body.contentScale);
+  const notes = normalizeNotes(req.body.notes);
+
   const sessionId = typeof req.body.sessionId === "string" ? req.body.sessionId : null;
 
   if (!paperSize) {
@@ -1056,8 +1070,13 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     claimedAt: null,
     printConfig: {
       paperSize,
-      copies
-    }
+      copies,
+      colorMode,
+      orientation,
+      pageRange,
+      contentScale
+    },
+    notes
   };
 
   try {
