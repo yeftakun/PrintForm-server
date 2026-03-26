@@ -37,7 +37,7 @@ TL;DR: Fokus pada arsitektur sederhana tapi stabil untuk purwarupa tugas akhir: 
 11. Penambahan print preview (bagaimana tampilan dokumen ketika dicetak nanti
 ) pada form print job pada web ui (realtime preview setiap kali pelanggan merubah konfigurasi cetak). **Selesai.**
 12. Perancangan mockup pada [UI_MOCKUP_CONCEPT.md](UI_MOCKUP_CONCEPT.md). **Saya sendiri**
-13. Lengkapi konfigurasi cetak pada tugas cetak (konfigurasi akan dieksekusi pelanggan di web). [Detail Step 13](detail_step13.md)
+13. Lengkapi konfigurasi cetak pada tugas cetak (konfigurasi akan dieksekusi pelanggan di web). **Selesai implementasi Server & Web; Spec untuk opsi driver-aware di client sudah siap.** [Detail Step 13](detail_step13.md)
 14. Penyesuaian role akun: Admin, Mitra, Pelanggan.
 15. Deployment single-node — dockerize app + PostgreSQL + Nginx reverse proxy TLS; siapkan backup DB, log rotation, dan SOP recovery.
 

@@ -16,22 +16,39 @@ Tujuan Step 13 adalah menjaga input pelanggan di Web UI tetap sederhana, tetapi 
 
 Input yang direkomendasikan untuk fase ini:
 
-- paperSize (A4, A5 F4)
+- paperSize (A4, A5, F4/Folio)
 - copies (1-999)
 - colorMode (bw atau color)
-- orientation (portrait atau landscape, opsional)
+- orientation (portrait atau landscape)
 - pageRange (opsional, format sederhana seperti 1-3,5,8)
-- Content scale (100% adalah defaultnya/sesuai dengan pdf asli; dapat naik-turunkan scale). (Sebenarnya saya ingin tambahkan `fit to printable area`, tapi setiap driver printer memiliki printable area berbeda, jadi sampai sini hanya mengatur scalenya saja).
+- contentScale (100% adalah defaultnya/sesuai dengan pdf asli; dapat naik-turunkan scale).
 - notes (opsional, catatan pelanggan untuk operator)
-
-Catatan implementasi awal:
-
-- Minimal wajib tetap paperSize dan copies agar kompatibel dengan implementasi server saat ini.
-- Field tambahan bisa dirilis bertahap mulai dari colorMode dulu, lalu orientation dan pageRange.
 
 ---
 
-### 13b. Konfigurasi Kios di Level Akun Mitra
+### 13b. Spesifikasi Implementasi Client (Desktop)
+
+Berdasarkan diskusi arsitektur (Margin 0 vs Force Shrink), berikut adalah spesifikasi rendering untuk PrintForm Client (.NET):
+
+1.  **Margin Strategy: "Hardware Margin Pass-through"**
+    *   Client **TIDAK BOLEH** melakukan *auto-shrink* atau *fit-to-page* secara paksa jika user meminta Scale 100%.
+    *   Client harus mengeset Software Margin ke 0: `printDoc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);`.
+    *   Ini membiarkan driver printer menangani "Hard Margin" (area tidak ter-print) secara alami.
+    *   **Risiko**: Jika user mendesain borderless, bagian tepi (±4-5mm) akan terpotong oleh fisik printer. Ini risiko yang diterima user demi akurasi skala.
+
+2.  **Mapping Konfigurasi**:
+    *   **Paper Size**: Cari nama kertas di driver yang cocok dengan input (`A4`, `A5`, `F4`/`Folio`). Jika `F4` tidak ada, fallback ke ukuran custom `215 x 330 mm`.
+    *   **Orientation**: `printDoc.DefaultPageSettings.Landscape = (config.orientation == "landscape")`.
+    *   **Color Mode**: `printDoc.DefaultPageSettings.Color = (config.colorMode == "color")`.
+    *   **Copies**: `printDoc.PrinterSettings.Copies = config.copies`.
+    *   **Scale**: Gunakan `Graphics.ScaleTransform(scale/100f, scale/100f)`.
+
+3.  **Page Range**:
+    *   Client harus memparsing string range (misal "1, 3-5") dan hanya mencetak halaman tersebut.
+
+---
+
+### 13c. Konfigurasi Kios di Level Akun Mitra
 
 Setiap akun kios memiliki policy dasar layanan cetak, bukan policy per browser pelanggan. Policy ini dipakai server untuk memvalidasi request sebelum job masuk antrean.
 
