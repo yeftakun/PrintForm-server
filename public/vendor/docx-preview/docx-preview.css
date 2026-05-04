@@ -1,0 +1,8 @@
+/* Minimal local styles for docx-preview output. */
+.docx-preview-container .docx-wrapper {
+  background: transparent;
+}
+
+.docx-preview-container .docx {
+  width: 100%;
+}

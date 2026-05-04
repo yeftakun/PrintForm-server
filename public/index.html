@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PrintForm Server</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="vendor/docx-preview/docx-preview.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="vendor/docx-preview/docx-preview.min.js"></script>
     <script>
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
@@ -277,6 +279,11 @@
       let previewConversionPending = false;
       let previewConversionSeq = 0;
       let previewConversionError = "";
+      let previewConversionNotice = "";
+      let previewDocxActive = false;
+      let previewDocxUrl = "";
+      let previewPollTimer = null;
+      let previewPollAttempts = 0;
 
       async function apiFetch(input, init = {}, options = {}) {
         return fetch(input, init);
@@ -412,6 +419,121 @@
         visualArea.innerHTML = `<div class="visual-preview-placeholder" style="color:${color}">${text}</div>`;
       }
 
+      function getDocxRenderer() {
+        if (window.docx && typeof window.docx.renderAsync === "function") {
+          return window.docx.renderAsync;
+        }
+        if (window.docxPreview && typeof window.docxPreview.renderAsync === "function") {
+          return window.docxPreview.renderAsync;
+        }
+        return null;
+      }
+
+      async function renderDocxPreviewFromUrl(sourceUrl, expectedSeq) {
+        const visualArea = document.getElementById("visualPreviewArea");
+        if (!visualArea) {
+          return;
+        }
+
+        if (expectedSeq && expectedSeq !== previewConversionSeq) {
+          return;
+        }
+
+        const renderAsync = getDocxRenderer();
+        if (!renderAsync) {
+          setVisualPreviewMessage("Docx preview belum siap.", true);
+          return;
+        }
+
+        const res = await apiFetch(sourceUrl);
+        if (!res.ok) {
+          throw new Error("Gagal memuat dokumen untuk preview");
+        }
+
+        const buffer = await res.arrayBuffer();
+        if (expectedSeq && expectedSeq !== previewConversionSeq) {
+          return;
+        }
+        visualArea.innerHTML = "";
+
+        const container = document.createElement("div");
+        container.className = "docx-preview-container";
+        visualArea.appendChild(container);
+
+        await renderAsync(buffer, container, null, {
+          inWrapper: false,
+          ignoreWidth: false,
+          ignoreHeight: false
+        });
+
+        if (expectedSeq && expectedSeq !== previewConversionSeq) {
+          return;
+        }
+
+        updatePageRangeInput(1);
+      }
+
+      function clearPreviewPoll() {
+        if (previewPollTimer) {
+          clearTimeout(previewPollTimer);
+          previewPollTimer = null;
+        }
+        previewPollAttempts = 0;
+      }
+
+      function startPdfPolling(pdfUrl, sourceFile, maxAttempts = 30, delayMs = 2000) {
+        clearPreviewPoll();
+
+        const currentSeq = previewConversionSeq;
+        const attemptFetch = async () => {
+          if (currentSeq !== previewConversionSeq) {
+            return;
+          }
+          previewPollAttempts += 1;
+
+          try {
+            const res = await apiFetch(pdfUrl);
+            if (res.ok) {
+              const blob = await res.blob();
+              if (currentSeq !== previewConversionSeq) {
+                return;
+              }
+
+              const pdfName = buildPdfFileName(sourceFile);
+              previewConvertedFile = new File([blob], pdfName, { type: "application/pdf" });
+              previewConversionPending = false;
+              previewConversionNotice = "";
+              previewDocxActive = false;
+              previewDocxUrl = "";
+              renderPreviewState();
+              return;
+            }
+
+            if (res.status !== 404) {
+              throw new Error("Gagal mengambil PDF hasil konversi");
+            }
+          } catch (err) {
+            if (currentSeq !== previewConversionSeq) {
+              return;
+            }
+            previewConversionError = "Konversi ke PDF gagal. Silakan coba lagi.";
+            setVisualPreviewMessage("Gagal mengonversi dokumen.", true);
+            renderPreviewState();
+            return;
+          }
+
+          if (previewPollAttempts >= maxAttempts) {
+            previewConversionError = "Konversi PDF terlalu lama. Silakan coba lagi.";
+            renderPreviewState();
+            return;
+          }
+
+          previewPollTimer = setTimeout(attemptFetch, delayMs);
+        };
+
+        previewPollTimer = setTimeout(attemptFetch, delayMs);
+      }
+
       function getPreviewFile() {
         return previewConvertedFile || uploadFileInput?.files?.[0] || null;
       }
@@ -420,8 +542,12 @@
         const currentSeq = ++previewConversionSeq;
         previewConversionPending = true;
         previewConversionError = "";
+        previewConversionNotice = "";
         previewConvertedFile = null;
-        setVisualPreviewMessage("Mengonversi ke PDF...");
+        previewDocxActive = false;
+        previewDocxUrl = "";
+        clearPreviewPoll();
+        setVisualPreviewMessage("Menyiapkan preview...");
 
         try {
           const formData = new FormData();
@@ -437,7 +563,54 @@
             throw new Error(body.error || "Konversi gagal");
           }
 
-          const blob = await res.blob();
+          const contentType = res.headers.get("Content-Type") || "";
+          let blob = null;
+
+          if (contentType.includes("application/json")) {
+            const payload = await res.json();
+            if (currentSeq !== previewConversionSeq) {
+              return;
+            }
+
+            if (payload.sourceUrl) {
+              previewConversionPending = false;
+              previewDocxUrl = payload.sourceUrl;
+              previewConversionNotice = "PDF sedang diproses di server.";
+
+              const ext = String(file?.name || "").toLowerCase();
+              if (ext.endsWith(".docx")) {
+                try {
+                  previewDocxActive = true;
+                  await renderDocxPreviewFromUrl(payload.sourceUrl, currentSeq);
+                } catch (docxErr) {
+                  // Fallback to PDF polling when instant DOCX render fails.
+                  previewDocxActive = false;
+                  previewConversionNotice = "Preview instan DOCX gagal, menunggu PDF dari server.";
+                  setVisualPreviewMessage("Preview instan gagal. Menunggu PDF...");
+                }
+              } else {
+                setVisualPreviewMessage("Preview instan belum tersedia. Menunggu PDF...");
+              }
+
+              if (payload.pdfUrl) {
+                startPdfPolling(payload.pdfUrl, file);
+              }
+
+              renderPreviewState();
+              return;
+            } else if (payload.pdfUrl) {
+              const pdfRes = await apiFetch(payload.pdfUrl);
+              if (!pdfRes.ok) {
+                throw new Error("Gagal mengambil PDF hasil konversi");
+              }
+              blob = await pdfRes.blob();
+            } else {
+              throw new Error("Respons konversi tidak dikenali");
+            }
+          } else {
+            blob = await res.blob();
+          }
+
           if (currentSeq !== previewConversionSeq) {
             return;
           }
@@ -650,6 +823,9 @@
         if (previewConversionError) {
           previewWarning.textContent = previewConversionError;
           previewWarning.classList.remove("hidden");
+        } else if (previewConversionNotice) {
+          previewWarning.textContent = previewConversionNotice;
+          previewWarning.classList.remove("hidden");
         } else if (showCopiesWarning) {
           previewWarning.textContent = "Perhatian: jumlah salinan sangat besar. Pastikan konfigurasi sudah benar.";
           previewWarning.classList.remove("hidden");
@@ -664,7 +840,11 @@
         }
 
         if (previewConversionPending) {
-          setVisualPreviewMessage("Mengonversi ke PDF...");
+          setVisualPreviewMessage("Menyiapkan preview...");
+          return;
+        }
+
+        if (previewDocxActive) {
           return;
         }
 
@@ -686,6 +866,10 @@
         previewConvertedFile = null;
         previewConversionPending = false;
         previewConversionError = "";
+        previewConversionNotice = "";
+        previewDocxActive = false;
+        previewDocxUrl = "";
+        clearPreviewPoll();
         renderPreviewState();
       }
 
@@ -719,6 +903,10 @@
         previewConvertedFile = null;
         previewConversionPending = false;
         previewConversionError = "";
+        previewConversionNotice = "";
+        previewDocxActive = false;
+        previewDocxUrl = "";
+        clearPreviewPoll();
 
         const selectedFile = uploadFileInput?.files?.[0] || null;
         if (!selectedFile) {

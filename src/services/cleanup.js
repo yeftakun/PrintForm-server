@@ -91,6 +91,9 @@ async function cleanupOrphanFiles() {
     if (entry.name === ".gitkeep") {
       continue;
     }
+    if (entry.name.startsWith("preview_")) {
+      continue;
+    }
     if (jobFiles.has(entry.name)) {
       continue;
     }

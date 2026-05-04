@@ -1,0 +1,118 @@
+const fs = require("fs");
+const path = require("path");
+const { filesDir } = require("../config");
+const { convertToPdf } = require("../services/convertToPdf");
+
+const fsp = fs.promises;
+const OFFICE_EXTENSIONS = new Set([".doc", ".docx", ".ppt", ".pptx"]);
+const PREVIEW_PREFIX = "preview_";
+
+function normalizeConversionMode(value) {
+  return String(value || "SYNC").trim().toUpperCase();
+}
+
+function buildPreviewUrl(fileName) {
+  return `/api/jobs/preview/file/${encodeURIComponent(fileName)}`;
+}
+
+function isSafeFileName(fileName) {
+  if (!fileName) {
+    return false;
+  }
+  if (fileName.includes("..") || fileName.includes("/") || fileName.includes("\\")) {
+    return false;
+  }
+  return path.basename(fileName) === fileName;
+}
+
+async function removeFileSafe(filePath) {
+  if (!filePath) {
+    return;
+  }
+  await fsp.unlink(filePath).catch(() => null);
+}
+
+async function handlePreviewUpload(req, res) {
+  let storedPath = req.file?.path || "";
+
+  try {
+    // Validate input file presence.
+    if (!req.file) {
+      res.status(400).json({ error: "Document is required" });
+      return;
+    }
+
+    // Validate allowed office extensions for conversion.
+    const extension = path.extname(String(req.file.originalname || "")).toLowerCase();
+    if (!OFFICE_EXTENSIONS.has(extension)) {
+      await removeFileSafe(req.file.path);
+      res.status(400).json({ error: "Preview hanya mendukung DOC/DOCX/PPT/PPTX" });
+      return;
+    }
+
+    // Rename the temp file to keep the original extension for preview URLs.
+    const storedFileName = `${PREVIEW_PREFIX}${req.file.filename}${extension}`;
+    storedPath = path.join(filesDir, storedFileName);
+    await fsp.rename(req.file.path, storedPath);
+
+    const conversionMode = normalizeConversionMode(process.env.CONVERSION_MODE);
+
+    if (conversionMode === "HYBRID") {
+      // Hybrid mode: respond immediately with original file URL.
+      const pdfFileName = `${PREVIEW_PREFIX}${req.file.filename}.convert.pdf`;
+      res.status(202).json({
+        status: "accepted",
+        sourceUrl: buildPreviewUrl(storedFileName),
+        sourcePath: storedPath,
+        pdfUrl: buildPreviewUrl(pdfFileName)
+      });
+
+      // Run conversion in the background using a temp copy to preserve the source.
+      const copyName = `${PREVIEW_PREFIX}${req.file.filename}.convert${extension}`;
+      const copyPath = path.join(filesDir, copyName);
+      fsp.copyFile(storedPath, copyPath)
+        .then(() => convertToPdf(copyPath, filesDir))
+        .catch(err => {
+          console.error("Preview conversion failed:", err?.message || err);
+        });
+      return;
+    }
+
+    // Sync mode: wait for PDF conversion and return PDF URL.
+    const pdfPath = await convertToPdf(storedPath, filesDir);
+    const pdfFileName = path.basename(pdfPath);
+    res.status(200).json({
+      status: "ready",
+      pdfUrl: buildPreviewUrl(pdfFileName),
+      pdfPath
+    });
+  } catch (err) {
+    // Cleanup any temporary file on failure.
+    await removeFileSafe(storedPath);
+    res.status(500).json({ error: "Preview conversion failed" });
+  }
+}
+
+async function downloadPreviewFile(req, res) {
+  // Serve preview files via a controlled filename parameter.
+  const fileName = String(req.params.fileName || "").trim();
+  if (!isSafeFileName(fileName)) {
+    res.status(400).json({ error: "Invalid file name" });
+    return;
+  }
+
+  const filePath = path.join(filesDir, fileName);
+  try {
+    await fsp.access(filePath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "File not found" });
+    return;
+  }
+
+  res.sendFile(filePath);
+}
+
+module.exports = {
+  handlePreviewUpload,
+  downloadPreviewFile
+};
