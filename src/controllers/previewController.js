@@ -15,6 +15,10 @@ function buildPreviewUrl(fileName) {
   return `/api/jobs/preview/file/${encodeURIComponent(fileName)}`;
 }
 
+function buildPreviewStatusUrl(fileName) {
+  return `/api/jobs/preview/status/${encodeURIComponent(fileName)}`;
+}
+
 function isSafeFileName(fileName) {
   if (!fileName) {
     return false;
@@ -64,7 +68,8 @@ async function handlePreviewUpload(req, res) {
         status: "accepted",
         sourceUrl: buildPreviewUrl(storedFileName),
         sourcePath: storedPath,
-        pdfUrl: buildPreviewUrl(pdfFileName)
+        pdfUrl: buildPreviewUrl(pdfFileName),
+        pdfStatusUrl: buildPreviewStatusUrl(pdfFileName)
       });
 
       // Run conversion in the background using a temp copy to preserve the source.
@@ -84,6 +89,7 @@ async function handlePreviewUpload(req, res) {
     res.status(200).json({
       status: "ready",
       pdfUrl: buildPreviewUrl(pdfFileName),
+      pdfStatusUrl: buildPreviewStatusUrl(pdfFileName),
       pdfPath
     });
   } catch (err) {
@@ -112,7 +118,34 @@ async function downloadPreviewFile(req, res) {
   res.sendFile(filePath);
 }
 
+async function getPreviewFileStatus(req, res) {
+  // Return readiness state without using 404 to avoid noisy polling logs.
+  const fileName = String(req.params.fileName || "").trim();
+  if (!isSafeFileName(fileName)) {
+    res.status(400).json({ error: "Invalid file name" });
+    return;
+  }
+
+  const filePath = path.join(filesDir, fileName);
+  try {
+    const stat = await fsp.stat(filePath);
+    if (!stat.isFile()) {
+      res.json({ ready: false });
+      return;
+    }
+
+    res.json({
+      ready: true,
+      size: stat.size,
+      url: buildPreviewUrl(fileName)
+    });
+  } catch {
+    res.json({ ready: false });
+  }
+}
+
 module.exports = {
   handlePreviewUpload,
-  downloadPreviewFile
+  downloadPreviewFile,
+  getPreviewFileStatus
 };

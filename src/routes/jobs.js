@@ -34,7 +34,11 @@ const {
 } = require("../services/realtime");
 const { getActorFromRequest, writeAuditLogSafe } = require("../services/audit");
 const { asyncHandler } = require("../utils/asyncHandler");
-const { handlePreviewUpload, downloadPreviewFile } = require("../controllers/previewController");
+const {
+  handlePreviewUpload,
+  downloadPreviewFile,
+  getPreviewFileStatus
+} = require("../controllers/previewController");
 
 const ALLOWED_MIME_TYPES = new Set(
   (ALLOWED_UPLOAD_MIME_TYPES || []).map(value => String(value || "").toLowerCase())
@@ -468,6 +472,7 @@ router.get("/", asyncHandler(async (req, res) => {
 
 router.post("/preview", uploadDocument, asyncHandler(handlePreviewUpload));
 router.get("/preview/file/:fileName", asyncHandler(downloadPreviewFile));
+router.get("/preview/status/:fileName", asyncHandler(getPreviewFileStatus));
 
 router.get("/:id", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();

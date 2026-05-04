@@ -481,8 +481,29 @@
         previewPollAttempts = 0;
       }
 
-      function startPdfPolling(pdfUrl, sourceFile, maxAttempts = 30, delayMs = 2000) {
+      function toPdfStatusUrl(pdfUrl) {
+        const marker = "/api/jobs/preview/file/";
+        if (typeof pdfUrl !== "string" || !pdfUrl.includes(marker)) {
+          return "";
+        }
+
+        const encodedName = pdfUrl.split(marker)[1] || "";
+        if (!encodedName) {
+          return "";
+        }
+
+        return `/api/jobs/preview/status/${encodedName}`;
+      }
+
+      function startPdfPolling(pdfUrl, pdfStatusUrl, sourceFile, maxAttempts = 30, delayMs = 2000) {
         clearPreviewPoll();
+
+        const statusUrl = pdfStatusUrl || toPdfStatusUrl(pdfUrl);
+        if (!statusUrl) {
+          previewConversionError = "URL status konversi tidak valid.";
+          renderPreviewState();
+          return;
+        }
 
         const currentSeq = previewConversionSeq;
         const attemptFetch = async () => {
@@ -492,9 +513,20 @@
           previewPollAttempts += 1;
 
           try {
-            const res = await apiFetch(pdfUrl);
-            if (res.ok) {
-              const blob = await res.blob();
+            const statusRes = await apiFetch(statusUrl);
+            if (!statusRes.ok) {
+              throw new Error("Gagal mengecek status konversi");
+            }
+
+            const statusPayload = await statusRes.json();
+            if (statusPayload?.ready) {
+              const finalPdfUrl = String(statusPayload.url || pdfUrl || "");
+              const pdfRes = await apiFetch(finalPdfUrl);
+              if (!pdfRes.ok) {
+                throw new Error("Gagal mengambil PDF hasil konversi");
+              }
+
+              const blob = await pdfRes.blob();
               if (currentSeq !== previewConversionSeq) {
                 return;
               }
@@ -507,10 +539,6 @@
               previewDocxUrl = "";
               renderPreviewState();
               return;
-            }
-
-            if (res.status !== 404) {
-              throw new Error("Gagal mengambil PDF hasil konversi");
             }
           } catch (err) {
             if (currentSeq !== previewConversionSeq) {
@@ -593,7 +621,7 @@
               }
 
               if (payload.pdfUrl) {
-                startPdfPolling(payload.pdfUrl, file);
+                startPdfPolling(payload.pdfUrl, payload.pdfStatusUrl, file);
               }
 
               renderPreviewState();
