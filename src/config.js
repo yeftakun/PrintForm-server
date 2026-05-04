@@ -55,7 +55,9 @@ const ALLOWED_UPLOAD_MIME_TYPES = parseCsvList(process.env.ALLOWED_UPLOAD_MIME_T
   "image/png",
   "text/plain",
   "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 ]);
 const ALLOWED_UPLOAD_EXTENSIONS = parseCsvList(process.env.ALLOWED_UPLOAD_EXTENSIONS, [
   ".pdf",
@@ -64,7 +66,9 @@ const ALLOWED_UPLOAD_EXTENSIONS = parseCsvList(process.env.ALLOWED_UPLOAD_EXTENS
   ".png",
   ".txt",
   ".doc",
-  ".docx"
+  ".docx",
+  ".ppt",
+  ".pptx"
 ]);
 const AUTO_DELETE_TERMINAL_JOB_FILES = process.env.AUTO_DELETE_TERMINAL_JOB_FILES !== "false";
 const CLIENT_RETENTION_DAYS = Number(process.env.CLIENT_RETENTION_DAYS) || 30;

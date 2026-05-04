@@ -55,7 +55,7 @@
             <form id="uploadForm">
               <label class="field">
                 <span>Dokumen</span>
-                <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+                <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
               </label>
 
               <label class="field">
@@ -273,6 +273,10 @@
         contentScale: 100,
         hasFile: false
       };
+      let previewConvertedFile = null;
+      let previewConversionPending = false;
+      let previewConversionSeq = 0;
+      let previewConversionError = "";
 
       async function apiFetch(input, init = {}, options = {}) {
         return fetch(input, init);
@@ -384,6 +388,75 @@
              pageRangeInput.placeholder = `Contoh: 1, 3-${Math.min(5, totalPages)}`;
              pageRangeContainer.style.opacity = "1";
            }
+        }
+      }
+
+      function isOfficeDocument(file) {
+        const name = String(file?.name || "");
+        const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+        return ext === ".doc" || ext === ".docx" || ext === ".ppt" || ext === ".pptx";
+      }
+
+      function buildPdfFileName(file) {
+        const name = String(file?.name || "document");
+        const baseName = name.replace(/\.[^/.]+$/, "");
+        return `${baseName || "document"}.pdf`;
+      }
+
+      function setVisualPreviewMessage(text, isError = false) {
+        const visualArea = document.getElementById("visualPreviewArea");
+        if (!visualArea) {
+          return;
+        }
+        const color = isError ? "#b91c1c" : "#666";
+        visualArea.innerHTML = `<div class="visual-preview-placeholder" style="color:${color}">${text}</div>`;
+      }
+
+      function getPreviewFile() {
+        return previewConvertedFile || uploadFileInput?.files?.[0] || null;
+      }
+
+      async function convertFileForPreview(file) {
+        const currentSeq = ++previewConversionSeq;
+        previewConversionPending = true;
+        previewConversionError = "";
+        previewConvertedFile = null;
+        setVisualPreviewMessage("Mengonversi ke PDF...");
+
+        try {
+          const formData = new FormData();
+          formData.append("document", file);
+
+          const res = await apiFetch("/api/jobs/preview", {
+            method: "POST",
+            body: formData
+          });
+
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || "Konversi gagal");
+          }
+
+          const blob = await res.blob();
+          if (currentSeq !== previewConversionSeq) {
+            return;
+          }
+
+          const pdfName = buildPdfFileName(file);
+          previewConvertedFile = new File([blob], pdfName, { type: "application/pdf" });
+          previewConversionPending = false;
+          previewState.fileName = previewConvertedFile.name;
+          previewState.fileSizeBytes = previewConvertedFile.size;
+          renderPreviewState();
+        } catch (err) {
+          if (currentSeq !== previewConversionSeq) {
+            return;
+          }
+          previewConversionPending = false;
+          previewConvertedFile = null;
+          previewConversionError = "Konversi ke PDF gagal. Silakan coba lagi.";
+          setVisualPreviewMessage("Gagal mengonversi dokumen.", true);
+          renderPreviewState();
         }
       }
 
@@ -574,15 +647,28 @@
         printPreviewPanel.classList.toggle("print-preview-empty", !previewState.hasFile);
 
         const showCopiesWarning = previewState.hasFile && previewState.copies > 100;
-        if (showCopiesWarning) {
+        if (previewConversionError) {
+          previewWarning.textContent = previewConversionError;
+          previewWarning.classList.remove("hidden");
+        } else if (showCopiesWarning) {
           previewWarning.textContent = "Perhatian: jumlah salinan sangat besar. Pastikan konfigurasi sudah benar.";
           previewWarning.classList.remove("hidden");
         } else {
           previewWarning.textContent = "";
           previewWarning.classList.add("hidden");
         }
-        
-        const selectedFile = uploadFileInput?.files?.[0] || null;
+
+        if (previewConversionError) {
+          setVisualPreviewMessage("Gagal mengonversi dokumen.", true);
+          return;
+        }
+
+        if (previewConversionPending) {
+          setVisualPreviewMessage("Mengonversi ke PDF...");
+          return;
+        }
+
+        const selectedFile = getPreviewFile();
         renderVisualPreview(selectedFile);
       }
 
@@ -596,14 +682,19 @@
         previewState.pageRange = uploadPageRangeInput?.value || "";
         previewState.contentScale = Number(uploadContentScaleInput?.value || 100);
         previewState.hasFile = false;
+        previewConversionSeq += 1;
+        previewConvertedFile = null;
+        previewConversionPending = false;
+        previewConversionError = "";
         renderPreviewState();
       }
 
       function updatePreviewStateFromForm() {
         const selectedFile = uploadFileInput?.files?.[0] || null;
-        previewState.hasFile = Boolean(selectedFile);
-        previewState.fileName = selectedFile?.name || "";
-        previewState.fileSizeBytes = Number(selectedFile?.size || 0);
+        const fileForPreview = previewConvertedFile || selectedFile;
+        previewState.hasFile = Boolean(fileForPreview);
+        previewState.fileName = fileForPreview?.name || "";
+        previewState.fileSizeBytes = Number(fileForPreview?.size || 0);
         previewState.paperSize = uploadPaperSizeInput?.value || "A4";
         previewState.copies = Math.max(1, Number.parseInt(uploadCopiesInput?.value || "1", 10) || 1);
         previewState.colorMode = uploadColorModeInput?.value || "color";
@@ -621,6 +712,28 @@
         previewDebounceTimer = setTimeout(() => {
           updatePreviewStateFromForm();
         }, 80);
+      }
+
+      function handleFileSelection() {
+        previewConversionSeq += 1;
+        previewConvertedFile = null;
+        previewConversionPending = false;
+        previewConversionError = "";
+
+        const selectedFile = uploadFileInput?.files?.[0] || null;
+        if (!selectedFile) {
+          resetPreviewState();
+          return;
+        }
+
+        if (isOfficeDocument(selectedFile)) {
+          previewConversionPending = true;
+          updatePreviewStateFromForm();
+          convertFileForPreview(selectedFile);
+          return;
+        }
+
+        updatePreviewStateFromForm();
       }
 
       function setSessionUi(active) {
@@ -822,7 +935,22 @@
         uploadStatus.textContent = "Mengirim...";
         uploadStatus.className = "status";
 
+        if (previewConversionPending) {
+          uploadStatus.textContent = "Konversi masih berjalan. Mohon tunggu.";
+          uploadStatus.className = "status error";
+          return;
+        }
+
+        if (previewConversionError) {
+          uploadStatus.textContent = previewConversionError;
+          uploadStatus.className = "status error";
+          return;
+        }
+
         const formData = new FormData(uploadForm);
+        if (previewConvertedFile) {
+          formData.set("document", previewConvertedFile, previewConvertedFile.name);
+        }
         if (sessionId) {
           formData.append("sessionId", sessionId);
         }
@@ -849,7 +977,7 @@
       });
 
       if (uploadFileInput) {
-        uploadFileInput.addEventListener("change", schedulePreviewStateUpdate);
+        uploadFileInput.addEventListener("change", handleFileSelection);
       }
       if (uploadPaperSizeInput) {
         uploadPaperSizeInput.addEventListener("change", schedulePreviewStateUpdate);

@@ -32,6 +32,7 @@ const {
   notifyJobStatusChanged,
   publishRealtimeEvent
 } = require("../services/realtime");
+const { convertToPdf } = require("../services/convertToPdf");
 const { getActorFromRequest, writeAuditLogSafe } = require("../services/audit");
 const { asyncHandler } = require("../utils/asyncHandler");
 
@@ -58,6 +59,8 @@ const ALLOWED_JOB_STATUSES = new Set([
   "canceled",
   "send"
 ]);
+
+const OFFICE_EXTENSIONS = new Set([".doc", ".docx", ".ppt", ".pptx"]);
 
 const TERMINAL_JOB_STATUSES = new Set([
   "done",
@@ -462,6 +465,31 @@ router.get("/", asyncHandler(async (req, res) => {
     jobs = jobs.filter(job => job.status === req.query.status);
   }
   res.json(jobs.map(toPublicJob));
+}));
+
+router.post("/preview", uploadDocument, asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "Document is required" });
+    return;
+  }
+
+  const extension = path.extname(String(req.file.originalname || "")).toLowerCase();
+  if (!OFFICE_EXTENSIONS.has(extension)) {
+    await removeFileSafe(req.file.path);
+    res.status(400).json({ error: "Preview hanya mendukung DOC/DOCX/PPT/PPTX" });
+    return;
+  }
+
+  const expectedOutputPath = path.join(filesDir, `${path.parse(req.file.path).name}.pdf`);
+  let outputPath = expectedOutputPath;
+  try {
+    outputPath = await convertToPdf(req.file.path, filesDir);
+    const pdfBuffer = await fsp.readFile(outputPath);
+    res.set("Content-Type", "application/pdf");
+    res.send(pdfBuffer);
+  } finally {
+    await removeFileSafe(outputPath);
+  }
 }));
 
 router.get("/:id", asyncHandler(async (req, res) => {
