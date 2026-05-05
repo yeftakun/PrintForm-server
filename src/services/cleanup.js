@@ -75,6 +75,30 @@ async function cleanupOrphanFiles() {
       .map(filePath => path.basename(filePath))
   );
 
+  // If database is enabled, fetch active preview_files to protect them from deletion
+  const previewProtected = new Set();
+  if (useDb) {
+    try {
+      const res = await query("SELECT stored_name, deleted, expires_at FROM preview_files WHERE deleted = false");
+      const nowTs = Date.now();
+      for (const row of res.rows || []) {
+        const name = row.stored_name;
+        if (!name) continue;
+        if (row.expires_at) {
+          const exp = new Date(row.expires_at).getTime();
+          if (!Number.isFinite(exp) || exp <= nowTs) {
+            // expired -> not protected
+            continue;
+          }
+        }
+        previewProtected.add(name);
+      }
+    } catch (err) {
+      // On DB failure, fall back to legacy behavior
+      console.error("Failed to load preview_files for cleanup:", err?.message || err);
+    }
+  }
+
   let entries = [];
   try {
     entries = await fsp.readdir(filesDir, { withFileTypes: true });
@@ -91,10 +115,14 @@ async function cleanupOrphanFiles() {
     if (entry.name === ".gitkeep") {
       continue;
     }
-    if (entry.name.startsWith("preview_")) {
+    // Legacy behavior: protect preview_* files when DB mode is not enabled
+    if (!useDb && entry.name.startsWith("preview_")) {
       continue;
     }
     if (jobFiles.has(entry.name)) {
+      continue;
+    }
+    if (previewProtected.has(entry.name)) {
       continue;
     }
 

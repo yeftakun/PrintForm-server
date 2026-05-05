@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const { filesDir } = require("../config");
+const { filesDir, useDb } = require("../config");
 const { convertToPdf } = require("../services/convertToPdf");
+const { query } = require("../db");
+const crypto = require("crypto");
 
 const fsp = fs.promises;
 const OFFICE_EXTENSIONS = new Set([".doc", ".docx", ".ppt", ".pptx"]);
@@ -75,8 +77,29 @@ async function handlePreviewUpload(req, res) {
       // Run conversion in the background using a temp copy to preserve the source.
       const copyName = `${PREVIEW_PREFIX}${req.file.filename}.convert${extension}`;
       const copyPath = path.join(filesDir, copyName);
+      // Background conversion: after conversion, move PDF to canonical storage and register in DB when available.
       fsp.copyFile(storedPath, copyPath)
         .then(() => convertToPdf(copyPath, filesDir))
+        .then(async pdfPath => {
+          try {
+            const stat = await fsp.stat(pdfPath);
+            const storedId = crypto.randomBytes(16).toString("hex");
+            const destPath = path.join(filesDir, storedId);
+            await fsp.rename(pdfPath, destPath);
+            if (useDb) {
+              await query(
+                `INSERT INTO preview_files (id, stored_name, converted_name, original_name, mime_type, size_bytes, status, session_id, created_at, last_seen_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now(),now())`,
+                [storedId, storedId, storedId, req.file.originalname, "application/pdf", stat.size, "ready", req.body?.sessionId || null]
+              );
+            }
+          } catch (err) {
+            console.error("Background preview registration failed:", err?.message || err);
+            try {
+              await fsp.unlink(pdfPath).catch(() => null);
+            } catch {}
+          }
+        })
         .catch(err => {
           console.error("Preview conversion failed:", err?.message || err);
         });
@@ -85,12 +108,32 @@ async function handlePreviewUpload(req, res) {
 
     // Sync mode: wait for PDF conversion and return PDF URL.
     const pdfPath = await convertToPdf(storedPath, filesDir);
-    const pdfFileName = path.basename(pdfPath);
+    // Move converted PDF to canonical stored id and register in DB so job can reference it.
+    const stat = await fsp.stat(pdfPath);
+    const storedId = crypto.randomBytes(16).toString("hex");
+    const destPath = path.join(filesDir, storedId);
+    await fsp.rename(pdfPath, destPath);
+
+    if (useDb) {
+      try {
+        await query(
+          `INSERT INTO preview_files (id, stored_name, converted_name, original_name, mime_type, size_bytes, status, session_id, created_at, last_seen_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now(),now())`,
+          [storedId, storedId, storedId, req.file.originalname, "application/pdf", stat.size, "ready", req.body?.sessionId || null]
+        );
+      } catch (err) {
+        // If DB insert fails, remove the stored file to avoid orphan
+        await removeFileSafe(destPath);
+        throw err;
+      }
+    }
+
     res.status(200).json({
       status: "ready",
-      pdfUrl: buildPreviewUrl(pdfFileName),
-      pdfStatusUrl: buildPreviewStatusUrl(pdfFileName),
-      pdfPath
+      previewId: storedId,
+      pdfUrl: buildPreviewUrl(storedId),
+      pdfStatusUrl: buildPreviewStatusUrl(storedId),
+      pdfPath: destPath
     });
   } catch (err) {
     // Cleanup any temporary file on failure.

@@ -8,9 +8,11 @@ const {
   MAX_UPLOAD_BYTES,
   ALLOWED_UPLOAD_MIME_TYPES,
   ALLOWED_UPLOAD_EXTENSIONS,
+  useDb,
   AUTO_DELETE_TERMINAL_JOB_FILES,
   JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER
 } = require("../config");
+const { query } = require("../db");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions } = require("../repositories/sessionsRepository");
 const { getClients } = require("../repositories/clientsRepository");
@@ -1003,7 +1005,9 @@ router.patch("/:id", asyncHandler(async (req, res) => {
 }));
 
 router.post("/", uploadDocument, asyncHandler(async (req, res) => {
-  if (!req.file) {
+  const previewId = typeof req.body?.previewId === "string" ? req.body.previewId.trim() : null;
+
+  if (!req.file && !previewId) {
     res.status(400).json({ error: "Document is required" });
     return;
   }
@@ -1058,19 +1062,62 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
 
   const jobs = await getJobs();
   const usageBeforeUpload = await refreshStorageUsageSnapshot(jobs);
-  const uploadQuotaProjection = getQuotaProjection(usageBeforeUpload, req.file.size);
+  // If using previewId, no new storage is consumed; otherwise check quota for the uploaded file size
+  const incomingSize = previewId ? 0 : Number(req.file.size || 0);
+  const uploadQuotaProjection = getQuotaProjection(usageBeforeUpload, incomingSize);
   if (uploadQuotaProjection.quotaExceeded) {
-    await removeFileSafe(req.file.path);
+    if (req.file) await removeFileSafe(req.file.path);
     res.status(413).json({ error: "Server storage quota exceeded" });
     return;
   }
 
   const id = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let storedPath = req.file ? req.file.path : null;
+  let originalName = req.file ? req.file.originalname : null;
+  let fileSize = req.file ? req.file.size : 0;
+
+  if (previewId) {
+    // Use existing preview file as canonical storage
+    storedPath = path.join(filesDir, previewId);
+    try {
+      await fsp.access(storedPath, fs.constants.F_OK);
+      const stat = await fsp.stat(storedPath);
+      fileSize = stat.size;
+    } catch {
+      res.status(404).json({ error: "Preview file not found" });
+      return;
+    }
+
+    if (useDb) {
+      try {
+        const r = await query("SELECT id, status, deleted FROM preview_files WHERE stored_name = $1", [previewId]);
+        if (!r.rows || r.rows.length === 0) {
+          res.status(404).json({ error: "Preview not registered or expired" });
+          return;
+        }
+        const row = r.rows[0];
+        if (row.deleted) {
+          res.status(400).json({ error: "Preview already consumed or deleted" });
+          return;
+        }
+        if (String(row.status || "").toLowerCase() !== "ready") {
+          res.status(400).json({ error: "Preview is not ready" });
+          return;
+        }
+      } catch (err) {
+        res.status(500).json({ error: "Failed to validate preview" });
+        return;
+      }
+    }
+
+    originalName = originalName || (req.body.originalName || previewId);
+  }
+
   const job = {
     id,
-    originalName: req.file.originalname,
-    storedPath: req.file.path,
-    size: req.file.size,
+    originalName: originalName,
+    storedPath: storedPath,
+    size: fileSize,
     createdAt: new Date().toISOString(),
     status: "ready",
     alias: session.alias || null,
@@ -1108,11 +1155,21 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
       }
     });
 
+    // If this job was created from a preview, mark preview as deleted/consumed
+    if (previewId && useDb) {
+      try {
+        await query("UPDATE preview_files SET deleted = true, deleted_at = now(), job_id = $1 WHERE stored_name = $2", [job.id, previewId]);
+      } catch (err) {
+        // non-fatal: job is created, but preview registration failed to update
+        console.error("Failed to mark preview as deleted:", err?.message || err);
+      }
+    }
+
     const publicJob = toPublicJob(job);
-    notifyJobCreated(publicJob, "upload");
+    notifyJobCreated(publicJob, previewId ? "preview" : "upload");
     res.status(201).json(publicJob);
   } catch (err) {
-    await removeFileSafe(req.file.path);
+    if (req.file) await removeFileSafe(req.file.path);
     throw err;
   }
 }));
