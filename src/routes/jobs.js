@@ -1090,16 +1090,12 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
 
     if (useDb) {
       try {
-        const r = await query("SELECT id, status, deleted FROM preview_files WHERE stored_name = $1", [previewId]);
+        const r = await query("SELECT id, status FROM preview_files WHERE stored_name = $1", [previewId]);
         if (!r.rows || r.rows.length === 0) {
           res.status(404).json({ error: "Preview not registered or expired" });
           return;
         }
         const row = r.rows[0];
-        if (row.deleted) {
-          res.status(400).json({ error: "Preview already consumed or deleted" });
-          return;
-        }
         if (String(row.status || "").toLowerCase() !== "ready") {
           res.status(400).json({ error: "Preview is not ready" });
           return;
@@ -1155,18 +1151,18 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
       }
     });
 
-    // If this job was created from a preview, mark preview as deleted/consumed
+    // If this job was created from a preview, remove the preview registry row.
     if (previewId && useDb) {
       try {
-        await query("UPDATE preview_files SET deleted = true, deleted_at = now(), job_id = $1 WHERE stored_name = $2", [job.id, previewId]);
+        await query("DELETE FROM preview_files WHERE stored_name = $1", [previewId]);
       } catch (err) {
-        // non-fatal: job is created, but preview registration failed to update
-        console.error("Failed to mark preview as deleted:", err?.message || err);
+        // non-fatal: job is created, but preview registry row could not be removed
+        console.error("Failed to delete preview row:", err?.message || err);
       }
     }
 
     const publicJob = toPublicJob(job);
-    notifyJobCreated(publicJob, previewId ? "preview" : "upload");
+    notifyJobCreated(publicJob, "upload");
     res.status(201).json(publicJob);
   } catch (err) {
     if (req.file) await removeFileSafe(req.file.path);
