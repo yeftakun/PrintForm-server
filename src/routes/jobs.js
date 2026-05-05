@@ -1090,7 +1090,7 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
 
     if (useDb) {
       try {
-        const r = await query("SELECT id, status FROM preview_files WHERE stored_name = $1", [previewId]);
+        const r = await query("SELECT id, status, original_name FROM preview_files WHERE stored_name = $1", [previewId]);
         if (!r.rows || r.rows.length === 0) {
           res.status(404).json({ error: "Preview not registered or expired" });
           return;
@@ -1100,6 +1100,8 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
           res.status(400).json({ error: "Preview is not ready" });
           return;
         }
+
+        originalName = row.original_name || originalName || previewId;
       } catch (err) {
         res.status(500).json({ error: "Failed to validate preview" });
         return;
