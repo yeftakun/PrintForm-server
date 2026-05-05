@@ -72,6 +72,31 @@
 
     <section class="panel">
       <div class="panel-head">
+        <h2>Preview Files (latest 50)</h2>
+        <span id="preview-count" class="muted"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Original Name</th>
+              <th>Stored Name</th>
+              <th>Job</th>
+              <th>Session</th>
+              <th>Deleted</th>
+              <th>Expires</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2>Sessions (latest 100)</h2>
         <span id="sessions-count" class="muted"></span>
       </div>
@@ -195,6 +220,8 @@
     const jobsBody = document.getElementById('jobs-body');
     const clientsCount = document.getElementById('clients-count');
     const jobsCount = document.getElementById('jobs-count');
+    const previewBody = document.getElementById('preview-body');
+    const previewCount = document.getElementById('preview-count');
     const sessionsBody = document.getElementById('sessions-body');
     const sessionsCount = document.getElementById('sessions-count');
     const eventsBody = document.getElementById('events-body');
@@ -274,6 +301,23 @@
           <td>${j.copies || ''}</td>
           <td>${j.sizeBytes ? sizeFmt.format(j.sizeBytes / 1024) + ' KB' : ''}</td>
           <td>${formatDateSafe(j.createdAt)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderPreviewFiles(list) {
+      previewCount.textContent = `${list.length} shown`;
+      previewBody.innerHTML = list.map(p => `
+        <tr>
+          <td title="${p.id}">${p.id}</td>
+          <td><span class="badge ${p.status === 'ready' ? 'green' : p.status === 'failed' ? 'red' : 'gray'}">${p.status || ''}</span></td>
+          <td>${p.originalName || ''}</td>
+          <td title="${p.storedName || ''}">${p.storedName || ''}</td>
+          <td title="${p.jobId || ''}">${p.jobId || ''}</td>
+          <td title="${p.sessionId || ''}">${p.sessionId || ''}</td>
+          <td><span class="badge ${p.deleted ? 'red' : 'blue'}">${p.deleted ? 'yes' : 'no'}</span></td>
+          <td>${formatDateSafe(p.expiresAt)}</td>
+          <td>${formatDateSafe(p.createdAt)}</td>
         </tr>
       `).join('');
     }
@@ -378,6 +422,7 @@
       renderCards(data.summary, data.generatedAt);
       renderClients(data.clients || []);
       renderJobs(data.jobs || []);
+      renderPreviewFiles(data.previewFiles || []);
       renderSessions(data.sessions || []);
       renderEvents(data.events || []);
       renderAudit(data.auditLogs || []);

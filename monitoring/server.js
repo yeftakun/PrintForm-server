@@ -21,6 +21,7 @@ let hasSessionClientIdColumnCache = null;
 let hasJobOwnerUserIdColumnCache = null;
 let hasJobClaimedByClientIdColumnCache = null;
 let hasJobClaimedAtColumnCache = null;
+let hasPreviewFilesTableCache = null;
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -220,6 +221,28 @@ async function hasJobClaimedAtColumn() {
   return exists;
 }
 
+async function hasPreviewFilesTable() {
+  if (hasPreviewFilesTableCache === true) {
+    return true;
+  }
+
+  const res = await queryOrEmpty(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = 'preview_files'
+    ) AS exists`
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  if (exists) {
+    hasPreviewFilesTableCache = true;
+  }
+
+  return exists;
+}
+
 function deriveClientStatus(row, nowMs) {
   const cachedStatus = String(row?.status || "").toLowerCase();
   if (cachedStatus === "offline") {
@@ -243,14 +266,16 @@ async function fetchSnapshot() {
     hasSessionOwnerUserId,
     hasJobOwnerUserId,
     hasJobClaimedByClientId,
-    hasJobClaimedAt
+    hasJobClaimedAt,
+    hasPreviewFiles
   ] = await Promise.all([
     hasPinHashColumn(),
     hasSessionClientIdColumn(),
     hasSessionOwnerUserIdColumn(),
     hasJobOwnerUserIdColumn(),
     hasJobClaimedByClientIdColumn(),
-    hasJobClaimedAtColumn()
+    hasJobClaimedAtColumn(),
+    hasPreviewFilesTable()
   ]);
 
   const sessionClientIdSelect = hasSessionClientId
@@ -269,6 +294,28 @@ async function fetchSnapshot() {
   const jobClaimedAtSelect = hasJobClaimedAt
     ? "claimed_at"
     : "NULL::timestamptz AS claimed_at";
+
+  const previewFilesSelect = hasPreviewFiles
+    ? `select id,
+              stored_name,
+              converted_name,
+              original_name,
+              mime_type,
+              size_bytes,
+              status,
+              conversion_error,
+              session_id,
+              job_id,
+              owner_user_id,
+              created_at,
+              last_seen_at,
+              expires_at,
+              deleted,
+              deleted_at
+         from preview_files
+         order by created_at desc
+         limit 50`
+    : null;
 
   const usersQuery = hasPinHash
     ? `select id,
@@ -299,7 +346,8 @@ async function fetchSnapshot() {
     { rows: refreshTokenRows },
     { rows: refreshTokenSummaryRows },
     { rows: userRows },
-    { rows: storageRows }
+    { rows: storageRows },
+    { rows: previewFileRows }
   ] = await Promise.all([
     queryOrEmpty(
       `select id,
@@ -371,7 +419,8 @@ async function fetchSnapshot() {
          from storage_usage
          order by computed_at desc
          limit 1`
-    )
+    ),
+    previewFilesSelect ? queryOrEmpty(previewFilesSelect) : Promise.resolve({ rows: [] })
   ]);
 
   const now = Date.now();
@@ -396,6 +445,14 @@ async function fetchSnapshot() {
   const jobsClaimed = jobRows.filter(row => Boolean(row.claimed_by_client_id)).length;
   const sessionsOwned = sessionRows.filter(row => Boolean(row.owner_user_id)).length;
   const jobsOwned = jobRows.filter(row => Boolean(row.owner_user_id)).length;
+  const previewTotal = previewFileRows.length;
+  const previewReady = previewFileRows.filter(row => String(row.status || '').toLowerCase() === 'ready' && !row.deleted).length;
+  const previewDeleted = previewFileRows.filter(row => Boolean(row.deleted)).length;
+  const previewExpired = previewFileRows.filter(row => {
+    if (!row.expires_at) return false;
+    const exp = new Date(row.expires_at).getTime();
+    return Number.isFinite(exp) ? exp < now : false;
+  }).length;
 
   const storage = storageRows[0]
     ? {
@@ -417,6 +474,10 @@ async function fetchSnapshot() {
       jobsTotal: jobRows.length,
       jobsOwned,
       jobsClaimed,
+      previewTotal,
+      previewReady,
+      previewDeleted,
+      previewExpired,
       eventsTotal: eventRows.length,
       auditTotal: auditRows.length,
       refreshTokensTotal,
@@ -489,6 +550,24 @@ async function fetchSnapshot() {
       expiresAt: row.expires_at,
       revokedAt: row.revoked_at,
       replacedByTokenId: row.replaced_by_token_id
+    })),
+    previewFiles: previewFileRows.map(row => ({
+      id: row.id,
+      storedName: row.stored_name,
+      convertedName: row.converted_name || null,
+      originalName: row.original_name || null,
+      mimeType: row.mime_type || null,
+      sizeBytes: Number(row.size_bytes || 0),
+      status: row.status || null,
+      conversionError: row.conversion_error || null,
+      sessionId: row.session_id || null,
+      jobId: row.job_id || null,
+      ownerUserId: row.owner_user_id || null,
+      createdAt: row.created_at,
+      lastSeenAt: row.last_seen_at,
+      expiresAt: row.expires_at,
+      deleted: Boolean(row.deleted),
+      deletedAt: row.deleted_at
     }))
   };
 }
