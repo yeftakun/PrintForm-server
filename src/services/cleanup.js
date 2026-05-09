@@ -46,6 +46,7 @@ async function cleanupExpiredSessions() {
   await Promise.all(
     deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
   );
+  await cleanupPreviewFilesBySessionIds([...expiredIds]);
   await saveJobs(remainingJobs);
   await saveSessions(activeSessions);
   await refreshStorageUsageSnapshot(remainingJobs);
@@ -64,6 +65,36 @@ async function cleanupExpiredSessions() {
   }
 
   return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
+}
+
+async function cleanupPreviewFilesBySessionIds(sessionIds) {
+  const normalizedSessionIds = [...new Set(
+    (sessionIds || [])
+      .map(sessionId => String(sessionId || "").trim())
+      .filter(Boolean)
+  )];
+
+  if (normalizedSessionIds.length === 0 || !useDb) {
+    return { removedFiles: 0 };
+  }
+
+  try {
+    const res = await query(
+      "SELECT stored_name FROM preview_files WHERE session_id = ANY($1) AND deleted = false",
+      [normalizedSessionIds]
+    );
+
+    const deleteQueue = (res.rows || [])
+      .map(row => String(row.stored_name || "").trim())
+      .filter(Boolean)
+      .map(fileName => path.join(filesDir, fileName));
+
+    await Promise.all(deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null)));
+    return { removedFiles: deleteQueue.length };
+  } catch (err) {
+    console.error("Failed to cleanup preview files by session:", err?.message || err);
+    return { removedFiles: 0 };
+  }
 }
 
 async function cleanupOrphanFiles() {
@@ -172,6 +203,7 @@ async function cleanupStaleClients() {
 
   if (useDb) {
     if (staleSessionIds.length > 0) {
+      await cleanupPreviewFilesBySessionIds(staleSessionIds);
       // jobs tied to sessions will cascade on session delete
       await query("DELETE FROM sessions WHERE id = ANY($1)", [staleSessionIds]);
     }
@@ -201,6 +233,7 @@ async function cleanupStaleClients() {
 
 module.exports = {
   cleanupExpiredSessions,
+  cleanupPreviewFilesBySessionIds,
   cleanupOrphanFiles,
   cleanupStaleClients
 };

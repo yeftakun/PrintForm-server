@@ -11,7 +11,7 @@ const {
 const { normalizeAlias } = require("../utils/normalize");
 const { isClientOnline, withClientStatus, getClientReadiness } = require("../services/status");
 const { toPublicClient } = require("../utils/publicMapper");
-const { cleanupExpiredSessions } = require("../services/cleanup");
+const { cleanupExpiredSessions, cleanupPreviewFilesBySessionIds } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
 const {
   notifyJobsRemoved,
@@ -415,6 +415,7 @@ router.post("/close", asyncHandler(async (req, res) => {
   await Promise.all(
     deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
   );
+  await cleanupPreviewFilesBySessionIds([sessionId]);
   await saveJobs(remainingJobs);
   await saveSessions(remainingSessions);
   await refreshStorageUsageSnapshot(remainingJobs);
