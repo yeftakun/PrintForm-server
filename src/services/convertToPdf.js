@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { secureDelete } = require("../utils/secureDelete");
 
 const fsp = fs.promises;
 const CONVERT_TIMEOUT_MS = 60_000;
@@ -71,12 +72,8 @@ async function convertToPdf(inputFilePath, outputDir) {
     // Surface conversion errors to the caller.
     throw err;
   } finally {
-    // Always delete the source file for privacy, even on errors.
-    try {
-      await fsp.unlink(inputFilePath);
-    } catch {
-      // Ignore cleanup failures.
-    }
+    // Always securely delete the source file for privacy, even on errors.
+    await secureDelete(inputFilePath);
   }
 }
 

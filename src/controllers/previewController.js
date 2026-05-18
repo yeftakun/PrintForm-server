@@ -4,6 +4,7 @@ const { filesDir, useDb } = require("../config");
 const { convertToPdf } = require("../services/convertToPdf");
 const { query } = require("../db");
 const crypto = require("crypto");
+const { secureDelete } = require("../utils/secureDelete");
 
 const fsp = fs.promises;
 const OFFICE_EXTENSIONS = new Set([".doc", ".docx", ".ppt", ".pptx"]);
@@ -32,10 +33,7 @@ function isSafeFileName(fileName) {
 }
 
 async function removeFileSafe(filePath) {
-  if (!filePath) {
-    return;
-  }
-  await fsp.unlink(filePath).catch(() => null);
+  await secureDelete(filePath);
 }
 
 async function handlePreviewUpload(req, res) {
@@ -95,9 +93,7 @@ async function handlePreviewUpload(req, res) {
             }
           } catch (err) {
             console.error("Background preview registration failed:", err?.message || err);
-            try {
-              await fsp.unlink(pdfPath).catch(() => null);
-            } catch {}
+            await secureDelete(pdfPath);
           }
         })
         .catch(err => {

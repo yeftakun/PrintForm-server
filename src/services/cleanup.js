@@ -1,6 +1,5 @@
-const fs = require("fs");
 const path = require("path");
-const fsp = fs.promises;
+const { secureDelete } = require("../utils/secureDelete");
 const {
   filesDir,
   ORPHAN_GRACE_MS,
@@ -44,7 +43,7 @@ async function cleanupExpiredSessions() {
   }
 
   await Promise.all(
-    deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
+    deleteQueue.map(filePath => secureDelete(filePath))
   );
   await cleanupPreviewFilesBySessionIds([...expiredIds]);
   await saveJobs(remainingJobs);
@@ -89,7 +88,7 @@ async function cleanupPreviewFilesBySessionIds(sessionIds) {
       .filter(Boolean)
       .map(fileName => path.join(filesDir, fileName));
 
-    await Promise.all(deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null)));
+    await Promise.all(deleteQueue.map(filePath => secureDelete(filePath)));
     return { removedFiles: deleteQueue.length };
   } catch (err) {
     console.error("Failed to cleanup preview files by session:", err?.message || err);
@@ -165,7 +164,7 @@ async function cleanupOrphanFiles() {
         continue;
       }
 
-      await fsp.unlink(fullPath);
+      await secureDelete(fullPath);
       removedFiles += 1;
     } catch {
       // File mungkin sudah dihapus atau tidak bisa diakses

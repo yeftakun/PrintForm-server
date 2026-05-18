@@ -3,6 +3,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
+const { secureDelete } = require("../utils/secureDelete");
 const {
   filesDir,
   MAX_UPLOAD_BYTES,
@@ -139,10 +140,7 @@ function isAllowedUploadFile(file) {
 }
 
 async function removeFileSafe(filePath) {
-  if (!filePath) {
-    return;
-  }
-  await fsp.unlink(filePath).catch(() => null);
+  await secureDelete(filePath);
 }
 
 function isAccessibleClientForUser(client, user) {

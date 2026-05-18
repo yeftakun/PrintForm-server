@@ -1,5 +1,5 @@
 const express = require("express");
-const fsp = require("fs").promises;
+const { secureDelete } = require("../utils/secureDelete");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, updateClientPresence } = require("../repositories/clientsRepository");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
@@ -413,7 +413,7 @@ router.post("/close", asyncHandler(async (req, res) => {
   }
 
   await Promise.all(
-    deleteQueue.map(filePath => fsp.unlink(filePath).catch(() => null))
+    deleteQueue.map(filePath => secureDelete(filePath))
   );
   await cleanupPreviewFilesBySessionIds([sessionId]);
   await saveJobs(remainingJobs);
