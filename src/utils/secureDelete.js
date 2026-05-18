@@ -14,6 +14,7 @@ const CHUNK_SIZE = 64 * 1024; // 64 KB
  * @param {string} filePath - Absolute path to the file to delete.
  * @param {number} [passes=1] - Number of random-overwrite passes (1 is sufficient for most cases).
  */
+
 async function secureDelete(filePath, passes = 1) {
   if (!filePath) return;
 
