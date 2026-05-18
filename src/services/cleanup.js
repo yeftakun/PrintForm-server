@@ -81,17 +81,27 @@ async function cleanupPreviewFilesBySessionIds(sessionIds) {
 
   try {
     const res = await query(
-      "SELECT stored_name FROM preview_files WHERE session_id = ANY($1) AND deleted = false",
+      "SELECT stored_name FROM preview_files WHERE session_id = ANY($1)",
       [normalizedSessionIds]
     );
 
-    const deleteQueue = (res.rows || [])
+    const storedNames = (res.rows || [])
       .map(row => String(row.stored_name || "").trim())
-      .filter(Boolean)
-      .map(fileName => path.join(filesDir, fileName));
+      .filter(Boolean);
+
+    const deleteQueue = storedNames.map(fileName => path.join(filesDir, fileName));
 
     await Promise.all(deleteQueue.map(filePath => secureDelete(filePath)));
-    return { removedFiles: deleteQueue.length };
+
+    // Hard-delete DB records after physical files are removed.
+    if (storedNames.length > 0) {
+      await query(
+        "DELETE FROM preview_files WHERE stored_name = ANY($1)",
+        [storedNames]
+      );
+    }
+
+    return { removedFiles: storedNames.length };
   } catch (err) {
     console.error("Failed to cleanup preview files by session:", err?.message || err);
     return { removedFiles: 0 };
@@ -111,7 +121,7 @@ async function cleanupOrphanFiles() {
   const previewProtected = new Set();
   if (useDb) {
     try {
-      const res = await query("SELECT stored_name, deleted, expires_at FROM preview_files WHERE deleted = false");
+      const res = await query("SELECT stored_name, expires_at FROM preview_files");
       const nowTs = Date.now();
       for (const row of res.rows || []) {
         const name = row.stored_name;
@@ -140,6 +150,8 @@ async function cleanupOrphanFiles() {
 
   const now = Date.now();
   let removedFiles = 0;
+  const deletedFileNames = [];
+
   for (const entry of entries) {
     if (!entry.isFile()) {
       continue;
@@ -167,10 +179,21 @@ async function cleanupOrphanFiles() {
       }
 
       await secureDelete(fullPath);
+      deletedFileNames.push(entry.name);
       removedFiles += 1;
     } catch {
       // File mungkin sudah dihapus atau tidak bisa diakses
     }
+  }
+
+  // Hard-delete any preview_files DB records whose physical file was just removed.
+  if (useDb && deletedFileNames.length > 0) {
+    await query(
+      "DELETE FROM preview_files WHERE stored_name = ANY($1)",
+      [deletedFileNames]
+    ).catch(err => {
+      console.error("Failed to delete orphaned preview_files rows:", err?.message || err);
+    });
   }
 
   return { removedFiles };
