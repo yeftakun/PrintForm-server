@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 009hmbEGgVS077j6fj59jQmUsA061FWmxynGPCb5OiW0Gr9NErMFQVc3WeIfaFJ
+\restrict lvUGLKPrEWZbk9BbBQsC1CkoMRaFtESVfKFls0LQyirLwmxCeQeTcdMu1dxnklC
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -191,6 +191,30 @@ CREATE TABLE public.jobs (
 ALTER TABLE public.jobs OWNER TO postgres;
 
 --
+-- Name: preview_files; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.preview_files (
+    id text NOT NULL,
+    stored_name text NOT NULL,
+    converted_name text,
+    original_name character varying(255),
+    mime_type character varying(128),
+    size_bytes bigint,
+    status character varying(16) DEFAULT 'pending'::character varying NOT NULL,
+    conversion_error text,
+    session_id text,
+    job_id text,
+    owner_user_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone,
+    expires_at timestamp with time zone
+);
+
+
+ALTER TABLE public.preview_files OWNER TO postgres;
+
+--
 -- Name: refresh_tokens; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -306,6 +330,7 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 --
 
 COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status, owner_user_id) FROM stdin;
+1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop)", "OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Microsoft Print to PDF	2026-05-05 06:17:48.704+08	2026-05-18 15:43:16.584+08	online	user_60da7484-9e0c-462c-bf78-357c340ae216
 \.
 
 
@@ -322,6 +347,14 @@ COPY public.events (id, client_id, session_id, job_id, type, payload, created_at
 --
 
 COPY public.jobs (id, session_id, original_name, stored_path, size_bytes, status, alias, paper_size, copies, created_at, updated_at, owner_user_id, claimed_by_client_id, claimed_at, color_mode, orientation, page_range, content_scale, notes) FROM stdin;
+\.
+
+
+--
+-- Data for Name: preview_files; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.preview_files (id, stored_name, converted_name, original_name, mime_type, size_bytes, status, conversion_error, session_id, job_id, owner_user_id, created_at, last_seen_at, expires_at) FROM stdin;
 \.
 
 
@@ -346,6 +379,7 @@ COPY public.sessions (id, alias, created_at, last_seen_at, status, owner_user_id
 --
 
 COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
+t	0	0	2026-05-18 15:33:32.639545+08
 \.
 
 
@@ -354,6 +388,7 @@ COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
 --
 
 COPY public.users (id, email, password_hash, role, created_at, username, pin_hash) FROM stdin;
+user_60da7484-9e0c-462c-bf78-357c340ae216	\N	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m
 \.
 
 
@@ -369,7 +404,7 @@ COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 22141, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 27570, true);
 
 
 --
@@ -425,6 +460,14 @@ ALTER TABLE ONLY public.events
 
 ALTER TABLE ONLY public.jobs
     ADD CONSTRAINT jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: preview_files preview_files_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.preview_files
+    ADD CONSTRAINT preview_files_pkey PRIMARY KEY (id);
 
 
 --
@@ -575,6 +618,41 @@ CREATE INDEX idx_jobs_status ON public.jobs USING btree (status);
 
 
 --
+-- Name: idx_preview_files_created_desc; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_preview_files_created_desc ON public.preview_files USING btree (created_at DESC);
+
+
+--
+-- Name: idx_preview_files_expires; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_preview_files_expires ON public.preview_files USING btree (expires_at);
+
+
+--
+-- Name: idx_preview_files_session; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_preview_files_session ON public.preview_files USING btree (session_id);
+
+
+--
+-- Name: idx_preview_files_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_preview_files_status ON public.preview_files USING btree (status);
+
+
+--
+-- Name: idx_preview_files_stored_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_preview_files_stored_name ON public.preview_files USING btree (stored_name);
+
+
+--
 -- Name: idx_refresh_tokens_expires; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -681,6 +759,30 @@ ALTER TABLE ONLY public.jobs
 
 
 --
+-- Name: preview_files preview_files_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.preview_files
+    ADD CONSTRAINT preview_files_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: preview_files preview_files_owner_user_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.preview_files
+    ADD CONSTRAINT preview_files_owner_user_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: preview_files preview_files_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.preview_files
+    ADD CONSTRAINT preview_files_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id) ON DELETE SET NULL;
+
+
+--
 -- Name: refresh_tokens refresh_tokens_replaced_by_token_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -724,5 +826,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 009hmbEGgVS077j6fj59jQmUsA061FWmxynGPCb5OiW0Gr9NErMFQVc3WeIfaFJ
+\unrestrict lvUGLKPrEWZbk9BbBQsC1CkoMRaFtESVfKFls0LQyirLwmxCeQeTcdMu1dxnklC
 
