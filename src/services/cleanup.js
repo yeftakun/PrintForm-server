@@ -1,4 +1,6 @@
+const fs = require("fs");
 const path = require("path");
+const fsp = fs.promises;
 const { secureDelete } = require("../utils/secureDelete");
 const {
   filesDir,
