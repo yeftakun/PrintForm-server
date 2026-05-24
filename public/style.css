@@ -143,6 +143,23 @@ th {
   display: none;
 }
 
+.qr-scanner-frame {
+  margin-top: 16px;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #1d1b16;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.qr-scanner-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .print-preview {
   margin-top: 16px;
   border: 1px solid var(--border);
