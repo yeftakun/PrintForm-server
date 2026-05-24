@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lvUGLKPrEWZbk9BbBQsC1CkoMRaFtESVfKFls0LQyirLwmxCeQeTcdMu1dxnklC
+\restrict 8EXbgWSEo4S4aF7iKhla2ZTQfN1mbSeMY2nycqcNxA8QPBkGqYrBdDqjqSxRRIz
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -330,7 +330,7 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 --
 
 COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status, owner_user_id) FROM stdin;
-1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop)", "OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Microsoft Print to PDF	2026-05-05 06:17:48.704+08	2026-05-18 15:43:16.584+08	online	user_60da7484-9e0c-462c-bf78-357c340ae216
+1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop)", "OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Canon G1030 series	2026-05-05 06:17:48.704+08	2026-05-25 06:19:58.423+08	offline	user_60da7484-9e0c-462c-bf78-357c340ae216
 \.
 
 
@@ -379,7 +379,7 @@ COPY public.sessions (id, alias, created_at, last_seen_at, status, owner_user_id
 --
 
 COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
-t	0	0	2026-05-18 15:33:32.639545+08
+t	0	0	2026-05-25 06:22:32.893411+08
 \.
 
 
@@ -388,7 +388,7 @@ t	0	0	2026-05-18 15:33:32.639545+08
 --
 
 COPY public.users (id, email, password_hash, role, created_at, username, pin_hash) FROM stdin;
-user_60da7484-9e0c-462c-bf78-357c340ae216	\N	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m
+user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m
 \.
 
 
@@ -404,7 +404,7 @@ COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 27570, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 29091, true);
 
 
 --
@@ -826,5 +826,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lvUGLKPrEWZbk9BbBQsC1CkoMRaFtESVfKFls0LQyirLwmxCeQeTcdMu1dxnklC
+\unrestrict 8EXbgWSEo4S4aF7iKhla2ZTQfN1mbSeMY2nycqcNxA8QPBkGqYrBdDqjqSxRRIz
 
