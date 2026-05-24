@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8EXbgWSEo4S4aF7iKhla2ZTQfN1mbSeMY2nycqcNxA8QPBkGqYrBdDqjqSxRRIz
+\restrict oY4To2JbDbbpGVcBlUrKpHM5dh9sBL7OrRyFGouVerjNI2k4ryk8qtZ8uRyhuix
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -274,7 +274,10 @@ CREATE TABLE public.users (
     role character varying(32),
     created_at timestamp with time zone DEFAULT now(),
     username character varying(64),
-    pin_hash text
+    pin_hash text,
+    alamat text,
+    konfigurasi_toko jsonb DEFAULT '{}'::jsonb NOT NULL,
+    kode_toko character varying(64)
 );
 
 
@@ -387,8 +390,8 @@ t	0	0	2026-05-25 06:22:32.893411+08
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.users (id, email, password_hash, role, created_at, username, pin_hash) FROM stdin;
-user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m
+COPY public.users (id, email, password_hash, role, created_at, username, pin_hash, alamat, konfigurasi_toko, kode_toko) FROM stdin;
+user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m	\N	{}	\N
 \.
 
 
@@ -688,6 +691,13 @@ CREATE INDEX idx_sessions_owner_user ON public.sessions USING btree (owner_user_
 
 
 --
+-- Name: idx_users_kode_toko_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_users_kode_toko_unique ON public.users USING btree (lower((kode_toko)::text)) WHERE (kode_toko IS NOT NULL);
+
+
+--
 -- Name: idx_users_username_unique; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -826,5 +836,5 @@ ALTER TABLE ONLY public.websocket_subscriptions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8EXbgWSEo4S4aF7iKhla2ZTQfN1mbSeMY2nycqcNxA8QPBkGqYrBdDqjqSxRRIz
+\unrestrict oY4To2JbDbbpGVcBlUrKpHM5dh9sBL7OrRyFGouVerjNI2k4ryk8qtZ8uRyhuix
 
