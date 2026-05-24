@@ -28,6 +28,17 @@ function createApp() {
   app.use("/api/sessions", optionalAuth, sessionsRouter);
   app.use("/api/jobs", optionalAuth, jobsRouter);
 
+  app.get("/:kodeToko", (req, res, next) => {
+    const kodeToko = String(req.params.kodeToko || "").trim();
+    const reservedPaths = new Set(["api", "home", "session", "mitra", "store", "vendor"]);
+    if (!kodeToko || kodeToko.includes(".") || reservedPaths.has(kodeToko.toLowerCase())) {
+      next();
+      return;
+    }
+
+    res.sendFile(path.join(rootDir, "public", "store", "index.html"));
+  });
+
   app.use(errorHandler);
 
   return app;

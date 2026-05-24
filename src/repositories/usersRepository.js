@@ -1,7 +1,7 @@
 const { useDb } = require("../config");
 const { query } = require("../db");
 
-let hasPinHashColumnCache = null;
+const columnExistsCache = new Map();
 
 function ensureDbEnabled() {
   if (useDb) {
@@ -13,10 +13,10 @@ function ensureDbEnabled() {
   throw err;
 }
 
-async function hasPinHashColumn() {
+async function hasUserColumn(columnName) {
   ensureDbEnabled();
-  if (hasPinHashColumnCache === true) {
-    return hasPinHashColumnCache;
+  if (columnExistsCache.has(columnName)) {
+    return columnExistsCache.get(columnName);
   }
 
   const res = await query(
@@ -25,23 +25,45 @@ async function hasPinHashColumn() {
       FROM information_schema.columns
       WHERE table_schema = 'public'
         AND table_name = 'users'
-        AND column_name = 'pin_hash'
-    ) AS exists`
+        AND column_name = $1
+    ) AS exists`,
+    [columnName]
   );
 
   const exists = Boolean(res.rows[0]?.exists);
-  if (exists) {
-    hasPinHashColumnCache = true;
-  }
-
+  columnExistsCache.set(columnName, exists);
   return exists;
 }
 
+async function hasPinHashColumn() {
+  return hasUserColumn("pin_hash");
+}
+
 async function getUserSelectColumnsSql() {
-  if (await hasPinHashColumn()) {
-    return "id, username, email, password_hash, pin_hash, role, created_at";
-  }
-  return "id, username, email, password_hash, NULL::text AS pin_hash, role, created_at";
+  const [
+    hasPinColumn,
+    hasAlamatColumn,
+    hasKonfigurasiTokoColumn,
+    hasKodeTokoColumn
+  ] = await Promise.all([
+    hasUserColumn("pin_hash"),
+    hasUserColumn("alamat"),
+    hasUserColumn("konfigurasi_toko"),
+    hasUserColumn("kode_toko")
+  ]);
+
+  return [
+    "id",
+    "username",
+    "email",
+    "password_hash",
+    hasPinColumn ? "pin_hash" : "NULL::text AS pin_hash",
+    "role",
+    "created_at",
+    hasAlamatColumn ? "alamat" : "NULL::text AS alamat",
+    hasKonfigurasiTokoColumn ? "konfigurasi_toko" : "'{}'::jsonb AS konfigurasi_toko",
+    hasKodeTokoColumn ? "kode_toko" : "NULL::text AS kode_toko"
+  ].join(", ");
 }
 
 function mapUserRow(row) {
@@ -56,7 +78,10 @@ function mapUserRow(row) {
     passwordHash: row.password_hash || null,
     pinHash: row.pin_hash || null,
     role: row.role || "user",
-    createdAt: row.created_at?.toISOString?.() || row.created_at
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+    alamat: row.alamat || null,
+    konfigurasiToko: row.konfigurasi_toko || {},
+    kodeToko: row.kode_toko || null
   };
 }
 
@@ -134,6 +159,25 @@ async function getUserByIdentifier(identifier) {
          OR lower(email) = lower($1)
       LIMIT 1`,
     [identifier]
+  );
+
+  return mapUserRow(res.rows[0]);
+}
+
+async function getUserByStoreCode(kodeToko) {
+  ensureDbEnabled();
+  const normalizedKodeToko = String(kodeToko || "").trim();
+  if (!normalizedKodeToko || !await hasUserColumn("kode_toko")) {
+    return null;
+  }
+
+  const selectColumns = await getUserSelectColumnsSql();
+  const res = await query(
+    `SELECT ${selectColumns}
+       FROM users
+      WHERE lower(kode_toko) = lower($1)
+      LIMIT 1`,
+    [normalizedKodeToko]
   );
 
   return mapUserRow(res.rows[0]);
@@ -264,6 +308,7 @@ module.exports = {
   getUserByUsername,
   getUserByEmail,
   getUserByIdentifier,
+  getUserByStoreCode,
   createUser,
   updateUserProfile,
   updateUserPasswordHash,

@@ -16,7 +16,7 @@ const {
   AUTH_ACCESS_TOKEN_TTL,
   useDb
 } = require("../config");
-const { getUserByIdentifier, getUserById } = require("../repositories/usersRepository");
+const { getUserByIdentifier, getUserById, getUserByStoreCode } = require("../repositories/usersRepository");
 const { createRefreshTokenRecord } = require("../repositories/refreshTokensRepository");
 const {
   normalizeName,
@@ -128,6 +128,69 @@ function getKioskDisplayName(user, ownerUserId) {
   }
   const suffix = String(ownerUserId || "").slice(-6) || "unknown";
   return `Kios-${suffix}`;
+}
+
+function getStoreDisplayName(user, ownerUserId) {
+  return getKioskDisplayName(user, ownerUserId);
+}
+
+function getStoreHours(user) {
+  const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
+    ? user.konfigurasiToko
+    : {};
+  return config.jamOperasional || config.jam_operasional || "Setiap hari 08.00 - 21.00";
+}
+
+function summarizeStoreClients(storeClients) {
+  const effectiveClients = (storeClients || [])
+    .map(toEffectivePublicClient)
+    .map(client => ({
+      ...client,
+      readiness: getClientReadiness(client)
+    }))
+    .sort((a, b) => getLastSeenMs(b.lastSeen) - getLastSeenMs(a.lastSeen));
+
+  const readyClients = effectiveClients.filter(client => client.readiness === "ready");
+  const onlineClients = effectiveClients.filter(client => client.status === "online");
+  const preferredClient = readyClients[0] || null;
+  const readiness = readyClients.length > 0
+    ? "ready"
+    : onlineClients.length > 0
+      ? "owned"
+      : "offline";
+
+  return {
+    readiness,
+    status: preferredClient ? "online" : "offline",
+    canStartSession: Boolean(preferredClient),
+    targetClientId: preferredClient?.id || null,
+    targetClientName: preferredClient?.name || null,
+    clientCount: effectiveClients.length,
+    onlineClientCount: onlineClients.length,
+    readyClientCount: readyClients.length,
+    lastSeen: effectiveClients[0]?.lastSeen || null
+  };
+}
+
+function toPublicStore(user, storeClients = []) {
+  const summary = summarizeStoreClients(storeClients);
+  return {
+    id: user.id,
+    ownerUserId: user.id,
+    kodeToko: user.kodeToko || null,
+    displayName: getStoreDisplayName(user, user.id),
+    alamat: user.alamat || "Alamat belum diatur",
+    jamOperasional: getStoreHours(user),
+    status: summary.status,
+    readiness: summary.readiness,
+    canStartSession: summary.canStartSession,
+    targetClientId: summary.targetClientId,
+    targetClientName: summary.targetClientName,
+    clientCount: summary.clientCount,
+    onlineClientCount: summary.onlineClientCount,
+    readyClientCount: summary.readyClientCount,
+    lastSeen: summary.lastSeen
+  };
 }
 
 async function getOwnerUserMap(ownerUserIds) {
@@ -366,6 +429,28 @@ router.get("/kiosks", asyncHandler(async (req, res) => {
   });
 
   res.json(kiosks);
+}));
+
+router.get("/stores/:kodeToko", asyncHandler(async (req, res) => {
+  const kodeToko = String(req.params.kodeToko || "").trim();
+  if (!kodeToko) {
+    res.status(400).json({ error: "kodeToko is required" });
+    return;
+  }
+
+  const storeUser = await getUserByStoreCode(kodeToko);
+  if (!storeUser) {
+    res.status(404).json({
+      error: "Toko tidak ditemukan.",
+      code: "STORE_NOT_FOUND",
+      kodeToko
+    });
+    return;
+  }
+
+  const clients = await getClients();
+  const storeClients = clients.filter(client => client.ownerUserId === storeUser.id);
+  res.json(toPublicStore(storeUser, storeClients));
 }));
 
 router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {

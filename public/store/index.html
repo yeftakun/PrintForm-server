@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrintForm Store</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <h1 id="storeName">Toko Percetakan</h1>
+        <p id="storeCodeText">Kode toko: -</p>
+      </header>
+
+      <section class="card">
+        <h2>Informasi Toko</h2>
+        <div class="print-preview-grid">
+          <div class="print-preview-item">
+            <span class="print-preview-label">Kode Toko</span>
+            <span id="storeCodeValue" class="print-preview-value">-</span>
+          </div>
+          <div class="print-preview-item">
+            <span class="print-preview-label">Alamat</span>
+            <span id="storeAddress" class="print-preview-value">-</span>
+          </div>
+          <div class="print-preview-item">
+            <span class="print-preview-label">Jam Operasional</span>
+            <span id="storeHours" class="print-preview-value">-</span>
+          </div>
+          <div class="print-preview-item">
+            <span class="print-preview-label">Status Toko</span>
+            <span id="storeStatus" class="print-preview-value">-</span>
+          </div>
+        </div>
+        <div class="row" style="margin-top: 16px;">
+          <a href="/" class="status">Cari toko lain</a>
+          <button id="confirmStoreBtn" type="button">Konfirmasi Toko</button>
+        </div>
+        <div id="storePageStatus" class="status"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/store/index.js"></script>
+  </body>
+</html>

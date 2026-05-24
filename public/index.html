@@ -10,13 +10,12 @@
     <main class="page">
       <header class="header">
         <h1>PrintForm Cloud Queue</h1>
-        <p>Pilih kios tujuan sebelum mengirim dokumen.</p>
-        <p id="realtimeStatus" class="muted">Realtime: menghubungkan...</p>
+        <p>Masukkan kode toko atau scan QR untuk mulai mengirim dokumen.</p>
       </header>
 
-      <section class="card" id="sessionCard">
-        <h2>Session Print</h2>
-        <div>
+      <section class="card" id="storeSearchCard">
+        <h2>Cari Toko</h2>
+        <form id="storeSearchForm">
           <label class="field">
             <span>Alias Pengirim</span>
             <input type="text" id="aliasInput" placeholder="Nama pengirim (opsional)">
@@ -26,36 +25,15 @@
             <button id="clearAliasBtn" type="button">Hapus Alias</button>
           </div>
           <label class="field">
-            <span>Tujuan Kios</span>
-            <select id="clientSelect" required>
-              <option value="">Memuat daftar kios...</option>
-            </select>
+            <span>Kode Toko</span>
+            <input type="text" id="storeCodeInput" placeholder="Contoh: TOKO-001" autocomplete="off" required>
           </label>
-          <button id="startSessionBtn" type="button">Mulai Session</button>
-          <div id="sessionStatus" class="status"></div>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Daftar Kios Percetakan</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Nama Kios</th>
-              <th>Kesiapan</th>
-              <th>Client Terdaftar</th>
-              <th>Client Online</th>
-              <th>Client Siap</th>
-              <th>Bisa Mulai Session</th>
-            </tr>
-          </thead>
-          <tbody id="clientsBody">
-            <tr>
-              <td colspan="6" class="muted">Belum ada kios.</td>
-            </tr>
-          </tbody>
-        </table>
-        <div id="clientsStatus" class="status"></div>
+          <div class="row">
+            <button id="searchStoreBtn" type="submit">Cari Toko</button>
+            <button id="scanQrBtn" type="button">Scan QR</button>
+          </div>
+          <div id="storeSearchStatus" class="status"></div>
+        </form>
       </section>
     </main>
 

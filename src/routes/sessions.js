@@ -2,6 +2,7 @@ const express = require("express");
 const { secureDelete } = require("../utils/secureDelete");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, updateClientPresence } = require("../repositories/clientsRepository");
+const { getUserByStoreCode } = require("../repositories/usersRepository");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const {
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
@@ -148,10 +149,26 @@ async function waitForClientConfirmation(client) {
 router.post("/", asyncHandler(async (req, res) => {
   await cleanupExpiredSessions();
   const clientId = normalizeRequestString(req.body?.clientId);
-  const kioskId =
+  let kioskId =
     normalizeRequestString(req.body?.kioskId) ||
     normalizeRequestString(req.body?.ownerUserId) ||
     normalizeRequestString(req.body?.accountId);
+  const kodeToko =
+    normalizeRequestString(req.body?.kodeToko) ||
+    normalizeRequestString(req.body?.storeCode);
+
+  if (!kioskId && kodeToko) {
+    const storeUser = await getUserByStoreCode(kodeToko);
+    if (!storeUser) {
+      res.status(404).json({
+        error: "Toko tidak ditemukan.",
+        code: "STORE_NOT_FOUND",
+        kodeToko
+      });
+      return;
+    }
+    kioskId = storeUser.id;
+  }
 
   if (!kioskId && !ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE) {
     if (clientId) {
@@ -173,7 +190,7 @@ router.post("/", asyncHandler(async (req, res) => {
   }
 
   if (!clientId && !kioskId) {
-    res.status(400).json({ error: "kioskId or clientId is required" });
+    res.status(400).json({ error: "kioskId, kodeToko, or clientId is required" });
     return;
   }
 
@@ -214,7 +231,7 @@ router.post("/", asyncHandler(async (req, res) => {
 
     client = readyClient;
     sessionOwnerUserId = kioskId;
-    targetSource = "kiosk";
+    targetSource = kodeToko ? "store-code" : "kiosk";
   } else {
     client = clients.find(c => c.id === clientId);
     if (!client) {
