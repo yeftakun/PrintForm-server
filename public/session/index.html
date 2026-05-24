@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PrintForm Session</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="../vendor/docx-preview/docx-preview.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="../vendor/docx-preview/docx-preview.min.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <h1>PrintForm Cloud Queue</h1>
+        <p>Upload dokumen dan atur konfigurasi cetak.</p>
+        <p id="realtimeStatus" class="muted">Realtime: menghubungkan...</p>
+      </header>
+
+      <section class="card" id="sessionCard">
+        <h2>Session Print</h2>
+        <div id="sessionActive">
+          <p class="status">Session aktif untuk <strong id="sessionClientName"></strong></p>
+          <p id="sessionAliasText" class="muted"></p>
+          <div class="row">
+            <span id="sessionIdText" class="muted"></span>
+            <button id="endSessionBtn" type="button">Akhiri Session</button>
+          </div>
+        </div>
+        <div id="sessionStatus" class="status"></div>
+      </section>
+
+      <section class="card requires-session" id="uploadSection">
+        <h2>Upload Print Job</h2>
+        <div class="upload-section-grid">
+          <div class="upload-form-column">
+            <form id="uploadForm">
+              <label class="field">
+                <span>Dokumen</span>
+                <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
+              </label>
+
+              <label class="field">
+                <span>Ukuran Kertas</span>
+                <select name="paperSize" id="paperSize">
+                  <option value="A4" selected>A4</option>
+                  <option value="A5">A5</option>
+                  <option value="F4">F4 (Folio)</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Warna</span>
+                <select name="colorMode" id="colorMode">
+                  <option value="color" selected>Warna</option>
+                  <option value="bw">Hitam Putih</option>
+                </select>
+              </label>
+
+              <div class="row">
+                <label class="field" style="flex: 1;">
+                  <span>Orientasi</span>
+                  <select name="orientation" id="orientation">
+                    <option value="portrait" selected>Portrait</option>
+                    <option value="landscape">Landscape</option>
+                  </select>
+                </label>
+                <label class="field" style="flex: 1;">
+                  <span>Skala (%)</span>
+                  <input type="number" name="contentScale" id="contentScale" min="10" max="500" value="100">
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Rentang Halaman (Opsional)</span>
+                <input type="text" name="pageRange" id="pageRange" placeholder="Contoh: 1, 3-5, 8">
+              </label>
+
+              <label class="field">
+                <span>Banyak Salinan</span>
+                <input type="number" name="copies" id="copies" min="1" max="999" value="1">
+              </label>
+
+              <label class="field">
+                <span>Catatan (Opsional)</span>
+                <textarea name="notes" id="notes" placeholder="Catatan tambahan untuk operator..."></textarea>
+              </label>
+
+              <button type="submit">Kirim Job</button>
+              <div id="uploadStatus" class="status"></div>
+            </form>
+
+            <div id="printPreviewPanel" class="print-preview print-preview-empty" aria-live="polite">
+              <h3>Metadate Dokumen</h3>
+              <div class="print-preview-grid">
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Dokumen</span>
+                  <span id="previewFileName" class="print-preview-value">-</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Ukuran File</span>
+                  <span id="previewFileSize" class="print-preview-value">-</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Ukuran Kertas</span>
+                  <span id="previewPaperSize" class="print-preview-value">A4</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Warna</span>
+                  <span id="previewColorMode" class="print-preview-value">Warna</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Orientasi</span>
+                  <span id="previewOrientation" class="print-preview-value">Portrait</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Halaman</span>
+                  <span id="previewPageRange" class="print-preview-value">Semua</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Skala</span>
+                  <span id="previewContentScale" class="print-preview-value">100%</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Salinan</span>
+                  <span id="previewCopies" class="print-preview-value">1</span>
+                </div>
+                <div class="print-preview-item">
+                  <span class="print-preview-label">Total Impresi</span>
+                  <span id="previewImpressions" class="print-preview-value">-</span>
+                </div>
+              </div>
+              <p id="previewWarning" class="print-preview-warning hidden"></p>
+            </div>
+          </div>
+          
+          <div class="visual-preview-column">
+            <h3>Visual Preview</h3>
+            <div id="visualPreviewArea" class="visual-preview-area">
+              <div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card requires-session">
+        <div class="row">
+          <h2>Daftar Job</h2>
+          <button id="refreshBtn" type="button">Refresh</button>
+        </div>
+        <div id="jobsStatus" class="status"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Dokumen</th>
+              <th>Alias</th>
+              <th>Claimed By</th>
+              <th>Config</th>
+              <th>Salinan</th>
+              <th>Status</th>
+              <th>Waktu</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="jobsBody">
+            <tr>
+              <td colspan="9" class="muted">Belum ada job.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
