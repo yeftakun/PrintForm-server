@@ -7,7 +7,9 @@ const uploadStatus = document.getElementById("uploadStatus");
 const jobsBody = document.getElementById("jobsBody");
 const jobsStatus = document.getElementById("jobsStatus");
 const refreshBtn = document.getElementById("refreshBtn");
+const downloadAllProofBtn = document.getElementById("downloadAllProofBtn");
 let loadJobsTimer = null;
+let latestJobs = [];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -16,6 +18,198 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function isCompletedJob(job) {
+  const status = String(job?.status || "").toLowerCase();
+  return status === "done" || status === "sent";
+}
+
+function formatStatus(value = "") {
+  const status = String(value || "").toLowerCase();
+  if (status === "ready") return "Ready";
+  if (status === "processing" || status === "claimed") return "Diproses";
+  if (status === "done" || status === "sent") return "Selesai";
+  if (status === "canceled") return "Batal";
+  return value || "-";
+}
+
+function getStatusClass(value = "") {
+  const status = String(value || "").toLowerCase();
+  if (status === "ready" || status === "done" || status === "sent") return "success";
+  if (status === "processing" || status === "claimed") return "warning";
+  if (status === "canceled") return "error";
+  return "";
+}
+
+function getJobConfigText(job) {
+  const contentScale = Number(job.printConfig?.contentScale || 100);
+  return [
+    job.printConfig?.paperSize,
+    job.printConfig?.colorMode === "bw" ? "BW" : "Col",
+    job.printConfig?.orientation === "landscape" ? "L" : "P",
+    job.printConfig?.copies ? String(job.printConfig.copies) : "",
+    job.printConfig?.pageRange ? `(${job.printConfig.pageRange})` : "",
+    contentScale !== 100 ? `${contentScale}%` : ""
+  ].filter(Boolean).join(" - ");
+}
+
+function getReceiptContext() {
+  return {
+    storeName: sessionStorage.getItem("printformSessionClientName") || "Toko Percetakan",
+    storeCode: sessionStorage.getItem("printformSessionStoreCode") || "-",
+    storeAddress: sessionStorage.getItem("printformSessionStoreAddress") || "Alamat toko belum tersedia",
+    storeHours: sessionStorage.getItem("printformSessionStoreHours") || "Jam operasional belum tersedia",
+    sessionId: getSessionId() || "-",
+    alias: sessionStorage.getItem("printformSessionAlias") || "-"
+  };
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const words = String(text || "-").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth || !line) {
+      line = candidate;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  }
+
+  if (line) {
+    lines.push(line);
+  }
+
+  return lines.length ? lines : ["-"];
+}
+
+function drawReceiptText(ctx, text, x, y, options = {}) {
+  ctx.font = `${options.weight || "400"} ${options.size || 24}px "Courier New", monospace`;
+  ctx.fillStyle = options.color || "#111111";
+  ctx.textAlign = options.align || "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(String(text ?? ""), x, y);
+}
+
+function drawDivider(ctx, y, width, margin) {
+  ctx.save();
+  ctx.strokeStyle = "#111111";
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.moveTo(margin, y);
+  ctx.lineTo(width - margin, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawKeyValue(ctx, label, value, x, y, maxWidth) {
+  drawReceiptText(ctx, label, x, y, { size: 20, weight: "700" });
+  const lines = wrapCanvasText(ctx, value, maxWidth - 160);
+  lines.forEach((line, index) => {
+    drawReceiptText(ctx, line, x + 160, y + (index * 25), { size: 20 });
+  });
+  return y + Math.max(1, lines.length) * 25;
+}
+
+function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
+  const completedJobs = jobs.filter(isCompletedJob);
+  const context = getReceiptContext();
+  const width = 576;
+  const margin = 34;
+  const contentWidth = width - (margin * 2);
+  const height = Math.max(820, 720 + (completedJobs.length * 360));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+
+  let y = 28;
+  drawReceiptText(ctx, "PrintForm", width / 2, y, { size: 38, weight: "700", align: "center" });
+  y += 46;
+  drawReceiptText(ctx, title, width / 2, y, { size: 22, weight: "700", align: "center" });
+  y += 34;
+  wrapCanvasText(ctx, context.storeName, contentWidth).forEach(line => {
+    drawReceiptText(ctx, line, width / 2, y, { size: 24, weight: "700", align: "center" });
+    y += 29;
+  });
+  wrapCanvasText(ctx, context.storeAddress, contentWidth).forEach(line => {
+    drawReceiptText(ctx, line, width / 2, y, { size: 18, align: "center" });
+    y += 23;
+  });
+  drawReceiptText(ctx, context.storeHours, width / 2, y, { size: 18, align: "center" });
+  y += 32;
+  drawDivider(ctx, y, width, margin);
+  y += 22;
+
+  y = drawKeyValue(ctx, "Kode", context.storeCode, margin, y, contentWidth);
+  y = drawKeyValue(ctx, "Alias", context.alias, margin, y + 6, contentWidth);
+  y = drawKeyValue(ctx, "Sesi", context.sessionId, margin, y + 6, contentWidth);
+  y = drawKeyValue(ctx, "Tanggal", new Date().toLocaleString(), margin, y + 6, contentWidth);
+  y += 18;
+  drawDivider(ctx, y, width, margin);
+  y += 22;
+
+  completedJobs.forEach((job, index) => {
+    drawReceiptText(ctx, `${index + 1}. ${job.id}`, margin, y, { size: 20, weight: "700" });
+    y += 28;
+    wrapCanvasText(ctx, job.originalName || "-", contentWidth - 18).forEach(line => {
+      drawReceiptText(ctx, line, margin + 18, y, { size: 20 });
+      y += 25;
+    });
+    y = drawKeyValue(ctx, "Config", getJobConfigText(job) || "-", margin + 18, y + 4, contentWidth - 18);
+    y = drawKeyValue(ctx, "Status", formatStatus(job.status), margin + 18, y + 4, contentWidth - 18);
+    y = drawKeyValue(ctx, "Waktu", new Date(job.createdAt).toLocaleString(), margin + 18, y + 4, contentWidth - 18);
+    y += 16;
+    drawDivider(ctx, y, width, margin);
+    y += 22;
+  });
+
+  drawReceiptText(ctx, `Total tugas selesai: ${completedJobs.length}`, margin, y, { size: 22, weight: "700" });
+  y += 36;
+  drawReceiptText(ctx, "Simpan bukti ini untuk pengecekan tugas cetak.", width / 2, y, { size: 18, align: "center" });
+  y += 28;
+  drawReceiptText(ctx, "Terima kasih", width / 2, y, { size: 22, weight: "700", align: "center" });
+
+  return canvas;
+}
+
+function downloadCanvas(canvas, filename) {
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+function slugify(value) {
+  return String(value || "bukti")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "bukti";
+}
+
+function downloadProofForJobs(jobs, filenamePrefix = "bukti-cetak") {
+  const completedJobs = jobs.filter(isCompletedJob);
+  if (completedJobs.length === 0) {
+    jobsStatus.textContent = "Belum ada tugas selesai untuk diunduh buktinya.";
+    jobsStatus.className = "status";
+    return;
+  }
+
+  const canvas = buildReceiptCanvas(completedJobs, {
+    title: completedJobs.length > 1 ? "BUKTI CETAK GABUNGAN" : "BUKTI CETAK"
+  });
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+  downloadCanvas(canvas, `${slugify(filenamePrefix)}-${timestamp}.png`);
+  jobsStatus.textContent = "Bukti cetak berhasil dibuat.";
+  jobsStatus.className = "status success";
 }
 
 export function scheduleLoadJobs(delayMs = 200) {
@@ -35,6 +229,7 @@ export function scheduleLoadJobs(delayMs = 200) {
 export async function loadJobs() {
   const sessionId = getSessionId();
   if (!sessionId) {
+    latestJobs = [];
     jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Session belum aktif.</td></tr>';
     jobsStatus.textContent = "";
     return;
@@ -52,6 +247,7 @@ export async function loadJobs() {
     }
 
     const jobs = await res.json();
+    latestJobs = Array.isArray(jobs) ? jobs : [];
     if (!Array.isArray(jobs) || jobs.length === 0) {
       jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Belum ada tugas cetak.</td></tr>';
       jobsStatus.textContent = "";
@@ -79,6 +275,7 @@ export async function loadJobs() {
       const status = String(job.status || "").toLowerCase();
       const isReady = status === "ready";
       const isFinal = status === "done" || status === "sent" || status === "canceled";
+      const isCompleted = isCompletedJob(job);
       const cloneDisabled = isFinal ? "disabled" : "";
       const cancelDisabled = isReady ? "" : "disabled";
       
@@ -106,7 +303,7 @@ export async function loadJobs() {
         <td class="session-job-actions">
           <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="clone" ${cloneDisabled}>Buat Lagi</button>
           <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="cancel" ${cancelDisabled}>Batal</button>
-          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="download-proof">Download Bukti</button>
+          ${isCompleted ? `<button class="session-proof-btn" type="button" data-job-id="${escapeHtml(job.id)}" data-action="download-proof">↓ Bukti</button>` : ""}
         </td>
       </tr>`;
     }).join("");
@@ -213,8 +410,13 @@ function bindJobActions() {
   }
 
   if (action === "download-proof") {
-    jobsStatus.textContent = "Fitur download bukti belum tersedia.";
-    jobsStatus.className = "status";
+    const job = latestJobs.find(item => item.id === jobId);
+    if (!job || !isCompletedJob(job)) {
+      jobsStatus.textContent = "Bukti hanya tersedia untuk tugas selesai.";
+      jobsStatus.className = "status";
+      return;
+    }
+    downloadProofForJobs([job], `bukti-${job.id}`);
     return;
   }
 
@@ -250,5 +452,8 @@ function bindJobActions() {
 export function initJobs() {
   bindUploadForm();
   refreshBtn.addEventListener("click", loadJobs);
+  downloadAllProofBtn?.addEventListener("click", () => {
+    downloadProofForJobs(latestJobs, "bukti-semua-tugas-selesai");
+  });
   bindJobActions();
 }

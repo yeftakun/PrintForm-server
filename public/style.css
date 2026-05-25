@@ -2615,6 +2615,7 @@ th {
 
 .session-change-file-btn,
 .session-refresh-btn,
+.session-proof-all-btn,
 .session-job-actions button {
   border: 1px solid #cf542d;
   border-radius: 9px;
@@ -2657,6 +2658,13 @@ th {
   min-height: 38px;
   padding: 0 16px;
   font-size: 0.86rem;
+}
+
+.session-proof-all-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .session-table-wrap {
@@ -2749,6 +2757,11 @@ th {
   min-height: 32px;
   padding: 0 12px;
   font-size: 0.78rem;
+}
+
+.session-job-actions .session-proof-btn {
+  background: #fff8f2;
+  font-weight: 800;
 }
 
 .session-job-actions button + button {

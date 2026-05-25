@@ -105,6 +105,9 @@ confirmStoreBtn.addEventListener("click", async () => {
 
     sessionStorage.setItem("printformSessionId", body.id);
     sessionStorage.setItem("printformSessionClientName", currentStore.displayName || "toko");
+    sessionStorage.setItem("printformSessionStoreCode", currentStore.kodeToko || "");
+    sessionStorage.setItem("printformSessionStoreAddress", currentStore.alamat || "");
+    sessionStorage.setItem("printformSessionStoreHours", currentStore.jamOperasional || "");
     sessionStorage.setItem("printformSessionAlias", body.alias || alias || "");
     window.location.href = "/session/";
   } catch {

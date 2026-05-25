@@ -67,6 +67,9 @@ function clearSessionState() {
   sessionHeartbeatFailures = 0;
   sessionStorage.removeItem("printformSessionId");
   sessionStorage.removeItem("printformSessionClientName");
+  sessionStorage.removeItem("printformSessionStoreCode");
+  sessionStorage.removeItem("printformSessionStoreAddress");
+  sessionStorage.removeItem("printformSessionStoreHours");
   sessionStorage.removeItem("printformSessionAlias");
   setSessionUi(false);
   callbacks.resetPreviewState();
