@@ -6,47 +6,128 @@
     <title>PrintForm Server</title>
     <link rel="stylesheet" href="style.css">
   </head>
-  <body>
-    <main class="page">
-      <header class="header">
-        <h1>PrintForm Cloud Queue</h1>
-        <p>Masukkan kode toko atau scan QR untuk mulai mengirim dokumen.</p>
-      </header>
+  <body class="home-body">
+    <main class="home-shell">
+      <section class="home-intro" aria-label="PrintForm">
+        <div class="home-brand">
+          <div class="home-logo" aria-hidden="true">
+            <span></span>
+          </div>
+          <h1>PrintForm</h1>
+        </div>
 
-      <section class="card" id="storeSearchCard">
-        <h2>Cari Toko</h2>
-        <form id="storeSearchForm">
-          <label class="field">
-            <span>Alias Pengirim</span>
-            <input type="text" id="aliasInput" placeholder="Nama pengirim (opsional)">
-          </label>
-          <div class="row">
-            <button id="saveAliasBtn" type="button">Simpan Alias</button>
-            <button id="clearAliasBtn" type="button">Hapus Alias</button>
+        <h2>Upload dokumen dan atur konfigurasi cetak dengan <span>lebih mudah</span></h2>
+        <p class="home-copy">Simpan alias pengirim Anda, masukkan kode kios, atau scan kode di toko untuk melanjutkan sesi cetak.</p>
+
+        <div class="home-benefits" aria-label="Keunggulan">
+          <div class="home-benefit">
+            <div class="home-benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l0-7Z"></path></svg>
+            </div>
+            <div>
+              <strong>Cepat</strong>
+              <p>Dalam hitungan detik</p>
+            </div>
           </div>
-          <label class="field">
-            <span>Kode Toko</span>
-            <input type="text" id="storeCodeInput" placeholder="Contoh: TOKO-001" autocomplete="off" required>
-          </label>
-          <div class="row">
-            <button id="searchStoreBtn" type="submit">Cari Toko</button>
-            <button id="scanQrBtn" type="button">Scan QR</button>
+          <div class="home-benefit">
+            <div class="home-benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+            </div>
+            <div>
+              <strong>Mudah</strong>
+              <p>Langkah simpel</p>
+            </div>
           </div>
-          <div id="storeSearchStatus" class="status"></div>
-        </form>
+          <div class="home-benefit">
+            <div class="home-benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.3 7 10 4.2-1.7 7-5.5 7-10V6l-7-3Z"></path><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+            </div>
+            <div>
+              <strong>Aman</strong>
+              <p>Data tetap aman</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-hint">
+          <div class="home-hint-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4z"></path><path d="M14 4h6v6h-6z"></path><path d="M4 14h6v6H4z"></path><path d="M14 14h2v2h-2z"></path><path d="M18 14h2v6h-2z"></path><path d="M14 18h2v2h-2z"></path></svg>
+          </div>
+          <div>
+            <strong>Belum tahu kode kios?</strong>
+            <p>Scan QR yang tersedia di toko.</p>
+          </div>
+        </div>
+
+        <p class="home-privacy"><span>⌂</span> Data diproses sementara untuk keperluan pencetakan. Kami tidak menyimpan dokumen Anda setelah sesi selesai.</p>
       </section>
 
-      <section class="card hidden" id="qrScannerCard">
-        <div class="row">
-          <h2>Scan QR Toko</h2>
-          <button id="closeQrBtn" type="button">Tutup Kamera</button>
+      <section class="home-card" id="storeSearchCard">
+        <div class="home-card-head">
+          <div class="home-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v7H6z"></path><path d="M8 17h8"></path></svg>
+          </div>
+          <div>
+            <h2>Mulai Sesi Cetak</h2>
+            <p>Isi informasi di bawah untuk memulai</p>
+          </div>
+        </div>
+
+        <form id="storeSearchForm" class="home-form">
+          <div class="home-form-section">
+            <label class="home-field">
+              <span>Alias Pengirim</span>
+              <div class="home-input-wrap">
+                <input type="text" id="aliasInput" placeholder="Jane Doe">
+                <button id="clearAliasBtn" class="home-input-action" type="button" aria-label="Hapus alias">×</button>
+              </div>
+            </label>
+            <div class="home-actions-right">
+              <button id="saveAliasBtn" class="home-outline-btn" type="button">Simpan Alias</button>
+            </div>
+          </div>
+
+          <div class="home-form-section">
+            <label class="home-field">
+              <span>Kode Kios</span>
+              <div class="home-input-wrap home-code-wrap">
+                <span class="home-search-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16.5 16.5 4 4"></path></svg>
+                </span>
+                <input type="text" id="storeCodeInput" placeholder="Masukkan kode kios..." autocomplete="off" required>
+                <button id="scanQrBtn" class="home-scan-btn" type="button" aria-label="Scan QR">
+                  <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M8 8h8v8H8z"></path></svg>
+                </button>
+              </div>
+            </label>
+            <p class="home-field-note">Masukkan kode kios atau gunakan scanner di lokasi.</p>
+            <button id="searchStoreBtn" class="home-submit-btn" type="submit">
+              <span class="home-submit-label">Lihat</span>
+              <span class="home-submit-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+
+          <div id="storeSearchStatus" class="status home-form-status"></div>
+          <div class="home-info-note">ⓘ Pastikan kode kios sesuai dengan yang tertera di toko.</div>
+        </form>
+      </section>
+    </main>
+
+    <div class="qr-modal-backdrop hidden" id="qrScannerCard" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+      <div class="qr-modal">
+        <div class="qr-modal-head">
+          <div>
+            <h2 id="qrModalTitle">Scan QR Toko</h2>
+            <p>Arahkan kamera ke QR kode toko.</p>
+          </div>
+          <button id="closeQrBtn" class="qr-close-btn" type="button" aria-label="Tutup kamera">×</button>
         </div>
         <div class="qr-scanner-frame">
           <video id="qrVideo" autoplay muted playsinline></video>
         </div>
         <div id="qrStatus" class="status">Arahkan kamera ke QR kode toko.</div>
-      </section>
-    </main>
+      </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script type="module" src="/home/index.js"></script>
