@@ -9,6 +9,15 @@ const jobsStatus = document.getElementById("jobsStatus");
 const refreshBtn = document.getElementById("refreshBtn");
 let loadJobsTimer = null;
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 export function scheduleLoadJobs(delayMs = 200) {
   if (!getSessionId()) {
     return;
@@ -26,7 +35,7 @@ export function scheduleLoadJobs(delayMs = 200) {
 export async function loadJobs() {
   const sessionId = getSessionId();
   if (!sessionId) {
-    jobsBody.innerHTML = '<tr><td colspan="9" class="muted">Session belum aktif.</td></tr>';
+    jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Session belum aktif.</td></tr>';
     jobsStatus.textContent = "";
     return;
   }
@@ -44,16 +53,26 @@ export async function loadJobs() {
 
     const jobs = await res.json();
     if (!Array.isArray(jobs) || jobs.length === 0) {
-      jobsBody.innerHTML = '<tr><td colspan="9" class="muted">Belum ada job.</td></tr>';
+      jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Belum ada tugas cetak.</td></tr>';
       jobsStatus.textContent = "";
       return;
     }
 
-    const formatStatus = (value) => {
-      if (!value) {
-        return "-";
-      }
-      return value.toLowerCase() === "done" ? "Sent" : value;
+    const formatStatus = (value = "") => {
+      const status = String(value || "").toLowerCase();
+      if (status === "ready") return "Ready";
+      if (status === "processing" || status === "claimed") return "Diproses";
+      if (status === "done" || status === "sent") return "Selesai";
+      if (status === "canceled") return "Batal";
+      return value || "-";
+    };
+
+    const getStatusClass = (value = "") => {
+      const status = String(value || "").toLowerCase();
+      if (status === "ready" || status === "done" || status === "sent") return "success";
+      if (status === "processing" || status === "claimed") return "warning";
+      if (status === "canceled") return "error";
+      return "";
     };
 
     jobsBody.innerHTML = jobs.map(job => {
@@ -64,23 +83,26 @@ export async function loadJobs() {
         job.printConfig.paperSize,
         job.printConfig.colorMode === "bw" ? "BW" : "Col",
         job.printConfig.orientation === "landscape" ? "L" : "P",
+        job.printConfig.copies ? String(job.printConfig.copies) : "",
         job.printConfig.pageRange ? `(${job.printConfig.pageRange})` : "",
         job.printConfig.contentScale !== 100 ? `${job.printConfig.contentScale}%` : ""
       ].filter(Boolean).join(" ");
+      const statusClass = getStatusClass(job.status);
+      const claimedBy = job.claimedByClientName || job.claimedByClientId || "-";
+      const originalName = job.originalName || "-";
 
       return `
       <tr>
-        <td>${job.id}</td>
-        <td>${job.originalName}</td>
-        <td>${job.alias || "-"}</td>
-        <td>${job.claimedByClientId || "-"}</td>
-        <td>${configParts}</td>
-        <td>${job.printConfig.copies}</td>
-        <td>${formatStatus(job.status)}</td>
-        <td>${new Date(job.createdAt).toLocaleString()}</td>
-        <td>
-          <button type="button" data-job-id="${job.id}" data-action="clone">Buat lagi</button>
-          <button type="button" data-job-id="${job.id}" data-action="cancel" ${cancelDisabled}>Batal</button>
+        <td>${escapeHtml(job.id)}</td>
+        <td><span class="session-doc-cell"><span aria-hidden="true">▧</span>${escapeHtml(originalName)}</span></td>
+        <td>${escapeHtml(job.alias || "-")}</td>
+        <td>${escapeHtml(claimedBy)}</td>
+        <td>${escapeHtml(configParts || "-")}</td>
+        <td><span class="session-status-pill ${statusClass}">${escapeHtml(formatStatus(job.status))}</span></td>
+        <td>${escapeHtml(new Date(job.createdAt).toLocaleString())}</td>
+        <td class="session-job-actions">
+          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="clone">Buat Lagi</button>
+          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="cancel" ${cancelDisabled}>Batal</button>
         </td>
       </tr>`;
     }).join("");

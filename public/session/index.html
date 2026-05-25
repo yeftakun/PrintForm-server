@@ -9,37 +9,84 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="../vendor/docx-preview/docx-preview.min.js"></script>
   </head>
-  <body>
-    <main class="page">
-      <header class="header">
-        <h1>PrintForm Cloud Queue</h1>
-        <p>Upload dokumen dan atur konfigurasi cetak.</p>
-        <p id="realtimeStatus" class="muted">Realtime: menghubungkan...</p>
+  <body class="session-body">
+    <main class="session-shell">
+      <header class="session-brand">
+        <div class="session-brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+        </div>
+        <div>
+          <h1>PrintForm</h1>
+          <p>Upload dokumen dan atur konfigurasi cetak!</p>
+        </div>
       </header>
 
-      <section class="card" id="sessionCard">
-        <h2>Session Print</h2>
-        <div id="sessionActive">
-          <p class="status">Session aktif untuk <strong id="sessionClientName"></strong></p>
-          <p id="sessionAliasText" class="muted"></p>
-          <div class="row">
-            <span id="sessionIdText" class="muted"></span>
-            <button id="endSessionBtn" type="button">Akhiri Session</button>
-          </div>
+      <section class="session-card session-summary-card" id="sessionCard">
+        <div class="session-summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v7H6z"></path><path d="M8 17h8"></path></svg>
         </div>
-        <div id="sessionStatus" class="status"></div>
+        <div class="session-summary-content">
+          <h2>Sesi Cetak</h2>
+          <div id="sessionActive" class="session-summary-grid">
+            <div class="session-summary-item">
+              <span class="session-item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7"></path><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"></path><path d="M9 20v-6h6v6"></path></svg>
+              </span>
+              <div>
+                <span>Kios Aktif</span>
+                <strong id="sessionClientName">-</strong>
+              </div>
+            </div>
+            <div class="session-summary-item">
+              <span class="session-item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              </span>
+              <div>
+                <span>Alias</span>
+                <strong id="sessionAliasText">-</strong>
+              </div>
+            </div>
+            <div class="session-summary-item session-id-item">
+              <span class="session-item-icon" aria-hidden="true">AB</span>
+              <div>
+                <span>Sesi ID</span>
+                <strong id="sessionIdText">-</strong>
+              </div>
+            </div>
+          </div>
+          <div id="sessionStatus" class="status session-page-status"></div>
+        </div>
+        <div class="session-summary-actions">
+          <p id="realtimeStatus" class="session-ready-pill">Sesi aktif dan siap menerima tugas cetak</p>
+          <button id="endSessionBtn" class="session-end-btn" type="button">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg>
+            </span>
+            Akhiri Sesi
+          </button>
+        </div>
       </section>
 
-      <section class="card requires-session" id="uploadSection">
-        <h2>Upload Print Job</h2>
-        <div class="upload-section-grid">
-          <div class="upload-form-column">
-            <form id="uploadForm">
-              <label class="field">
-                <span>Dokumen</span>
-                <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
-              </label>
+      <section class="session-work-grid requires-session" id="uploadSection">
+        <article class="session-card session-upload-card">
+          <div class="session-section-title">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M20 16.5A4.5 4.5 0 0 1 15.5 21h-7A4.5 4.5 0 0 1 4 16.5"></path></svg>
+            </span>
+            <h2>Upload Tugas Cetak</h2>
+          </div>
 
+          <form id="uploadForm" class="session-upload-form">
+            <label class="field session-file-field">
+              <span>Dokumen</span>
+              <div class="session-file-picker">
+                <button id="chooseDocumentBtn" class="session-file-button" type="button">Pilih Dokumen</button>
+                <span id="selectedDocumentName" class="session-file-name">Belum ada dokumen</span>
+              </div>
+              <input class="session-file-input" type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
+            </label>
+
+            <div class="session-form-grid">
               <label class="field">
                 <span>Ukuran Kertas</span>
                 <select name="paperSize" id="paperSize">
@@ -50,125 +97,118 @@
               </label>
 
               <label class="field">
-                <span>Warna</span>
+                <span>Mode Warna</span>
                 <select name="colorMode" id="colorMode">
-                  <option value="color" selected>Warna</option>
+                  <option value="color" selected>Berwarna</option>
                   <option value="bw">Hitam Putih</option>
                 </select>
               </label>
 
-              <div class="row">
-                <label class="field" style="flex: 1;">
-                  <span>Orientasi</span>
-                  <select name="orientation" id="orientation">
-                    <option value="portrait" selected>Portrait</option>
-                    <option value="landscape">Landscape</option>
-                  </select>
-                </label>
-                <label class="field" style="flex: 1;">
-                  <span>Skala (%)</span>
-                  <input type="number" name="contentScale" id="contentScale" min="10" max="500" value="100">
-                </label>
-              </div>
-
               <label class="field">
-                <span>Rentang Halaman (Opsional)</span>
-                <input type="text" name="pageRange" id="pageRange" placeholder="Contoh: 1, 3-5, 8">
+                <span>Orientasi</span>
+                <select name="orientation" id="orientation">
+                  <option value="portrait" selected>Portrait</option>
+                  <option value="landscape">Landscape</option>
+                </select>
               </label>
 
+              <label class="field">
+                <span>Catatan Tambahan</span>
+                <textarea name="notes" id="notes" placeholder="Ketik catatan..."></textarea>
+              </label>
+            </div>
+
+            <div class="session-hidden-controls">
+              <label class="field">
+                <span>Skala (%)</span>
+                <input type="number" name="contentScale" id="contentScale" min="10" max="500" value="100">
+              </label>
+              <label class="field">
+                <span>Rentang Halaman</span>
+                <input type="text" name="pageRange" id="pageRange" placeholder="Contoh: 1, 3-5, 8">
+              </label>
               <label class="field">
                 <span>Banyak Salinan</span>
                 <input type="number" name="copies" id="copies" min="1" max="999" value="1">
               </label>
+            </div>
 
-              <label class="field">
-                <span>Catatan (Opsional)</span>
-                <textarea name="notes" id="notes" placeholder="Catatan tambahan untuk operator..."></textarea>
-              </label>
+            <button class="session-submit-btn" type="submit">
+              <span aria-hidden="true">↗</span>
+              Kirim Tugas
+            </button>
+            <div id="uploadStatus" class="status"></div>
+          </form>
 
-              <button type="submit">Kirim Job</button>
-              <div id="uploadStatus" class="status"></div>
-            </form>
+          <p class="session-privacy-note">Dokumen diproses sementara untuk keperluan pencetakan.</p>
+        </article>
 
-            <div id="printPreviewPanel" class="print-preview print-preview-empty" aria-live="polite">
-              <h3>Metadate Dokumen</h3>
-              <div class="print-preview-grid">
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Dokumen</span>
-                  <span id="previewFileName" class="print-preview-value">-</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Ukuran File</span>
-                  <span id="previewFileSize" class="print-preview-value">-</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Ukuran Kertas</span>
-                  <span id="previewPaperSize" class="print-preview-value">A4</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Warna</span>
-                  <span id="previewColorMode" class="print-preview-value">Warna</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Orientasi</span>
-                  <span id="previewOrientation" class="print-preview-value">Portrait</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Halaman</span>
-                  <span id="previewPageRange" class="print-preview-value">Semua</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Skala</span>
-                  <span id="previewContentScale" class="print-preview-value">100%</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Salinan</span>
-                  <span id="previewCopies" class="print-preview-value">1</span>
-                </div>
-                <div class="print-preview-item">
-                  <span class="print-preview-label">Total Impresi</span>
-                  <span id="previewImpressions" class="print-preview-value">-</span>
-                </div>
-              </div>
-              <p id="previewWarning" class="print-preview-warning hidden"></p>
+        <article class="session-card session-preview-card">
+          <div class="session-section-title">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </span>
+            <h2>Document Preview</h2>
+          </div>
+
+          <div id="visualPreviewArea" class="visual-preview-area session-visual-preview">
+            <div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>
+          </div>
+
+          <div id="printPreviewPanel" class="session-preview-info print-preview print-preview-empty" aria-live="polite">
+            <div class="session-preview-file-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M10 13v5"></path><path d="M8 16h4"></path></svg>
+            </div>
+            <div>
+              <strong id="previewFileName" class="print-preview-value">-</strong>
+              <p><span>PDF</span> <span id="previewFileSize">-</span> <span id="previewImpressions">-</span></p>
+            </div>
+            <button id="changeDocumentBtn" class="session-change-file-btn" type="button">Ganti Dokumen</button>
+            <p id="previewWarning" class="print-preview-warning hidden"></p>
+            <div class="session-preview-meta" aria-hidden="true">
+              <span id="previewPaperSize">A4</span>
+              <span id="previewColorMode">Warna</span>
+              <span id="previewOrientation">Portrait</span>
+              <span id="previewPageRange">Semua</span>
+              <span id="previewContentScale">100%</span>
+              <span id="previewCopies">1</span>
             </div>
           </div>
-          
-          <div class="visual-preview-column">
-            <h3>Visual Preview</h3>
-            <div id="visualPreviewArea" class="visual-preview-area">
-              <div class="visual-preview-placeholder">Preview dokumen akan muncul di sini</div>
-            </div>
-          </div>
-        </div>
+        </article>
       </section>
 
-      <section class="card requires-session">
-        <div class="row">
-          <h2>Daftar Job</h2>
-          <button id="refreshBtn" type="button">Refresh</button>
+      <section class="session-card session-jobs-card requires-session">
+        <div class="session-jobs-head">
+          <div class="session-section-title">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M9 11h6"></path><path d="M9 15h6"></path><path d="M8 3h8l2 3v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6Z"></path></svg>
+            </span>
+            <h2>Daftar Tugas Cetak Anda</h2>
+          </div>
+          <button id="refreshBtn" class="session-refresh-btn" type="button">↻ Refresh</button>
         </div>
         <div id="jobsStatus" class="status"></div>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Dokumen</th>
-              <th>Alias</th>
-              <th>Claimed By</th>
-              <th>Config</th>
-              <th>Salinan</th>
-              <th>Status</th>
-              <th>Waktu</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="jobsBody">
-            <tr>
-              <td colspan="9" class="muted">Belum ada job.</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="session-table-wrap">
+          <table class="session-jobs-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Dokumen</th>
+                <th>Alias</th>
+                <th>Diklaim Oleh</th>
+                <th>Konfigurasi</th>
+                <th>Status</th>
+                <th>Waktu</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="jobsBody">
+              <tr>
+                <td colspan="8" class="muted">Belum ada tugas cetak.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
 

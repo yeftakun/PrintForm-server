@@ -38,7 +38,7 @@ function setRealtimeStatus(text, isError = false) {
   }
 
   realtimeStatus.textContent = text;
-  realtimeStatus.className = isError ? "status error" : "muted";
+  realtimeStatus.className = isError ? "session-ready-pill error" : "session-ready-pill";
 }
 
 function setSessionUi(active) {
@@ -53,8 +53,8 @@ function setSessionUi(active) {
   });
   if (active) {
     sessionClientName.textContent = sessionClient || "kios";
-    sessionIdText.textContent = sessionId ? `Session ID: ${sessionId}` : "";
-    sessionAliasText.textContent = sessionAlias ? `Alias: ${sessionAlias}` : "Alias: -";
+    sessionIdText.textContent = sessionId || "-";
+    sessionAliasText.textContent = sessionAlias || "-";
   } else {
     sessionAliasText.textContent = "";
   }
@@ -205,7 +205,7 @@ function handleRealtimeMessage(rawMessage) {
   switch (type) {
     case "realtime.connected":
     case "realtime.subscribed":
-      setRealtimeStatus("Realtime: tersambung");
+      setRealtimeStatus("Sesi aktif dan siap menerima tugas cetak");
       return;
     case "clients.snapshot":
     case "client.upserted":
@@ -272,7 +272,7 @@ async function connectRealtime() {
 
   socket.addEventListener("open", () => {
     realtimeReconnectAttempt = 0;
-    setRealtimeStatus("Realtime: tersambung");
+    setRealtimeStatus("Sesi aktif dan siap menerima tugas cetak");
     socket.send(JSON.stringify({ action: "subscribe", channels: ["jobs", "sessions"] }));
     callbacks.scheduleLoadJobs(0);
   });
