@@ -13,6 +13,7 @@ const uploadForm = document.getElementById("uploadForm");
 const uploadFileInput = document.querySelector('#uploadForm input[name="document"]');
 const openJobsModalBtn = document.getElementById("openJobsModalBtn");
 const closeJobsModalBtn = document.getElementById("closeJobsModalBtn");
+const closeJobsDrawerBtn = document.getElementById("closeJobsDrawerBtn");
 const jobsModal = document.getElementById("jobsModal");
 
 if (changeDocumentBtn && uploadFileInput) {
@@ -59,6 +60,12 @@ if (openJobsModalBtn) {
 
 if (closeJobsModalBtn) {
   closeJobsModalBtn.addEventListener("click", () => {
+    setJobsModalOpen(false);
+  });
+}
+
+if (closeJobsDrawerBtn) {
+  closeJobsDrawerBtn.addEventListener("click", () => {
     setJobsModalOpen(false);
   });
 }

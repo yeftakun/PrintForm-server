@@ -196,12 +196,11 @@
 
       <div id="jobsModal" class="session-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="jobsModalTitle">
         <section class="session-card session-jobs-card requires-session">
+          <div class="session-drawer-handle" aria-hidden="true"></div>
           <div class="session-jobs-head">
-            <div class="session-section-title">
-              <span aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M9 11h6"></path><path d="M9 15h6"></path><path d="M8 3h8l2 3v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6Z"></path></svg>
-              </span>
+            <div>
               <h2 id="jobsModalTitle">Daftar Tugas Cetak Anda</h2>
+              <p>Lihat status dan detail tugas cetak Anda</p>
             </div>
             <div class="session-modal-actions">
               <button id="downloadAllProofBtn" class="session-proof-all-btn" type="button">↓ Bukti Semua</button>
@@ -210,26 +209,26 @@
             </div>
           </div>
           <div id="jobsStatus" class="status"></div>
-          <div class="session-table-wrap">
-            <table class="session-jobs-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Dokumen</th>
-                  <th>Alias</th>
-                  <th>Diklaim Oleh</th>
-                  <th>Konfigurasi</th>
-                  <th>Status</th>
-                  <th>Waktu</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="jobsBody">
-                <tr>
-                  <td colspan="8" class="muted">Belum ada tugas cetak.</td>
-                </tr>
-              </tbody>
-            </table>
+          <div id="jobsBody" class="session-job-card-list">
+            <p class="muted">Belum ada tugas cetak.</p>
+          </div>
+          <button id="closeJobsDrawerBtn" class="session-drawer-close-btn" type="button">Tutup</button>
+        </section>
+      </div>
+
+      <div id="jobDetailModal" class="session-detail-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="jobDetailTitle">
+        <section class="session-card session-detail-card">
+          <div class="session-detail-head">
+            <div>
+              <h2 id="jobDetailTitle">Detail Tugas</h2>
+              <p id="jobDetailSubtitle">Informasi lengkap tugas cetak</p>
+            </div>
+            <button id="closeJobDetailBtn" class="session-modal-close-btn" type="button" aria-label="Tutup detail tugas">×</button>
+          </div>
+          <div id="jobDetailContent" class="session-detail-content"></div>
+          <div class="session-detail-actions">
+            <button id="detailCloneBtn" type="button">Buat Lagi</button>
+            <button id="detailCancelBtn" type="button">Batal</button>
           </div>
         </section>
       </div>

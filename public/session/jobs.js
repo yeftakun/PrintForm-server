@@ -8,8 +8,15 @@ const jobsBody = document.getElementById("jobsBody");
 const jobsStatus = document.getElementById("jobsStatus");
 const refreshBtn = document.getElementById("refreshBtn");
 const downloadAllProofBtn = document.getElementById("downloadAllProofBtn");
+const jobDetailModal = document.getElementById("jobDetailModal");
+const closeJobDetailBtn = document.getElementById("closeJobDetailBtn");
+const jobDetailContent = document.getElementById("jobDetailContent");
+const jobDetailSubtitle = document.getElementById("jobDetailSubtitle");
+const detailCloneBtn = document.getElementById("detailCloneBtn");
+const detailCancelBtn = document.getElementById("detailCancelBtn");
 let loadJobsTimer = null;
 let latestJobs = [];
+let selectedDetailJobId = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -52,6 +59,69 @@ function getJobConfigText(job) {
     job.printConfig?.pageRange ? `(${job.printConfig.pageRange})` : "",
     contentScale !== 100 ? `${contentScale}%` : ""
   ].filter(Boolean).join(" - ");
+}
+
+function getClaimedBy(job) {
+  return job.claimedByClientName || job.claimedByClientId || "-";
+}
+
+function formatJobTime(value) {
+  if (!value) {
+    return "-";
+  }
+  return new Date(value).toLocaleString();
+}
+
+function setJobDetailOpen(isOpen) {
+  if (!jobDetailModal) {
+    return;
+  }
+
+  jobDetailModal.classList.toggle("hidden", !isOpen);
+  document.body.classList.toggle("session-modal-open", isOpen || !document.getElementById("jobsModal")?.classList.contains("hidden"));
+}
+
+function renderDetailRow(label, value) {
+  return `
+    <div class="session-detail-row">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "-")}</strong>
+    </div>`;
+}
+
+function openJobDetail(jobId) {
+  const job = latestJobs.find(item => item.id === jobId);
+  if (!job || !jobDetailContent) {
+    return;
+  }
+
+  selectedDetailJobId = job.id;
+  const status = String(job.status || "").toLowerCase();
+  const isReady = status === "ready";
+  const isFinal = status === "done" || status === "sent" || status === "canceled";
+
+  if (jobDetailSubtitle) {
+    jobDetailSubtitle.textContent = job.originalName || "Informasi lengkap tugas cetak";
+  }
+
+  jobDetailContent.innerHTML = [
+    renderDetailRow("ID", job.id),
+    renderDetailRow("Nama Dokumen", job.originalName),
+    renderDetailRow("Alias", job.alias || "-"),
+    renderDetailRow("Diklaim Oleh", getClaimedBy(job)),
+    renderDetailRow("Konfigurasi", getJobConfigText(job) || "-"),
+    renderDetailRow("Status", formatStatus(job.status)),
+    renderDetailRow("Waktu", formatJobTime(job.createdAt))
+  ].join("");
+
+  if (detailCloneBtn) {
+    detailCloneBtn.disabled = isFinal;
+  }
+  if (detailCancelBtn) {
+    detailCancelBtn.disabled = !isReady;
+  }
+
+  setJobDetailOpen(true);
 }
 
 function getReceiptContext() {
@@ -121,14 +191,14 @@ function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
   const width = 576;
   const margin = 34;
   const contentWidth = width - (margin * 2);
-  const height = Math.max(820, 720 + (completedJobs.length * 360));
+  const estimatedHeight = Math.max(820, 640 + (completedJobs.length * 230));
   const canvas = document.createElement("canvas");
   canvas.width = width;
-  canvas.height = height;
+  canvas.height = estimatedHeight;
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, width, estimatedHeight);
 
   let y = 28;
   drawReceiptText(ctx, "PrintForm", width / 2, y, { size: 38, weight: "700", align: "center" });
@@ -176,8 +246,17 @@ function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
   drawReceiptText(ctx, "Simpan bukti ini untuk pengecekan tugas cetak.", width / 2, y, { size: 18, align: "center" });
   y += 28;
   drawReceiptText(ctx, "Terima kasih", width / 2, y, { size: 22, weight: "700", align: "center" });
+  y += 42;
 
-  return canvas;
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = width;
+  finalCanvas.height = Math.ceil(y);
+  const finalCtx = finalCanvas.getContext("2d");
+  finalCtx.fillStyle = "#ffffff";
+  finalCtx.fillRect(0, 0, width, finalCanvas.height);
+  finalCtx.drawImage(canvas, 0, 0);
+
+  return finalCanvas;
 }
 
 function downloadCanvas(canvas, filename) {
@@ -230,7 +309,7 @@ export async function loadJobs() {
   const sessionId = getSessionId();
   if (!sessionId) {
     latestJobs = [];
-    jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Session belum aktif.</td></tr>';
+    jobsBody.innerHTML = '<p class="muted">Session belum aktif.</p>';
     jobsStatus.textContent = "";
     return;
   }
@@ -249,63 +328,31 @@ export async function loadJobs() {
     const jobs = await res.json();
     latestJobs = Array.isArray(jobs) ? jobs : [];
     if (!Array.isArray(jobs) || jobs.length === 0) {
-      jobsBody.innerHTML = '<tr><td colspan="8" class="muted">Belum ada tugas cetak.</td></tr>';
+      jobsBody.innerHTML = '<p class="muted">Belum ada tugas cetak.</p>';
       jobsStatus.textContent = "";
       return;
     }
 
-    const formatStatus = (value = "") => {
-      const status = String(value || "").toLowerCase();
-      if (status === "ready") return "Ready";
-      if (status === "processing" || status === "claimed") return "Diproses";
-      if (status === "done" || status === "sent") return "Selesai";
-      if (status === "canceled") return "Batal";
-      return value || "-";
-    };
-
-    const getStatusClass = (value = "") => {
-      const status = String(value || "").toLowerCase();
-      if (status === "ready" || status === "done" || status === "sent") return "success";
-      if (status === "processing" || status === "claimed") return "warning";
-      if (status === "canceled") return "error";
-      return "";
-    };
-
     jobsBody.innerHTML = jobs.map(job => {
       const status = String(job.status || "").toLowerCase();
-      const isReady = status === "ready";
-      const isFinal = status === "done" || status === "sent" || status === "canceled";
       const isCompleted = isCompletedJob(job);
-      const cloneDisabled = isFinal ? "disabled" : "";
-      const cancelDisabled = isReady ? "" : "disabled";
-      
-      const configParts = [
-        job.printConfig.paperSize,
-        job.printConfig.colorMode === "bw" ? "BW" : "Col",
-        job.printConfig.orientation === "landscape" ? "L" : "P",
-        job.printConfig.copies ? String(job.printConfig.copies) : "",
-        job.printConfig.pageRange ? `(${job.printConfig.pageRange})` : "",
-        job.printConfig.contentScale !== 100 ? `${job.printConfig.contentScale}%` : ""
-      ].filter(Boolean).join(" - ");
       const statusClass = getStatusClass(job.status);
-      const claimedBy = job.claimedByClientName || job.claimedByClientId || "-";
       const originalName = job.originalName || "-";
 
       return `
-      <tr>
-        <td>${escapeHtml(job.id)}</td>
-        <td><span class="session-doc-cell"><span aria-hidden="true">▧</span>${escapeHtml(originalName)}</span></td>
-        <td>${escapeHtml(job.alias || "-")}</td>
-        <td>${escapeHtml(claimedBy)}</td>
-        <td>${escapeHtml(configParts || "-")}</td>
-        <td><span class="session-status-pill ${statusClass}">${escapeHtml(formatStatus(job.status))}</span></td>
-        <td>${escapeHtml(new Date(job.createdAt).toLocaleString())}</td>
-        <td class="session-job-actions">
-          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="clone" ${cloneDisabled}>Buat Lagi</button>
-          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="cancel" ${cancelDisabled}>Batal</button>
-          ${isCompleted ? `<button class="session-proof-btn" type="button" data-job-id="${escapeHtml(job.id)}" data-action="download-proof">↓ Bukti</button>` : ""}
-        </td>
-      </tr>`;
+      <article class="session-job-card" data-job-id="${escapeHtml(job.id)}" tabindex="0" role="button" aria-label="Lihat detail ${escapeHtml(originalName)}">
+        <div class="session-job-file-icon" aria-hidden="true">PDF</div>
+        <div class="session-job-card-main">
+          <div class="session-job-card-top">
+            <h3>${escapeHtml(originalName)}</h3>
+            <span class="session-status-pill ${statusClass}">${escapeHtml(formatStatus(job.status))}</span>
+          </div>
+          <div class="session-job-card-actions">
+            <span class="session-job-time">${escapeHtml(formatJobTime(job.createdAt))}</span>
+            ${isCompleted ? `<button class="session-proof-btn" type="button" data-job-id="${escapeHtml(job.id)}" data-action="download-proof">↓ Bukti</button>` : ""}
+          </div>
+        </div>
+      </article>`;
     }).join("");
   } catch {
     jobsStatus.textContent = "Gagal memuat daftar job.";
@@ -368,84 +415,135 @@ function bindUploadForm() {
   });
 }
 
+async function cloneJob(jobId) {
+  jobsStatus.textContent = "Membuat ulang job...";
+  jobsStatus.className = "status";
+  try {
+    const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: getSessionId() })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      jobsStatus.textContent = body.error || "Gagal membuat ulang job.";
+      jobsStatus.className = "status error";
+      return;
+    }
+    jobsStatus.textContent = "Job baru berhasil dibuat.";
+    jobsStatus.className = "status success";
+    setJobDetailOpen(false);
+    await loadJobs();
+  } catch (err) {
+    jobsStatus.textContent = "Gagal terhubung ke server.";
+    jobsStatus.className = "status error";
+  }
+}
+
+async function cancelJob(jobId) {
+  jobsStatus.textContent = "Membatalkan job...";
+  jobsStatus.className = "status";
+  try {
+    const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "canceled", sessionId: getSessionId() })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      jobsStatus.textContent = body.error || "Gagal membatalkan job.";
+      jobsStatus.className = "status error";
+      return;
+    }
+    jobsStatus.textContent = "Job dibatalkan.";
+    jobsStatus.className = "status success";
+    setJobDetailOpen(false);
+    await loadJobs();
+  } catch (err) {
+    jobsStatus.textContent = "Gagal terhubung ke server.";
+    jobsStatus.className = "status error";
+  }
+}
+
+function downloadProof(jobId) {
+  const job = latestJobs.find(item => item.id === jobId);
+  if (!job || !isCompletedJob(job)) {
+    jobsStatus.textContent = "Bukti hanya tersedia untuk tugas selesai.";
+    jobsStatus.className = "status";
+    return;
+  }
+  downloadProofForJobs([job], `bukti-${job.id}`);
+}
+
 function bindJobActions() {
   jobsBody.addEventListener("click", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLButtonElement)) {
-    return;
-  }
-
-  const jobId = target.dataset.jobId;
-  const action = target.dataset.action;
-  if (!jobId) {
-    return;
-  }
-
-  if (action === "clone") {
-    if (target.disabled) {
+    if (!(event.target instanceof Element)) {
       return;
     }
-    jobsStatus.textContent = "Membuat ulang job...";
-    jobsStatus.className = "status";
-    try {
-      const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: getSessionId() })
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        jobsStatus.textContent = body.error || "Gagal membuat ulang job.";
-        jobsStatus.className = "status error";
+    const button = event.target.closest("button");
+    if (button) {
+      event.stopPropagation();
+      if (button.disabled) {
         return;
       }
-      jobsStatus.textContent = "Job baru berhasil dibuat.";
-      jobsStatus.className = "status success";
-      await loadJobs();
-    } catch (err) {
-      jobsStatus.textContent = "Gagal terhubung ke server.";
-      jobsStatus.className = "status error";
-    }
-    return;
-  }
-
-  if (action === "download-proof") {
-    const job = latestJobs.find(item => item.id === jobId);
-    if (!job || !isCompletedJob(job)) {
-      jobsStatus.textContent = "Bukti hanya tersedia untuk tugas selesai.";
-      jobsStatus.className = "status";
-      return;
-    }
-    downloadProofForJobs([job], `bukti-${job.id}`);
-    return;
-  }
-
-  if (action === "cancel") {
-    if (target.disabled) {
-      return;
-    }
-    jobsStatus.textContent = "Membatalkan job...";
-    jobsStatus.className = "status";
-    try {
-      const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "canceled", sessionId: getSessionId() })
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        jobsStatus.textContent = body.error || "Gagal membatalkan job.";
-        jobsStatus.className = "status error";
-        return;
+      const jobId = button.dataset.jobId;
+      if (button.dataset.action === "download-proof" && jobId) {
+        downloadProof(jobId);
       }
-      jobsStatus.textContent = "Job dibatalkan.";
-      jobsStatus.className = "status success";
-      await loadJobs();
-    } catch (err) {
-      jobsStatus.textContent = "Gagal terhubung ke server.";
-      jobsStatus.className = "status error";
+      return;
     }
-  }
+
+    const card = event.target.closest(".session-job-card");
+    if (card?.dataset.jobId) {
+      openJobDetail(card.dataset.jobId);
+    }
+  });
+
+  jobsBody.addEventListener("keydown", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    const card = event.target.closest(".session-job-card");
+    if (card?.dataset.jobId) {
+      event.preventDefault();
+      openJobDetail(card.dataset.jobId);
+    }
+  });
+
+  detailCloneBtn?.addEventListener("click", () => {
+    const job = latestJobs.find(item => item.id === selectedDetailJobId);
+    const status = String(job?.status || "").toLowerCase();
+    if (!job || status === "done" || status === "sent" || status === "canceled") {
+      return;
+    }
+    cloneJob(job.id);
+  });
+
+  detailCancelBtn?.addEventListener("click", () => {
+    const job = latestJobs.find(item => item.id === selectedDetailJobId);
+    if (!job || String(job.status || "").toLowerCase() !== "ready") {
+      return;
+    }
+    cancelJob(job.id);
+  });
+
+  closeJobDetailBtn?.addEventListener("click", () => {
+    setJobDetailOpen(false);
+  });
+
+  jobDetailModal?.addEventListener("click", (event) => {
+    if (event.target === jobDetailModal) {
+      setJobDetailOpen(false);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setJobDetailOpen(false);
+    }
   });
 }
 
