@@ -2233,6 +2233,10 @@ th {
     linear-gradient(112deg, #ffffff 0%, #fffaf4 54%, #f7e4d6 100%);
 }
 
+.session-modal-open {
+  overflow: hidden;
+}
+
 .session-shell {
   min-height: 100vh;
   max-width: 1460px;
@@ -2764,6 +2768,248 @@ th {
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.session-main-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.58fr) minmax(620px, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.session-right-stack {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 20px;
+  min-width: 0;
+}
+
+.session-main-grid .session-preview-card {
+  min-height: 0;
+  padding: 22px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.session-main-grid .session-visual-preview {
+  height: min(59vh, 540px);
+  min-height: 430px;
+  padding: 24px;
+  justify-content: center;
+}
+
+.session-main-grid .session-visual-preview .preview-page-container {
+  max-height: 100%;
+}
+
+.session-main-grid .session-preview-info.print-preview {
+  min-height: 78px;
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid rgba(224, 214, 200, 0.9);
+  border-radius: 10px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.session-summary-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  padding: 24px;
+}
+
+.session-summary-head,
+.session-config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.session-summary-head .session-section-title,
+.session-config-head .session-section-title {
+  margin-bottom: 0;
+}
+
+.session-summary-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+}
+
+.session-summary-card .session-summary-grid {
+  grid-template-columns: minmax(130px, 0.8fr) minmax(120px, 0.75fr) minmax(220px, 1.2fr);
+}
+
+.session-summary-card .session-end-btn {
+  min-width: 140px;
+}
+
+.session-config-card {
+  padding: 24px;
+}
+
+.session-open-jobs-btn {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid #cf542d;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #cf542d;
+  background: rgba(255, 255, 255, 0.62);
+  font-size: 0.92rem;
+}
+
+.session-config-card .session-upload-form {
+  margin-top: 20px;
+}
+
+.session-config-card .session-file-picker {
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 22px;
+}
+
+.session-config-card .session-form-grid {
+  gap: 16px 26px;
+}
+
+.session-config-card .session-upload-form input,
+.session-config-card .session-upload-form select,
+.session-config-card .session-upload-form textarea {
+  min-height: 46px;
+}
+
+.session-config-card .session-submit-btn {
+  min-height: 50px;
+  margin-top: 4px;
+}
+
+.session-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(29, 27, 22, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.session-modal-backdrop.hidden {
+  display: none;
+}
+
+.session-modal-backdrop .session-jobs-card {
+  width: min(1280px, 100%);
+  max-height: min(760px, calc(100vh - 56px));
+  padding: 22px 24px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.session-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.session-modal-close-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(207, 84, 45, 0.34);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #cf542d;
+  background: #fff8f2;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.session-modal-backdrop .session-table-wrap {
+  overflow: auto;
+}
+
+.session-modal-backdrop .session-jobs-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff8f2;
+  box-shadow: 0 1px 0 rgba(224, 214, 200, 0.9);
+}
+
+@media (min-width: 1081px) {
+  .session-shell {
+    zoom: 0.82;
+    max-width: 1780px;
+    padding-top: 22px;
+  }
+
+  .session-main-grid {
+    grid-template-columns: minmax(400px, 0.55fr) minmax(620px, 1fr);
+    gap: 18px;
+  }
+
+  .session-right-stack {
+    gap: 18px;
+  }
+
+  .session-main-grid .session-preview-card,
+  .session-summary-card,
+  .session-config-card {
+    padding: 20px;
+  }
+
+  .session-main-grid .session-visual-preview {
+    height: min(62vh, 560px);
+    min-height: 390px;
+    padding: 22px;
+  }
+
+  .session-main-grid .session-preview-info.print-preview {
+    min-height: 70px;
+    margin-top: 16px;
+  }
+
+  .session-summary-card {
+    gap: 14px;
+  }
+
+  .session-summary-body {
+    gap: 18px;
+  }
+
+  .session-config-card .session-upload-form {
+    margin-top: 16px;
+    gap: 12px;
+  }
+
+  .session-config-card .session-form-grid {
+    gap: 13px 22px;
+  }
+
+  .session-config-card .session-upload-form input,
+  .session-config-card .session-upload-form select,
+  .session-config-card .session-upload-form textarea,
+  .session-file-button,
+  .session-file-name {
+    min-height: 42px;
+  }
+
+  .session-config-card .session-submit-btn {
+    min-height: 46px;
+  }
+
+  .session-modal-backdrop .session-jobs-card {
+    width: min(1380px, 100%);
+    max-height: min(820px, calc(100vh - 48px));
+  }
 }
 
 @media (min-width: 1180px) and (max-height: 860px) {

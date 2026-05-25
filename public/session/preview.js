@@ -22,7 +22,7 @@ const uploadCopiesInput = uploadForm.querySelector('input[name="copies"]');
 const uploadColorModeInput = uploadForm.querySelector('select[name="colorMode"]');
 const uploadOrientationInput = uploadForm.querySelector('select[name="orientation"]');
 const uploadPageRangeInput = uploadForm.querySelector('input[name="pageRange"]');
-const uploadContentScaleInput = uploadForm.querySelector('input[name="contentScale"]');
+const uploadContentScaleInput = uploadForm.querySelector('[name="contentScale"]');
 let previewDebounceTimer = null;
 
 const previewState = {
@@ -565,7 +565,7 @@ function renderPreviewState() {
   previewOrientation.textContent = previewState.orientation === "landscape" ? "Landscape" : "Portrait";
   previewPageRange.textContent = previewState.pageRange || "Semua";
   previewContentScale.textContent = previewState.contentScale + "%";
-  previewImpressions.textContent = previewState.hasFile ? String(Math.max(1, previewState.copies || 1)) : "-";
+  previewImpressions.textContent = previewState.hasFile ? `${Math.max(1, lastTotalPages || 1)} halaman` : "-";
 
   printPreviewPanel.classList.toggle("print-preview-empty", !previewState.hasFile);
 
@@ -605,6 +605,7 @@ function renderPreviewState() {
 export function resetPreviewState() {
   previewState.fileName = "";
   previewState.fileSizeBytes = 0;
+  lastTotalPages = 1;
   previewConversionId = null;
   previewState.paperSize = uploadPaperSizeInput?.value || "A4";
   previewState.copies = Math.max(1, Number.parseInt(uploadCopiesInput?.value || "1", 10) || 1);

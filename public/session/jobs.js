@@ -76,7 +76,10 @@ export async function loadJobs() {
     };
 
     jobsBody.innerHTML = jobs.map(job => {
-      const isReady = job.status === "ready";
+      const status = String(job.status || "").toLowerCase();
+      const isReady = status === "ready";
+      const isFinal = status === "done" || status === "sent" || status === "canceled";
+      const cloneDisabled = isFinal ? "disabled" : "";
       const cancelDisabled = isReady ? "" : "disabled";
       
       const configParts = [
@@ -86,7 +89,7 @@ export async function loadJobs() {
         job.printConfig.copies ? String(job.printConfig.copies) : "",
         job.printConfig.pageRange ? `(${job.printConfig.pageRange})` : "",
         job.printConfig.contentScale !== 100 ? `${job.printConfig.contentScale}%` : ""
-      ].filter(Boolean).join(" ");
+      ].filter(Boolean).join(" - ");
       const statusClass = getStatusClass(job.status);
       const claimedBy = job.claimedByClientName || job.claimedByClientId || "-";
       const originalName = job.originalName || "-";
@@ -101,8 +104,9 @@ export async function loadJobs() {
         <td><span class="session-status-pill ${statusClass}">${escapeHtml(formatStatus(job.status))}</span></td>
         <td>${escapeHtml(new Date(job.createdAt).toLocaleString())}</td>
         <td class="session-job-actions">
-          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="clone">Buat Lagi</button>
+          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="clone" ${cloneDisabled}>Buat Lagi</button>
           <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="cancel" ${cancelDisabled}>Batal</button>
+          <button type="button" data-job-id="${escapeHtml(job.id)}" data-action="download-proof">Download Bukti</button>
         </td>
       </tr>`;
     }).join("");
@@ -181,6 +185,9 @@ function bindJobActions() {
   }
 
   if (action === "clone") {
+    if (target.disabled) {
+      return;
+    }
     jobsStatus.textContent = "Membuat ulang job...";
     jobsStatus.className = "status";
     try {
@@ -202,6 +209,12 @@ function bindJobActions() {
       jobsStatus.textContent = "Gagal terhubung ke server.";
       jobsStatus.className = "status error";
     }
+    return;
+  }
+
+  if (action === "download-proof") {
+    jobsStatus.textContent = "Fitur download bukti belum tersedia.";
+    jobsStatus.className = "status";
     return;
   }
 

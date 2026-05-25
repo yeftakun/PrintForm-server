@@ -11,6 +11,9 @@ const chooseDocumentBtn = document.getElementById("chooseDocumentBtn");
 const selectedDocumentName = document.getElementById("selectedDocumentName");
 const uploadForm = document.getElementById("uploadForm");
 const uploadFileInput = document.querySelector('#uploadForm input[name="document"]');
+const openJobsModalBtn = document.getElementById("openJobsModalBtn");
+const closeJobsModalBtn = document.getElementById("closeJobsModalBtn");
+const jobsModal = document.getElementById("jobsModal");
 
 if (changeDocumentBtn && uploadFileInput) {
   changeDocumentBtn.addEventListener("click", () => {
@@ -37,3 +40,39 @@ if (selectedDocumentName && uploadForm) {
     }, 0);
   });
 }
+
+function setJobsModalOpen(isOpen) {
+  if (!jobsModal) {
+    return;
+  }
+
+  jobsModal.classList.toggle("hidden", !isOpen);
+  document.body.classList.toggle("session-modal-open", isOpen);
+}
+
+if (openJobsModalBtn) {
+  openJobsModalBtn.addEventListener("click", () => {
+    setJobsModalOpen(true);
+    loadJobs();
+  });
+}
+
+if (closeJobsModalBtn) {
+  closeJobsModalBtn.addEventListener("click", () => {
+    setJobsModalOpen(false);
+  });
+}
+
+if (jobsModal) {
+  jobsModal.addEventListener("click", (event) => {
+    if (event.target === jobsModal) {
+      setJobsModalOpen(false);
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    setJobsModalOpen(false);
+  }
+});
