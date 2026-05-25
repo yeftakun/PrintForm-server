@@ -11,6 +11,10 @@ const storeStatusBadge = document.getElementById("storeStatusBadge");
 const storeSummaryStatusIcon = document.getElementById("storeSummaryStatusIcon");
 const confirmStoreBtn = document.getElementById("confirmStoreBtn");
 const storePageStatus = document.getElementById("storePageStatus");
+const storeLayout = document.querySelector(".store-layout");
+const storeNotFound = document.getElementById("storeNotFound");
+const notFoundStoreCode = document.getElementById("notFoundStoreCode");
+const retryStoreBtn = document.getElementById("retryStoreBtn");
 const aliasStorageKey = "printformAlias";
 
 let currentStore = null;
@@ -28,6 +32,9 @@ function setPageStatus(text, kind = "") {
 
 function renderStore(store) {
   currentStore = store;
+  storeLayout?.classList.remove("hidden");
+  storeNotFound?.classList.add("hidden");
+  document.body.classList.remove("store-not-found-mode");
   const displayName = store.displayName || "Toko Percetakan";
   const isReady = store.status === "online" && store.canStartSession;
   const statusText = isReady ? "Siap menerima tugas" : "Belum siap menerima tugas";
@@ -54,6 +61,18 @@ function renderStore(store) {
   );
 }
 
+function renderStoreNotFound(kodeToko, message = "") {
+  currentStore = null;
+  storeLayout?.classList.add("hidden");
+  storeNotFound?.classList.remove("hidden");
+  document.body.classList.add("store-not-found-mode");
+  if (notFoundStoreCode) {
+    notFoundStoreCode.textContent = kodeToko || "-";
+  }
+  confirmStoreBtn.disabled = true;
+  setPageStatus(message || "Toko tidak ditemukan.", "error");
+}
+
 async function loadStore({ silent = false } = {}) {
   const kodeToko = getStoreCodeFromPath();
   if (!kodeToko) {
@@ -73,6 +92,10 @@ async function loadStore({ silent = false } = {}) {
     const res = await apiFetch(`/api/clients/stores/${encodeURIComponent(kodeToko)}`);
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 404) {
+        renderStoreNotFound(kodeToko, body.error || "Toko tidak ditemukan.");
+        return;
+      }
       setPageStatus(body.error || "Toko tidak ditemukan.", "error");
       return;
     }
@@ -114,6 +137,10 @@ confirmStoreBtn.addEventListener("click", async () => {
     setPageStatus("Gagal terhubung ke server.", "error");
     confirmStoreBtn.disabled = currentStore.status !== "online" || !currentStore.canStartSession;
   }
+});
+
+retryStoreBtn?.addEventListener("click", () => {
+  loadStore();
 });
 
 loadStore();
