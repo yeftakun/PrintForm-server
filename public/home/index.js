@@ -4,11 +4,15 @@ const saveAliasBtn = document.getElementById("saveAliasBtn");
 const clearAliasBtn = document.getElementById("clearAliasBtn");
 const storeCodeInput = document.getElementById("storeCodeInput");
 const scanQrBtn = document.getElementById("scanQrBtn");
+const mobileScanQrBtn = document.getElementById("mobileScanQrBtn");
 const storeSearchStatus = document.getElementById("storeSearchStatus");
 const qrScannerCard = document.getElementById("qrScannerCard");
 const qrVideo = document.getElementById("qrVideo");
 const closeQrBtn = document.getElementById("closeQrBtn");
 const qrStatus = document.getElementById("qrStatus");
+const toastStack = document.getElementById("toastStack");
+const mobileIntroCarousel = document.querySelector(".home-mobile-intro-card");
+const mobileIntroItems = Array.from(document.querySelectorAll(".home-mobile-intro-main, .home-mobile-benefit"));
 const aliasStorageKey = "printformAlias";
 
 let qrStream = null;
@@ -18,6 +22,10 @@ let qrCanvasContext = null;
 let qrScanning = false;
 let qrLookupPending = false;
 let lastInvalidQrText = "";
+let toastId = 0;
+let mobileIntroIndex = 0;
+let mobileIntroTimer = null;
+let mobileIntroAnimationTimer = null;
 
 function saveAlias(value) {
   const alias = String(value || "").trim();
@@ -51,11 +59,71 @@ function getStoreCodeFromQrText(value) {
 function setSearchStatus(text, kind = "") {
   storeSearchStatus.textContent = text;
   storeSearchStatus.className = kind ? `status ${kind}` : "status";
+  if (text && (kind === "error" || kind === "success")) {
+    showToast(text, kind);
+  }
 }
 
 function setQrStatus(text, kind = "") {
   qrStatus.textContent = text;
   qrStatus.className = kind ? `status ${kind}` : "status";
+}
+
+function showToast(message, kind = "") {
+  if (!toastStack || !message) {
+    return;
+  }
+
+  const toast = document.createElement("div");
+  const currentToastId = String(++toastId);
+  toast.className = kind ? `toast ${kind}` : "toast";
+  toast.dataset.toastId = currentToastId;
+  toast.textContent = message;
+  toastStack.appendChild(toast);
+
+  window.setTimeout(() => {
+    toast.classList.add("is-leaving");
+    window.setTimeout(() => {
+      toast.remove();
+    }, 180);
+  }, 2800);
+}
+
+function showMobileIntroItem(index) {
+  if (!mobileIntroItems.length) {
+    return;
+  }
+
+  mobileIntroIndex = (index + mobileIntroItems.length) % mobileIntroItems.length;
+  mobileIntroItems.forEach((item, itemIndex) => {
+    item.classList.remove("is-sliding-in");
+    item.hidden = itemIndex !== mobileIntroIndex;
+  });
+  const activeItem = mobileIntroItems[mobileIntroIndex];
+  activeItem.classList.add("is-sliding-in");
+  if (mobileIntroAnimationTimer) {
+    window.clearTimeout(mobileIntroAnimationTimer);
+  }
+  mobileIntroAnimationTimer = window.setTimeout(() => {
+    activeItem.classList.remove("is-sliding-in");
+  }, 360);
+}
+
+function scheduleMobileIntroRotation() {
+  if (mobileIntroTimer) {
+    window.clearInterval(mobileIntroTimer);
+  }
+  if (mobileIntroItems.length <= 1) {
+    return;
+  }
+  mobileIntroTimer = window.setInterval(() => {
+    showMobileIntroItem(mobileIntroIndex + 1);
+  }, 4000);
+}
+
+function advanceMobileIntro() {
+  showMobileIntroItem(mobileIntroIndex + 1);
+  scheduleMobileIntroRotation();
 }
 
 function openStorePage(kodeToko) {
@@ -110,10 +178,11 @@ async function handleQrText(rawText) {
 
     if (lastInvalidQrText !== kodeToko) {
       lastInvalidQrText = kodeToko;
-      alert("Toko tidak ditemukan.");
+      showToast("Toko tidak ditemukan.", "error");
     }
     setQrStatus("Toko tidak ditemukan. Arahkan kamera ke QR kode toko lain.", "error");
   } catch {
+    showToast("Gagal mengecek toko. Kamera tetap aktif, coba scan lagi.", "error");
     setQrStatus("Gagal mengecek toko. Kamera tetap aktif, coba scan lagi.", "error");
   } finally {
     qrLookupPending = false;
@@ -205,7 +274,28 @@ scanQrBtn.addEventListener("click", () => {
   startQrScanner();
 });
 
+if (mobileScanQrBtn) {
+  mobileScanQrBtn.addEventListener("click", () => {
+    saveAlias(aliasInput.value);
+    startQrScanner();
+  });
+}
+
 closeQrBtn.addEventListener("click", stopQrScanner);
+
+if (mobileIntroCarousel && mobileIntroItems.length) {
+  mobileIntroCarousel.setAttribute("role", "button");
+  mobileIntroCarousel.setAttribute("tabindex", "0");
+  mobileIntroCarousel.addEventListener("click", advanceMobileIntro);
+  mobileIntroCarousel.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      advanceMobileIntro();
+    }
+  });
+  showMobileIntroItem(0);
+  scheduleMobileIntroRotation();
+}
 
 window.addEventListener("beforeunload", stopQrScanner);
 

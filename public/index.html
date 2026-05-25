@@ -49,6 +49,48 @@
           </div>
         </div>
 
+        <div class="home-mobile-intro-card">
+          <div class="home-mobile-intro-main">
+            <div class="home-mobile-rocket" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 16c-1 1.5-1.5 3-1.5 4.5C5 20.5 6.5 20 8 19"></path><path d="M9 15 5 11l4-2c2.3-4.1 5.8-6.2 10-6-.2 4.2-1.9 7.8-6 10l-2 4-4-4"></path><path d="M15 8h.01"></path></svg>
+            </div>
+            <div>
+              <h2>Mulai sesi cetak dengan <span>lebih mudah</span></h2>
+              <p>Simpan alias Anda, lalu scan kode kios di toko untuk melanjutkan sesi cetak.</p>
+            </div>
+          </div>
+
+          <div class="home-mobile-benefits" aria-label="Keunggulan">
+            <div class="home-mobile-benefit">
+              <div class="home-mobile-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6l0-7Z"></path></svg>
+              </div>
+              <div>
+                <strong>Cepat</strong>
+                <p>Proses dalam hitungan detik</p>
+              </div>
+            </div>
+            <div class="home-mobile-benefit">
+              <div class="home-mobile-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+              </div>
+              <div>
+                <strong>Mudah</strong>
+                <p>Langkah simpel, tanpa ribet</p>
+              </div>
+            </div>
+            <div class="home-mobile-benefit">
+              <div class="home-mobile-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.3 7 10 4.2-1.7 7-5.5 7-10V6l-7-3Z"></path><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+              </div>
+              <div>
+                <strong>Aman</strong>
+                <p>Data diproses dengan aman</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="home-hint">
           <div class="home-hint-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4z"></path><path d="M14 4h6v6h-6z"></path><path d="M4 14h6v6H4z"></path><path d="M14 14h2v2h-2z"></path><path d="M18 14h2v6h-2z"></path><path d="M14 18h2v2h-2z"></path></svg>
@@ -90,6 +132,17 @@
           <div class="home-form-section">
             <label class="home-field">
               <span>Kode Kios</span>
+              <button id="mobileScanQrBtn" class="home-mobile-scan-card" type="button">
+                <span class="home-mobile-scan-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M10 12h4"></path></svg>
+                </span>
+                <span>
+                  <strong>Gunakan Scanner</strong>
+                  <small>Arahkan kamera ke kode kios di toko</small>
+                </span>
+                <span class="home-mobile-scan-arrow" aria-hidden="true">›</span>
+              </button>
+              <div class="home-mobile-divider"><span>atau</span></div>
               <div class="home-input-wrap home-code-wrap">
                 <span class="home-search-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16.5 16.5 4 4"></path></svg>
@@ -108,10 +161,17 @@
           </div>
 
           <div id="storeSearchStatus" class="status home-form-status"></div>
-          <div class="home-info-note">ⓘ Pastikan kode kios sesuai dengan yang tertera di toko.</div>
+          <!-- <div class="home-info-note">
+            <span class="home-info-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.3 7 10 4.2-1.7 7-5.5 7-10V6l-7-3Z"></path><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+            </span>
+            <span>Data diproses sementara untuk keperluan pencetakan. Kami tidak menyimpan dokumen Anda setelah sesi selesai.</span>
+          </div> -->
         </form>
       </section>
     </main>
+
+    <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
     <div class="qr-modal-backdrop hidden" id="qrScannerCard" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
       <div class="qr-modal">
