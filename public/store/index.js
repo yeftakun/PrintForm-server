@@ -1,11 +1,14 @@
 import { apiFetch } from "/shared/api.js";
 
 const storeName = document.getElementById("storeName");
+const storeNameSummary = document.getElementById("storeNameSummary");
 const storeCodeText = document.getElementById("storeCodeText");
 const storeCodeValue = document.getElementById("storeCodeValue");
 const storeAddress = document.getElementById("storeAddress");
 const storeHours = document.getElementById("storeHours");
 const storeStatus = document.getElementById("storeStatus");
+const storeStatusBadge = document.getElementById("storeStatusBadge");
+const storeSummaryStatusIcon = document.getElementById("storeSummaryStatusIcon");
 const confirmStoreBtn = document.getElementById("confirmStoreBtn");
 const storePageStatus = document.getElementById("storePageStatus");
 const aliasStorageKey = "printformAlias";
@@ -18,22 +21,36 @@ function getStoreCodeFromPath() {
 
 function setPageStatus(text, kind = "") {
   storePageStatus.textContent = text;
-  storePageStatus.className = kind ? `status ${kind}` : "status";
+  storePageStatus.className = kind
+    ? `status store-page-status ${kind}`
+    : "status store-page-status";
 }
 
 function renderStore(store) {
   currentStore = store;
-  storeName.textContent = store.displayName || "Toko Percetakan";
-  storeCodeText.textContent = `Kode toko: ${store.kodeToko || "-"}`;
+  const displayName = store.displayName || "Toko Percetakan";
+  const isReady = store.status === "online" && store.canStartSession;
+  const statusText = isReady ? "Siap menerima tugas" : "Belum siap menerima tugas";
+
+  storeName.textContent = displayName;
+  storeNameSummary.textContent = displayName;
+  storeCodeText.textContent = store.kodeToko || "-";
   storeCodeValue.textContent = store.kodeToko || "-";
   storeAddress.textContent = store.alamat || "Alamat belum diatur";
   storeHours.textContent = store.jamOperasional || "Setiap hari 08.00 - 21.00";
-  storeStatus.textContent = store.status === "online" ? "Online" : "Offline";
-  confirmStoreBtn.disabled = store.status !== "online" || !store.canStartSession;
+  storeStatus.textContent = statusText;
+  storeStatusBadge.textContent = isReady ? "Tersedia / Siap menerima tugas" : "Offline / Belum siap";
+  storeStatusBadge.className = isReady
+    ? "store-status-badge online"
+    : "store-status-badge offline";
+  storeSummaryStatusIcon.className = isReady
+    ? "store-summary-status-icon online"
+    : "store-summary-status-icon offline";
+  confirmStoreBtn.disabled = !isReady;
   setPageStatus(
     confirmStoreBtn.disabled
-      ? "Toko sedang offline. Halaman tetap dapat dilihat, tetapi session belum bisa dibuat."
-      : "Toko online. Tekan konfirmasi untuk mulai session."
+      ? "Toko sedang offline. Halaman tetap dapat dilihat, tetapi sesi belum bisa dibuat."
+      : ""
   );
 }
 
@@ -45,7 +62,7 @@ async function loadStore({ silent = false } = {}) {
     return;
   }
 
-  storeCodeText.textContent = `Kode toko: ${kodeToko}`;
+  storeCodeText.textContent = kodeToko;
   storeCodeValue.textContent = kodeToko;
   if (!silent) {
     setPageStatus("Memuat data toko...");

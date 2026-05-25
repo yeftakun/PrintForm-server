@@ -6,38 +6,175 @@
     <title>PrintForm Store</title>
     <link rel="stylesheet" href="/style.css">
   </head>
-  <body>
-    <main class="page">
-      <header class="header">
-        <h1 id="storeName">Toko Percetakan</h1>
-        <p id="storeCodeText">Kode toko: -</p>
+  <body class="store-body">
+    <main class="store-shell">
+      <header class="store-brand">
+        <div class="store-brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v7H6z"></path><path d="M8 17h8"></path></svg>
+        </div>
+        <div>
+          <h1>PrintForm</h1>
+          <p>Upload dokumen dan atur konfigurasi cetak!</p>
+        </div>
       </header>
 
-      <section class="card">
-        <h2>Informasi Toko</h2>
-        <div class="print-preview-grid">
-          <div class="print-preview-item">
-            <span class="print-preview-label">Kode Toko</span>
-            <span id="storeCodeValue" class="print-preview-value">-</span>
-          </div>
-          <div class="print-preview-item">
-            <span class="print-preview-label">Alamat</span>
-            <span id="storeAddress" class="print-preview-value">-</span>
-          </div>
-          <div class="print-preview-item">
-            <span class="print-preview-label">Jam Operasional</span>
-            <span id="storeHours" class="print-preview-value">-</span>
-          </div>
-          <div class="print-preview-item">
-            <span class="print-preview-label">Status Toko</span>
-            <span id="storeStatus" class="print-preview-value">-</span>
-          </div>
+      <section class="store-layout">
+        <div class="store-main">
+          <section class="store-hero">
+            <h2>Konfirmasi Toko Tujuan</h2>
+            <p>Kami menemukan toko dari kode kios atau QR yang Anda gunakan. Pastikan informasi toko di bawah sudah benar sebelum melanjutkan.</p>
+          </section>
+
+          <section class="store-card store-info-card">
+            <h3>Informasi Toko</h3>
+            <div class="store-title-row">
+              <div class="store-icon-box" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7"></path><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"></path><path d="M9 20v-6h6v6"></path></svg>
+              </div>
+              <h2 id="storeName">Toko Percetakan</h2>
+              <span id="storeStatusBadge" class="store-status-badge">Memuat</span>
+            </div>
+
+            <div class="store-info-grid">
+              <div class="store-detail-list">
+                <div class="store-detail-item">
+                  <span class="store-detail-icon" aria-hidden="true">AB</span>
+                  <div>
+                    <span>Kode Toko</span>
+                    <strong id="storeCodeValue">-</strong>
+                  </div>
+                </div>
+                <div class="store-detail-item">
+                  <span class="store-detail-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 21s7-4.4 7-11a7 7 0 0 0-14 0c0 6.6 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.3"></circle></svg>
+                  </span>
+                  <div>
+                    <span>Alamat</span>
+                    <strong id="storeAddress">-</strong>
+                  </div>
+                </div>
+                <div class="store-detail-item">
+                  <span class="store-detail-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                  </span>
+                  <div>
+                    <span>Jam Operasional</span>
+                    <strong id="storeHours">-</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="store-service-panel">
+                <div class="store-service-head">
+                  <span class="store-detail-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v7H6z"></path></svg>
+                  </span>
+                  <strong>Layanan Tersedia</strong>
+                </div>
+                <div class="store-chip-list" aria-label="Layanan tersedia">
+                  <span>Cetak PDF</span>
+                  <span>Hitam Putih</span>
+                  <span>Berwarna</span>
+                  <span>A4</span>
+                  <span>F4</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="store-note">
+              <span aria-hidden="true">i</span>
+              <p>Toko ini menerima dokumen melalui sistem PrintForm. Pastikan nama toko dan kode toko sudah sesuai.</p>
+            </div>
+          </section>
+
+          <section class="store-card store-flow-card">
+            <h3><span aria-hidden="true">✦</span> Cara Kerja Singkat</h3>
+            <div class="store-steps">
+              <div class="store-step">
+                <div class="store-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7"></path><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"></path><path d="M9 20v-6h6v6"></path></svg>
+                </div>
+                <span>1</span>
+                <div>
+                  <strong>Konfirmasi toko</strong>
+                  <p>Pastikan informasi toko sudah benar.</p>
+                </div>
+              </div>
+              <div class="store-step">
+                <div class="store-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v7H6z"></path></svg>
+                </div>
+                <span>2</span>
+                <div>
+                  <strong>Buat sesi cetak</strong>
+                  <p>Sistem akan menyiapkan sesi cetak untuk Anda.</p>
+                </div>
+              </div>
+              <div class="store-step">
+                <div class="store-step-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M20 16.5A4.5 4.5 0 0 1 15.5 21h-7A4.5 4.5 0 0 1 4 16.5"></path></svg>
+                </div>
+                <span>3</span>
+                <div>
+                  <strong>Upload dokumen dan atur konfigurasi</strong>
+                  <p>Unggah dokumen dan atur opsi cetak sesuai kebutuhan.</p>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-        <div class="row" style="margin-top: 16px;">
-          <a href="/" class="status">Cari toko lain</a>
-          <button id="confirmStoreBtn" type="button">Konfirmasi Toko</button>
-        </div>
-        <div id="storePageStatus" class="status"></div>
+
+        <aside class="store-card store-confirm-card">
+          <div class="store-confirm-head">
+            <div class="store-icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l3 2"></path><path d="m17 3 2 2"></path></svg>
+            </div>
+            <h2>Lanjut ke Toko Ini</h2>
+          </div>
+          <p>Setelah konfirmasi, Anda akan diarahkan ke halaman sesi cetak untuk mengunggah dokumen.</p>
+
+          <div class="store-summary-card">
+            <div class="store-summary-item">
+              <span class="store-detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7"></path><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"></path><path d="M9 20v-6h6v6"></path></svg>
+              </span>
+              <div>
+                <span>Nama Toko</span>
+                <strong id="storeNameSummary">-</strong>
+              </div>
+            </div>
+            <div class="store-summary-item">
+              <span class="store-detail-icon" aria-hidden="true">AB</span>
+              <div>
+                <span>Kode Toko</span>
+                <strong id="storeCodeText">-</strong>
+              </div>
+            </div>
+            <div class="store-summary-item">
+              <span id="storeSummaryStatusIcon" class="store-summary-status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-8"></path><circle cx="12" cy="12" r="9"></circle></svg>
+              </span>
+              <div>
+                <span>Status Toko</span>
+                <strong id="storeStatus">-</strong>
+              </div>
+            </div>
+          </div>
+
+          <button id="confirmStoreBtn" class="store-primary-btn" type="button">
+            <span>Konfirmasi Toko</span>
+            <span aria-hidden="true">→</span>
+          </button>
+          <a href="/" class="store-secondary-btn">Kembali</a>
+          <div id="storePageStatus" class="status store-page-status"></div>
+
+          <div class="store-safe-note">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.3 7 10 4.2-1.7 7-5.5 7-10V6l-7-3Z"></path><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+            </span>
+            <p>Data diproses sementara dan hanya digunakan untuk keperluan pencetakan.</p>
+          </div>
+        </aside>
       </section>
     </main>
 
