@@ -88,7 +88,7 @@ function wrapCanvasText(ctx, text, maxWidth) {
 }
 
 function drawReceiptText(ctx, text, x, y, options = {}) {
-  ctx.font = `${options.weight || "400"} ${options.size || 24}px "Courier New", monospace`;
+  ctx.font = `${options.weight || "400"} ${options.size || 24}px Arial, "Helvetica Neue", sans-serif`;
   ctx.fillStyle = options.color || "#111111";
   ctx.textAlign = options.align || "left";
   ctx.textBaseline = "top";
