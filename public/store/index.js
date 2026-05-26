@@ -14,7 +14,6 @@ const storePageStatus = document.getElementById("storePageStatus");
 const storeLayout = document.querySelector(".store-layout");
 const storeNotFound = document.getElementById("storeNotFound");
 const notFoundStoreCode = document.getElementById("notFoundStoreCode");
-const retryStoreBtn = document.getElementById("retryStoreBtn");
 const aliasStorageKey = "printformAlias";
 
 let currentStore = null;
@@ -80,8 +79,7 @@ function renderStoreNotFound(kodeToko, message = "") {
 async function loadStore({ silent = false } = {}) {
   const kodeToko = getStoreCodeFromPath();
   if (!kodeToko) {
-    setPageStatus("Kode toko tidak valid.", "error");
-    confirmStoreBtn.disabled = true;
+    renderStoreNotFound("", "Kode toko tidak valid.");
     return;
   }
 
@@ -100,12 +98,12 @@ async function loadStore({ silent = false } = {}) {
         renderStoreNotFound(kodeToko, body.error || "Toko tidak ditemukan.");
         return;
       }
-      setPageStatus(body.error || "Toko tidak ditemukan.", "error");
+      renderStoreNotFound(kodeToko, body.error || "Toko tidak ditemukan.");
       return;
     }
     renderStore(body);
   } catch {
-    setPageStatus("Gagal terhubung ke server.", "error");
+    renderStoreNotFound(kodeToko, "Gagal terhubung ke server.");
   }
 }
 
@@ -141,10 +139,6 @@ confirmStoreBtn.addEventListener("click", async () => {
     setPageStatus("Gagal terhubung ke server.", "error");
     confirmStoreBtn.disabled = currentStore.status !== "online" || !currentStore.canStartSession;
   }
-});
-
-retryStoreBtn?.addEventListener("click", () => {
-  loadStore();
 });
 
 loadStore();

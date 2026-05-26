@@ -19,16 +19,22 @@
       </header>
 
       <section id="storeNotFound" class="store-card store-not-found hidden">
-        <div class="store-not-found-icon" aria-hidden="true">?</div>
+        <div class="store-not-found-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="6"></circle>
+            <path d="m16 16 4 4"></path>
+            <path d="M11 8v3"></path>
+            <path d="M11 14h.01"></path>
+          </svg>
+        </div>
         <h2>Toko tidak ditemukan</h2>
         <p>Kode toko <strong id="notFoundStoreCode">-</strong> tidak terdaftar atau belum aktif di PrintForm.</p>
         <div class="store-not-found-actions">
           <a href="/" class="store-primary-btn">Cari Kode Toko</a>
-          <button id="retryStoreBtn" class="store-secondary-btn" type="button">Coba Lagi</button>
         </div>
       </section>
 
-      <section class="store-layout">
+      <section class="store-layout hidden">
         <div class="store-main">
           <section class="store-hero">
             <h2>Konfirmasi Toko Tujuan</h2>
