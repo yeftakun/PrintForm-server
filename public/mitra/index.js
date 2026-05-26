@@ -1,5 +1,4 @@
 (() => {
-  const guestActions = document.getElementById("guestActions");
   const userActions = document.getElementById("userActions");
   const userChip = document.getElementById("userChip");
   const heroText = document.getElementById("heroText");
@@ -8,19 +7,20 @@
   const linkedClientsStatus = document.getElementById("linkedClientsStatus");
   const linkedClientsBody = document.getElementById("linkedClientsBody");
   const refreshLinkedClientsBtn = document.getElementById("refreshLinkedClientsBtn");
+  const authShell = document.querySelector(".auth-shell");
+  const loginPanel = document.querySelector(".login-panel");
 
-  const loginModalBackdrop = document.getElementById("loginModalBackdrop");
   const registerModalBackdrop = document.getElementById("registerModalBackdrop");
 
-  const openLoginBtn = document.getElementById("openLoginBtn");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openAccountBtn = document.getElementById("openAccountBtn");
   const logoutBtn = document.getElementById("logoutBtn");
-  const toRegisterBtn = document.getElementById("toRegisterBtn");
   const toLoginBtn = document.getElementById("toLoginBtn");
 
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
+  const loginPassword = document.getElementById("loginPassword");
+  const togglePasswordBtn = document.getElementById("togglePasswordBtn");
 
   const loginStatus = document.getElementById("loginStatus");
   const registerStatus = document.getElementById("registerStatus");
@@ -204,17 +204,19 @@
   }
 
   function renderAuthedState(user) {
-    guestActions.classList.add("hidden");
     userActions.classList.remove("hidden");
     linkedClientsSection.classList.remove("hidden");
+    authShell?.classList.add("is-authed");
+    loginPanel?.setAttribute("aria-hidden", "true");
     userChip.textContent = user?.username ? `@${user.username}` : "Akun Mitra";
     heroText.textContent = "Akun sudah aktif. Gunakan tombol Akun untuk mengubah data profil atau password.";
   }
 
   function renderGuestState() {
-    guestActions.classList.remove("hidden");
     userActions.classList.add("hidden");
     linkedClientsSection.classList.add("hidden");
+    authShell?.classList.remove("is-authed");
+    loginPanel?.removeAttribute("aria-hidden");
     setLinkedClientsEmpty("Silakan login untuk melihat daftar client.");
     setStatus(linkedClientsStatus, "");
     heroText.textContent = "Silakan login atau daftar untuk membuka pengaturan akun.";
@@ -262,7 +264,6 @@
 
       setStatus(loginStatus, "Login berhasil.", "success");
       setStatus(heroStatus, "Selamat datang kembali.", "success");
-      closeModal(loginModalBackdrop);
       loginForm.reset();
       await renderAuthState();
     } catch (err) {
@@ -311,18 +312,7 @@
   }
 
   function bindModalHandlers() {
-    openLoginBtn.addEventListener("click", () => {
-      setStatus(loginStatus, "");
-      openModal(loginModalBackdrop);
-    });
-
     openRegisterBtn.addEventListener("click", () => {
-      setStatus(registerStatus, "");
-      openModal(registerModalBackdrop);
-    });
-
-    toRegisterBtn.addEventListener("click", () => {
-      closeModal(loginModalBackdrop);
       setStatus(registerStatus, "");
       openModal(registerModalBackdrop);
     });
@@ -330,7 +320,8 @@
     toLoginBtn.addEventListener("click", () => {
       closeModal(registerModalBackdrop);
       setStatus(loginStatus, "");
-      openModal(loginModalBackdrop);
+      loginForm.scrollIntoView({ behavior: "smooth", block: "center" });
+      loginForm.elements.identifier?.focus();
     });
 
     document.querySelectorAll("[data-close]").forEach(button => {
@@ -343,7 +334,7 @@
       });
     });
 
-    [loginModalBackdrop, registerModalBackdrop].forEach(modal => {
+    [registerModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -355,6 +346,13 @@
   function bindActionHandlers() {
     loginForm.addEventListener("submit", submitLogin);
     registerForm.addEventListener("submit", submitRegister);
+
+    togglePasswordBtn?.addEventListener("click", () => {
+      const shouldShow = loginPassword.type === "password";
+      loginPassword.type = shouldShow ? "text" : "password";
+      togglePasswordBtn.classList.toggle("is-visible", shouldShow);
+      togglePasswordBtn.setAttribute("aria-label", shouldShow ? "Sembunyikan password" : "Tampilkan password");
+    });
 
     refreshLinkedClientsBtn.addEventListener("click", loadLinkedClients);
 
