@@ -21,7 +21,8 @@ let realtimeManualClose = false;
 let callbacks = {
   loadJobs: async () => {},
   scheduleLoadJobs: () => {},
-  resetPreviewState: () => {}
+  resetPreviewState: () => {},
+  downloadAllProofs: () => false
 };
 
 export function getSessionId() {
@@ -321,6 +322,28 @@ export function initSession(nextCallbacks = {}) {
 
   if (endSessionBtn) {
     endSessionBtn.addEventListener("click", async () => {
+      const choice = window.PrintFormAlert
+        ? await window.PrintFormAlert.confirm({
+            variant: "warning",
+            title: "Akhiri sesi cetak?",
+            message: "Setelah sesi diakhiri, Anda akan kembali ke halaman utama. Unduh semua bukti cetak lebih dulu jika diperlukan.",
+            actions: [
+              { text: "Download Semua Bukti", className: "secondary", value: "download" },
+              { text: "Batal", className: "secondary", value: false },
+              { text: "Akhiri Sesi", className: "primary", value: true, autofocus: true }
+            ]
+          })
+        : window.confirm("Akhiri sesi cetak sekarang?");
+
+      if (choice === "download") {
+        callbacks.downloadAllProofs();
+        return;
+      }
+
+      if (choice !== true) {
+        return;
+      }
+
       await closeSessionRemote();
       clearSessionState();
       window.location.replace("/");

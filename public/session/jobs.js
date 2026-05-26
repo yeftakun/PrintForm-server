@@ -18,6 +18,10 @@ let loadJobsTimer = null;
 let latestJobs = [];
 let selectedDetailJobId = "";
 
+function notify(variant, title, message) {
+  window.PrintFormAlert?.notify({ variant, title, message });
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -279,7 +283,8 @@ function downloadProofForJobs(jobs, filenamePrefix = "bukti-cetak") {
   if (completedJobs.length === 0) {
     jobsStatus.textContent = "Belum ada tugas selesai untuk diunduh buktinya.";
     jobsStatus.className = "status";
-    return;
+    notify("warning", "Bukti Belum Tersedia", "Belum ada tugas selesai untuk diunduh buktinya.");
+    return false;
   }
 
   const canvas = buildReceiptCanvas(completedJobs, {
@@ -289,6 +294,12 @@ function downloadProofForJobs(jobs, filenamePrefix = "bukti-cetak") {
   downloadCanvas(canvas, `${slugify(filenamePrefix)}-${timestamp}.png`);
   jobsStatus.textContent = "Bukti cetak berhasil dibuat.";
   jobsStatus.className = "status success";
+  notify("success", "Bukti Cetak Diunduh", "Bukti cetak berhasil dibuat dan diunduh.");
+  return true;
+}
+
+export function downloadAllCompletedProofs() {
+  return downloadProofForJobs(latestJobs, "bukti-semua-tugas-selesai");
 }
 
 export function scheduleLoadJobs(delayMs = 200) {
@@ -365,17 +376,20 @@ function bindUploadForm() {
     event.preventDefault();
     uploadStatus.textContent = "Mengirim...";
     uploadStatus.className = "status";
+    notify("info", "Mengirim Tugas", "Tugas cetak sedang dikirim ke toko.");
 
     const preview = getPreviewSubmission();
     if (preview.pending) {
       uploadStatus.textContent = "Konversi masih berjalan. Mohon tunggu.";
       uploadStatus.className = "status error";
+      notify("warning", "Konversi Masih Berjalan", "Mohon tunggu sampai preview selesai diproses.");
       return;
     }
 
     if (preview.error) {
       uploadStatus.textContent = preview.error;
       uploadStatus.className = "status error";
+      notify("error", "Tugas Gagal Dikirim", preview.error);
       return;
     }
 
@@ -401,16 +415,19 @@ function bindUploadForm() {
       if (!res.ok) {
         uploadStatus.textContent = body.error || "Gagal mengirim job.";
         uploadStatus.className = "status error";
+        notify("error", "Tugas Gagal Dikirim", body.error || "Gagal mengirim tugas cetak.");
         return;
       }
       uploadStatus.textContent = "Job berhasil dikirim.";
       uploadStatus.className = "status success";
+      notify("success", "Tugas Dikirim", "Tugas cetak berhasil dikirim.");
       uploadForm.reset();
       resetPreviewState();
       await loadJobs();
     } catch (err) {
       uploadStatus.textContent = "Gagal terhubung ke server.";
       uploadStatus.className = "status error";
+      notify("error", "Tugas Gagal Dikirim", "Gagal terhubung ke server.");
     }
   });
 }
@@ -418,6 +435,7 @@ function bindUploadForm() {
 async function cloneJob(jobId) {
   jobsStatus.textContent = "Membuat ulang job...";
   jobsStatus.className = "status";
+  notify("info", "Membuat Tugas Baru", "Tugas baru sedang dibuat dari tugas sebelumnya.");
   try {
     const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}/clone`, {
       method: "POST",
@@ -428,21 +446,25 @@ async function cloneJob(jobId) {
     if (!res.ok) {
       jobsStatus.textContent = body.error || "Gagal membuat ulang job.";
       jobsStatus.className = "status error";
+      notify("error", "Gagal Membuat Tugas", body.error || "Gagal membuat tugas baru.");
       return;
     }
     jobsStatus.textContent = "Job baru berhasil dibuat.";
     jobsStatus.className = "status success";
+    notify("success", "Tugas Baru Dibuat", "Tugas baru berhasil dibuat.");
     setJobDetailOpen(false);
     await loadJobs();
   } catch (err) {
     jobsStatus.textContent = "Gagal terhubung ke server.";
     jobsStatus.className = "status error";
+    notify("error", "Gagal Membuat Tugas", "Gagal terhubung ke server.");
   }
 }
 
 async function cancelJob(jobId) {
   jobsStatus.textContent = "Membatalkan job...";
   jobsStatus.className = "status";
+  notify("info", "Membatalkan Tugas", "Permintaan pembatalan tugas sedang dikirim.");
   try {
     const res = await apiFetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
       method: "PATCH",
@@ -453,15 +475,18 @@ async function cancelJob(jobId) {
     if (!res.ok) {
       jobsStatus.textContent = body.error || "Gagal membatalkan job.";
       jobsStatus.className = "status error";
+      notify("error", "Gagal Membatalkan Tugas", body.error || "Gagal membatalkan tugas.");
       return;
     }
     jobsStatus.textContent = "Job dibatalkan.";
     jobsStatus.className = "status success";
+    notify("success", "Tugas Dibatalkan", "Tugas cetak berhasil dibatalkan.");
     setJobDetailOpen(false);
     await loadJobs();
   } catch (err) {
     jobsStatus.textContent = "Gagal terhubung ke server.";
     jobsStatus.className = "status error";
+    notify("error", "Gagal Membatalkan Tugas", "Gagal terhubung ke server.");
   }
 }
 
@@ -470,6 +495,7 @@ function downloadProof(jobId) {
   if (!job || !isCompletedJob(job)) {
     jobsStatus.textContent = "Bukti hanya tersedia untuk tugas selesai.";
     jobsStatus.className = "status";
+    notify("warning", "Bukti Belum Tersedia", "Bukti hanya tersedia untuk tugas selesai.");
     return;
   }
   downloadProofForJobs([job], `bukti-${job.id}`);
@@ -551,7 +577,7 @@ export function initJobs() {
   bindUploadForm();
   refreshBtn.addEventListener("click", loadJobs);
   downloadAllProofBtn?.addEventListener("click", () => {
-    downloadProofForJobs(latestJobs, "bukti-semua-tugas-selesai");
+    downloadAllCompletedProofs();
   });
   bindJobActions();
 }

@@ -162,7 +162,19 @@
       }
 
       let focusButton = null;
-      if (mode === "ok") {
+      const customActions = Array.isArray(options.actions) ? options.actions : [];
+      if (customActions.length > 0) {
+        customActions.forEach(action => {
+          const button = addButton(
+            action.text || action.label || "OK",
+            action.className || action.variant || "secondary",
+            Object.prototype.hasOwnProperty.call(action, "value") ? action.value : true
+          );
+          if (action.autofocus || !focusButton) {
+            focusButton = button;
+          }
+        });
+      } else if (mode === "ok") {
         focusButton = addButton(okText, "primary", true);
       } else if (mode === "close") {
         focusButton = addButton(closeText, "primary", null);

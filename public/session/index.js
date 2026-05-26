@@ -1,10 +1,10 @@
 import { initPreview, resetPreviewState } from "./preview.js";
-import { initJobs, loadJobs, scheduleLoadJobs } from "./jobs.js";
+import { initJobs, loadJobs, scheduleLoadJobs, downloadAllCompletedProofs } from "./jobs.js";
 import { initSession } from "./session.js";
 
 initPreview();
 initJobs();
-initSession({ loadJobs, scheduleLoadJobs, resetPreviewState });
+initSession({ loadJobs, scheduleLoadJobs, resetPreviewState, downloadAllProofs: downloadAllCompletedProofs });
 
 const changeDocumentBtn = document.getElementById("changeDocumentBtn");
 const chooseDocumentBtn = document.getElementById("chooseDocumentBtn");

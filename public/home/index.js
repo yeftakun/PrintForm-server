@@ -77,6 +77,15 @@ function setQrStatus(text, kind = "") {
 }
 
 function showToast(message, kind = "") {
+  if (window.PrintFormAlert) {
+    window.PrintFormAlert.notify({
+      variant: kind || "info",
+      title: kind === "error" ? "Terjadi Kesalahan" : "PrintForm",
+      message
+    });
+    return;
+  }
+
   if (!toastStack || !message) {
     return;
   }
@@ -270,6 +279,12 @@ storeSearchForm.addEventListener("submit", event => {
 
 saveAliasBtn.addEventListener("click", () => {
   saveAlias(aliasInput.value);
+  const alias = normalizeStoreCode(aliasInput.value);
+  window.PrintFormAlert?.notify({
+    variant: "success",
+    title: alias ? "Alias Disimpan" : "Alias Dikosongkan",
+    message: alias ? `Alias "${alias}" tersimpan di browser ini.` : "Alias pengirim berhasil dikosongkan."
+  });
 });
 
 clearAliasBtn.addEventListener("click", () => {
