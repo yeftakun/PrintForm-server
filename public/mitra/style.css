@@ -45,20 +45,20 @@ input {
 }
 
 .page {
-  width: min(100%, 1720px);
+  width: min(100%, 1220px);
   margin: 0 auto;
-  padding: 42px 68px 56px;
+  padding: clamp(22px, 4.6vw, 54px) clamp(22px, 4vw, 56px);
 }
 
 .auth-shell {
-  min-height: min(86vh, 880px);
+  min-height: min(82vh, 680px);
   border: 1px solid rgba(210, 202, 194, 0.82);
-  border-radius: 34px;
+  border-radius: 22px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 252, 248, 0.86)),
     var(--surface);
   box-shadow: var(--shadow);
-  padding: 44px 66px 64px;
+  padding: clamp(26px, 3vw, 38px) clamp(28px, 4vw, 48px) clamp(34px, 4vw, 48px);
 }
 
 .shell-header {
@@ -74,7 +74,7 @@ input {
   display: inline-flex;
   align-items: center;
   color: var(--ink);
-  font-size: 2rem;
+  font-size: clamp(1.45rem, 2.1vw, 1.9rem);
   font-weight: 800;
   letter-spacing: 0;
   text-decoration: none;
@@ -92,10 +92,11 @@ input {
 
 .auth-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.86fr);
-  gap: 82px;
+  grid-template-columns: minmax(390px, 520px) minmax(360px, 460px);
+  gap: clamp(40px, 4.2vw, 58px);
   align-items: center;
-  min-height: 650px;
+  justify-content: center;
+  min-height: 520px;
 }
 
 .auth-shell.is-authed .auth-grid {
@@ -142,14 +143,14 @@ input {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 14px;
-  min-height: 54px;
-  padding: 0 22px;
+  gap: 11px;
+  min-height: 42px;
+  padding: 0 16px;
   border-radius: 999px;
   color: var(--accent);
   background: rgba(252, 237, 228, 0.8);
   font-weight: 700;
-  font-size: 1.03rem;
+  font-size: 0.88rem;
 }
 
 .partner-badge svg,
@@ -159,8 +160,8 @@ input {
 .terms-note svg,
 .icon-btn svg {
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
@@ -169,59 +170,59 @@ input {
 }
 
 .hero h1 {
-  margin: 44px 0 0;
-  max-width: 710px;
-  font-size: clamp(3.1rem, 4.4vw, 5rem);
+  margin: 32px 0 0;
+  max-width: 540px;
+  font-size: clamp(2.25rem, 3.3vw, 3.45rem);
   font-weight: 800;
   line-height: 1.17;
   letter-spacing: 0;
 }
 
 .hero p {
-  margin: 28px 0 0;
-  max-width: 690px;
+  margin: 20px 0 0;
+  max-width: 520px;
   color: var(--body);
-  font-size: clamp(1.18rem, 1.45vw, 1.48rem);
-  line-height: 1.55;
+  font-size: clamp(0.94rem, 1.25vw, 1.08rem);
+  line-height: 1.48;
 }
 
 .feature-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px 0;
-  margin-top: 46px;
+  gap: 14px 0;
+  margin-top: 30px;
   color: #101928;
-  font-size: 1.06rem;
+  font-size: 0.9rem;
   font-weight: 500;
 }
 
 .feature-row span {
   display: inline-flex;
   align-items: center;
-  gap: 13px;
-  min-height: 36px;
+  gap: 9px;
+  min-height: 28px;
 }
 
 .feature-row span + span {
-  margin-left: 34px;
-  padding-left: 34px;
+  margin-left: 22px;
+  padding-left: 22px;
   border-left: 1px solid var(--line);
 }
 
 .feature-row i {
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border: 2px solid var(--accent);
   border-radius: 50%;
 }
 
 .feature-row i::before {
   content: "";
-  width: 8px;
-  height: 5px;
+  width: 7px;
+  height: 4px;
   border-left: 2px solid var(--accent);
   border-bottom: 2px solid var(--accent);
   transform: translateY(-1px) rotate(-45deg);
@@ -230,17 +231,17 @@ input {
 .trust-card {
   display: flex;
   align-items: center;
-  gap: 26px;
-  width: min(690px, 100%);
-  margin-top: 48px;
-  padding: 28px 34px;
+  gap: 18px;
+  width: min(520px, 100%);
+  margin-top: 32px;
+  padding: 20px 24px;
   border-radius: 12px;
   background: linear-gradient(105deg, rgba(255, 248, 244, 0.96), rgba(255, 236, 225, 0.72));
 }
 
 .trust-card svg {
-  width: 62px;
-  height: 62px;
+  width: 46px;
+  height: 46px;
   color: var(--accent);
   stroke-width: 1.7;
 }
@@ -251,13 +252,13 @@ input {
 }
 
 .trust-card strong {
-  font-size: 1.1rem;
+  font-size: 0.96rem;
   font-weight: 800;
 }
 
 .trust-card span {
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.88rem;
 }
 
 .hero-auth-copy {
@@ -267,53 +268,53 @@ input {
 .login-panel {
   position: relative;
   min-width: 0;
-  padding-left: 82px;
+  padding-left: clamp(38px, 4vw, 58px);
 }
 
 .login-panel::before {
   content: "";
   position: absolute;
   left: 0;
-  top: -64px;
-  bottom: -64px;
+  top: -44px;
+  bottom: -44px;
   width: 1px;
   background: linear-gradient(180deg, transparent, #bfc8d2 12%, #bfc8d2 88%, transparent);
 }
 
 .login-copy h2 {
   margin: 0;
-  font-size: clamp(2rem, 2.2vw, 2.8rem);
+  font-size: clamp(1.55rem, 2vw, 2.1rem);
   font-weight: 800;
   line-height: 1.15;
 }
 
 .login-copy p {
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: var(--body);
-  font-size: 1.14rem;
-  line-height: 1.5;
+  font-size: 0.94rem;
+  line-height: 1.42;
 }
 
 .form {
   display: grid;
-  gap: 28px;
-  margin-top: 42px;
+  gap: 20px;
+  margin-top: 30px;
 }
 
 .form-modal {
-  gap: 14px;
-  margin-top: 0;
+  gap: 16px;
+  margin-top: 28px;
 }
 
 .field {
   display: grid;
-  gap: 16px;
+  gap: 10px;
   color: var(--ink);
   font-weight: 700;
 }
 
 .field > span:first-child {
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .field input {
@@ -333,9 +334,9 @@ input {
 .input-shell {
   display: flex;
   align-items: center;
-  gap: 18px;
-  min-height: 66px;
-  padding: 0 18px;
+  gap: 13px;
+  min-height: 52px;
+  padding: 0 14px;
   border: 1px solid var(--line-strong);
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.72);
@@ -353,29 +354,38 @@ input {
 }
 
 .input-shell input {
-  min-height: 62px;
+  min-height: 50px;
   padding: 0;
   border: none;
   border-radius: 0;
   background: transparent;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 500;
 }
 
 .form-modal .field {
-  gap: 7px;
+  gap: 8px;
 }
 
 .form-modal .field input {
-  min-height: 46px;
-  padding: 10px 12px;
+  min-height: 48px;
+}
+
+.form-modal .input-shell {
+  min-height: 50px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.form-modal .input-shell input {
+  min-height: 48px;
+  padding: 0;
 }
 
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
   color: #777d89;
@@ -431,9 +441,9 @@ input {
 
 .btn-login {
   width: 100%;
-  min-height: 64px;
+  min-height: 52px;
   border-radius: 10px;
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .btn-outline {
@@ -467,8 +477,8 @@ input {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 28px;
-  margin: 42px 0 26px;
+  gap: 20px;
+  margin: 30px 0 20px;
   color: #586070;
   font-weight: 500;
 }
@@ -484,7 +494,7 @@ input {
   margin: 0;
   text-align: center;
   color: #111827;
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .terms-note {
@@ -492,11 +502,11 @@ input {
   justify-content: center;
   align-items: flex-start;
   gap: 10px;
-  max-width: 470px;
-  margin: 34px auto 0;
+  max-width: 390px;
+  margin: 24px auto 0;
   color: #8b92a0;
   text-align: center;
-  font-size: 0.92rem;
+  font-size: 0.78rem;
   line-height: 1.55;
 }
 
@@ -516,12 +526,12 @@ input {
 .auth-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
-  padding: 0 13px;
+  min-height: 34px;
+  padding: 0 12px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 800;
 }
 
@@ -546,8 +556,8 @@ input {
 }
 
 .panel {
-  margin-top: 28px;
-  padding: 24px;
+  margin-top: 22px;
+  padding: 20px;
   border: 1px solid rgba(210, 202, 194, 0.82);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.9);
@@ -633,8 +643,8 @@ input {
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: rgba(13, 17, 23, 0.58);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 18, 20, 0.54);
+  backdrop-filter: blur(3px);
 }
 
 .modal-backdrop.open {
@@ -643,38 +653,65 @@ input {
 }
 
 .modal {
-  width: min(460px, 100%);
-  padding: 20px;
+  position: relative;
+  width: min(430px, calc(100vw - 32px));
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  padding: 58px 32px 32px;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: var(--shadow);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 60px rgba(10, 12, 16, 0.22);
   animation: modalIn 220ms ease-out;
 }
 
 .modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  display: block;
+  margin-bottom: 0;
+  text-align: center;
+}
+
+.modal-copy {
+  display: grid;
+  gap: 10px;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.modal-header p {
+  margin: 0;
+  color: var(--body);
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .modal-close {
+  position: absolute;
+  top: 22px;
+  right: 24px;
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: none;
   border-radius: 50%;
-  color: var(--muted);
-  background: #f4f5f7;
+  color: var(--ink);
+  background: transparent;
   cursor: pointer;
+  font-size: 1.55rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  background: #f4f5f7;
+  transform: none;
+  box-shadow: none;
 }
 
 .form-footer {
@@ -682,6 +719,31 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+
+.btn-register {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 4px;
+  border-radius: 9px;
+  font-size: 1rem;
+}
+
+.modal-switch {
+  margin: 4px 0 0;
+  text-align: center;
+  color: var(--body);
+  font-size: 0.86rem;
+}
+
+.form-modal .status {
+  margin-top: 0;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.form-modal .status:empty {
+  display: none;
 }
 
 @keyframes pageFade {
@@ -706,32 +768,113 @@ input {
 
 @media (max-width: 1280px) {
   .page {
-    padding: 30px;
+    padding: 24px 30px;
   }
 
   .auth-shell {
-    padding: 34px 40px 46px;
+    padding: 28px 34px 36px;
   }
 
   .auth-grid {
-    gap: 48px;
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
+    gap: 40px;
+    grid-template-columns: minmax(360px, 500px) minmax(340px, 430px);
   }
 
   .login-panel {
-    padding-left: 48px;
+    padding-left: 40px;
+  }
+}
+
+@media (min-width: 981px) and (max-height: 820px) {
+  .page {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .auth-shell {
+    min-height: calc(100vh - 40px);
+    padding: 24px 32px 30px;
+  }
+
+  .auth-grid {
+    min-height: 450px;
+    gap: 36px;
+  }
+
+  .brand {
+    font-size: clamp(1.35rem, 1.8vw, 1.65rem);
+  }
+
+  .partner-badge {
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 0.8rem;
+  }
+
+  .hero h1 {
+    margin-top: 24px;
+    font-size: clamp(2rem, 2.8vw, 2.8rem);
+  }
+
+  .hero p {
+    margin-top: 14px;
+    font-size: 0.9rem;
+    line-height: 1.38;
+  }
+
+  .feature-row {
+    margin-top: 22px;
+    font-size: 0.82rem;
+  }
+
+  .trust-card {
+    margin-top: 24px;
+    padding: 16px 20px;
+  }
+
+  .login-copy h2 {
+    font-size: clamp(1.4rem, 1.8vw, 1.75rem);
+  }
+
+  .login-copy p {
+    font-size: 0.86rem;
+  }
+
+  .form {
+    gap: 16px;
+    margin-top: 22px;
+  }
+
+  .input-shell {
+    min-height: 46px;
+  }
+
+  .input-shell input {
+    min-height: 44px;
+  }
+
+  .btn-login {
+    min-height: 46px;
+  }
+
+  .divider {
+    margin: 22px 0 16px;
+  }
+
+  .terms-note {
+    margin-top: 18px;
   }
 }
 
 @media (max-width: 980px) {
   .page {
-    padding: 18px 14px 40px;
+    padding: 16px 14px 28px;
   }
 
   .auth-shell {
     min-height: 0;
-    padding: 26px 20px 30px;
-    border-radius: 24px;
+    padding: 22px 18px 26px;
+    border-radius: 18px;
   }
 
   .shell-header {
@@ -740,35 +883,36 @@ input {
   }
 
   .brand {
-    font-size: 1.55rem;
+    font-size: 1.35rem;
   }
 
   .auth-grid {
     display: block;
     min-height: 0;
-    margin-top: 38px;
+    margin-top: 28px;
   }
 
   .hero h1 {
-    margin-top: 30px;
+    margin-top: 24px;
+    font-size: clamp(1.9rem, 5vw, 2.6rem);
   }
 
   .hero p {
-    margin-top: 20px;
+    margin-top: 14px;
   }
 
   .feature-row {
-    margin-top: 30px;
+    margin-top: 22px;
   }
 
   .trust-card {
-    margin-top: 30px;
+    margin-top: 22px;
   }
 
   .login-panel {
-    margin-top: 42px;
+    margin-top: 30px;
     padding-left: 0;
-    padding-top: 38px;
+    padding-top: 28px;
     border-top: 1px solid var(--line);
   }
 
@@ -784,29 +928,29 @@ input {
 
 @media (max-width: 620px) {
   .auth-shell {
-    padding: 22px 16px 26px;
+    padding: 18px 14px 20px;
   }
 
   .partner-badge {
-    min-height: 46px;
-    padding: 0 16px;
-    font-size: 0.9rem;
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 0.78rem;
   }
 
   .hero h1 {
-    font-size: 2.55rem;
-    line-height: 1.12;
+    font-size: clamp(1.75rem, 8vw, 2.2rem);
+    line-height: 1.14;
   }
 
   .hero p,
   .login-copy p {
-    font-size: 1rem;
+    font-size: 0.86rem;
   }
 
   .feature-row {
     align-items: flex-start;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .feature-row span + span {
@@ -817,45 +961,45 @@ input {
 
   .trust-card {
     align-items: flex-start;
-    gap: 16px;
-    padding: 20px 18px;
+    gap: 12px;
+    padding: 15px 14px;
   }
 
   .trust-card svg {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
   }
 
   .login-copy h2 {
-    font-size: 1.85rem;
+    font-size: 1.45rem;
   }
 
   .form {
-    gap: 22px;
-    margin-top: 32px;
+    gap: 16px;
+    margin-top: 22px;
   }
 
   .input-shell {
-    gap: 12px;
-    min-height: 58px;
-    padding: 0 14px;
+    gap: 10px;
+    min-height: 46px;
+    padding: 0 12px;
   }
 
   .input-shell input {
-    min-height: 56px;
+    min-height: 44px;
   }
 
   .btn-login {
-    min-height: 58px;
+    min-height: 46px;
   }
 
   .divider {
-    gap: 16px;
-    margin-top: 32px;
+    gap: 12px;
+    margin-top: 22px;
   }
 
   .terms-note {
-    margin-top: 24px;
+    margin-top: 18px;
   }
 
   .form-footer {

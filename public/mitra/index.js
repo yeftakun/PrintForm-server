@@ -19,8 +19,6 @@
 
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
-  const loginPassword = document.getElementById("loginPassword");
-  const togglePasswordBtn = document.getElementById("togglePasswordBtn");
 
   const loginStatus = document.getElementById("loginStatus");
   const registerStatus = document.getElementById("registerStatus");
@@ -279,6 +277,13 @@
     const username = String(formData.get("username") || "").trim();
     const email = String(formData.get("email") || "").trim();
     const password = String(formData.get("password") || "");
+    const passwordConfirm = String(formData.get("passwordConfirm") || "");
+
+    if (password !== passwordConfirm) {
+      setStatus(registerStatus, "Konfirmasi password tidak sama.", "error");
+      registerForm.elements.passwordConfirm?.focus();
+      return;
+    }
 
     try {
       const body = await window.MitraAuth.apiJson("/api/auth/register", {
@@ -347,11 +352,18 @@
     loginForm.addEventListener("submit", submitLogin);
     registerForm.addEventListener("submit", submitRegister);
 
-    togglePasswordBtn?.addEventListener("click", () => {
-      const shouldShow = loginPassword.type === "password";
-      loginPassword.type = shouldShow ? "text" : "password";
-      togglePasswordBtn.classList.toggle("is-visible", shouldShow);
-      togglePasswordBtn.setAttribute("aria-label", shouldShow ? "Sembunyikan password" : "Tampilkan password");
+    document.querySelectorAll("[data-password-toggle]").forEach(button => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(button.dataset.target);
+        if (!(target instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const shouldShow = target.type === "password";
+        target.type = shouldShow ? "text" : "password";
+        button.classList.toggle("is-visible", shouldShow);
+        button.setAttribute("aria-label", shouldShow ? "Sembunyikan password" : "Tampilkan password");
+      });
     });
 
     refreshLinkedClientsBtn.addEventListener("click", loadLinkedClients);
