@@ -28,10 +28,9 @@ function createApp() {
   app.use("/api/sessions", optionalAuth, sessionsRouter);
   app.use("/api/jobs", optionalAuth, jobsRouter);
 
-  app.get("/:kodeToko", (req, res, next) => {
+  app.get("/p/:kodeToko", (req, res, next) => {
     const kodeToko = String(req.params.kodeToko || "").trim();
-    const reservedPaths = new Set(["api", "home", "session", "mitra", "store", "vendor"]);
-    if (!kodeToko || kodeToko.includes(".") || reservedPaths.has(kodeToko.toLowerCase())) {
+    if (!kodeToko || kodeToko.includes(".")) {
       next();
       return;
     }

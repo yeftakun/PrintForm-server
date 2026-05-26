@@ -20,7 +20,11 @@ const aliasStorageKey = "printformAlias";
 let currentStore = null;
 
 function getStoreCodeFromPath() {
-  return decodeURIComponent(window.location.pathname.replace(/^\/+|\/+$/g, ""));
+  const pathParts = window.location.pathname.split("/").filter(Boolean);
+  if (pathParts[0] !== "p" || !pathParts[1]) {
+    return "";
+  }
+  return decodeURIComponent(pathParts[1]);
 }
 
 function setPageStatus(text, kind = "") {

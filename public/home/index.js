@@ -47,12 +47,19 @@ function getStoreCodeFromQrText(value) {
     return "";
   }
 
+  function getCodeFromPathname(pathname) {
+    const pathParts = String(pathname || "").split("/").filter(Boolean);
+    if (pathParts[0] === "p") {
+      return normalizeStoreCode(pathParts[1] || "");
+    }
+    return normalizeStoreCode(pathParts[0] || "");
+  }
+
   try {
     const url = new URL(text);
-    const pathParts = url.pathname.split("/").filter(Boolean);
-    return normalizeStoreCode(pathParts[0] || "");
+    return getCodeFromPathname(url.pathname);
   } catch {
-    return text;
+    return getCodeFromPathname(text) || text;
   }
 }
 
@@ -133,7 +140,7 @@ function openStorePage(kodeToko) {
     return;
   }
 
-  window.location.href = `/${encodeURIComponent(normalizedKodeToko)}`;
+  window.location.href = `/p/${encodeURIComponent(normalizedKodeToko)}`;
 }
 
 async function storeExists(kodeToko) {
