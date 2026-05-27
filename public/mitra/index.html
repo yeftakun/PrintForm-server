@@ -328,6 +328,10 @@
                   <strong id="accountUsername">-</strong>
                 </article>
                 <article class="mini-panel">
+                  <span>Email</span>
+                  <strong id="accountEmail">-</strong>
+                </article>
+                <article class="mini-panel">
                   <span>Password</span>
                   <strong>Tersimpan</strong>
                 </article>
@@ -337,8 +341,9 @@
                 </article>
               </div>
               <div class="section-actions account-actions">
-                <a class="btn btn-outline btn-compact" href="/mitra/account/">Ganti Password</a>
-                <a class="btn btn-ghost btn-compact" href="/mitra/account/">Kelola PIN</a>
+                <button class="btn btn-outline btn-compact" type="button" data-account-modal="profileModalBackdrop">Edit Profil</button>
+                <button class="btn btn-outline btn-compact" type="button" data-account-modal="passwordModalBackdrop">Ganti Password</button>
+                <button class="btn btn-ghost btn-compact" type="button" data-account-modal="pinModalBackdrop">Kelola PIN</button>
               </div>
             </section>
 
@@ -500,6 +505,209 @@
             <button class="text-button" type="button" id="toLoginBtn">Masuk</button>
           </p>
           <div class="status" id="registerStatus" role="status"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="profileModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="profileModalTitle">Edit Profil</h2>
+            <p>Perbarui username dan email akun mitra.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="profileModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="accountProfileForm">
+          <label class="field">
+            <span>Username</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 21a8 8 0 0 0-16 0"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              <input type="text" name="username" minlength="3" maxlength="64" autocomplete="username" required>
+            </span>
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="20" height="16" x="2" y="4" rx="2"/>
+                <path d="m22 7-8.97 5.7a2 2 0 0 1-2.06 0L2 7"/>
+              </svg>
+              <input type="email" name="email" autocomplete="email" placeholder="Opsional">
+            </span>
+          </label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-primary" type="submit">Simpan Profil</button>
+            <button class="btn btn-ghost" type="button" data-close="profileModalBackdrop">Batal</button>
+          </div>
+          <div class="status" id="accountProfileStatus" role="status"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="passwordModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="passwordModalTitle">Ganti Password</h2>
+            <p>Gunakan password baru yang berbeda dari password saat ini.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="passwordModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="accountPasswordForm">
+          <label class="field">
+            <span>Password Saat Ini</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="accountCurrentPassword" type="password" name="currentPassword" autocomplete="current-password" required>
+              <button class="icon-btn" type="button" aria-label="Tampilkan password" data-password-toggle data-target="accountCurrentPassword">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m2 2 20 20"/>
+                  <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                  <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                </svg>
+              </button>
+            </span>
+          </label>
+          <label class="field">
+            <span>Password Baru</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="accountNewPassword" type="password" name="newPassword" minlength="8" autocomplete="new-password" required>
+              <button class="icon-btn" type="button" aria-label="Tampilkan password" data-password-toggle data-target="accountNewPassword">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m2 2 20 20"/>
+                  <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                  <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                </svg>
+              </button>
+            </span>
+          </label>
+          <label class="field">
+            <span>Konfirmasi Password Baru</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="accountConfirmPassword" type="password" name="confirmPassword" minlength="8" autocomplete="new-password" required>
+              <button class="icon-btn" type="button" aria-label="Tampilkan password" data-password-toggle data-target="accountConfirmPassword">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m2 2 20 20"/>
+                  <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                  <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                </svg>
+              </button>
+            </span>
+          </label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-primary" type="submit">Perbarui Password</button>
+            <button class="btn btn-ghost" type="button" data-close="passwordModalBackdrop">Batal</button>
+          </div>
+          <div class="status" id="accountPasswordStatus" role="status"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="pinModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="pinModalTitle">Kelola PIN</h2>
+            <p>PIN dipakai untuk verifikasi aksi sensitif di aplikasi desktop.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="pinModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="accountPinForm">
+          <label class="field">
+            <span>Password Saat Ini</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="pinCurrentPassword" type="password" name="currentPassword" autocomplete="current-password" required>
+              <button class="icon-btn" type="button" aria-label="Tampilkan password" data-password-toggle data-target="pinCurrentPassword">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m2 2 20 20"/>
+                  <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                  <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                </svg>
+              </button>
+            </span>
+          </label>
+          <label class="field">
+            <span>PIN Baru (4-8 digit)</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="accountPin" type="password" name="pin" minlength="4" maxlength="8" inputmode="numeric" pattern="[0-9]{4,8}" required>
+              <button class="icon-btn" type="button" aria-label="Tampilkan PIN" data-password-toggle data-target="accountPin">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m2 2 20 20"/>
+                  <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                  <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                </svg>
+              </button>
+            </span>
+          </label>
+          <label class="field">
+            <span>Konfirmasi PIN</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="accountConfirmPin" type="password" name="confirmPin" minlength="4" maxlength="8" inputmode="numeric" pattern="[0-9]{4,8}" required>
+              <button class="icon-btn" type="button" aria-label="Tampilkan PIN" data-password-toggle data-target="accountConfirmPin">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m2 2 20 20"/>
+                  <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                  <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                </svg>
+              </button>
+            </span>
+          </label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-primary" type="submit">Simpan PIN</button>
+            <button class="btn btn-ghost" type="button" data-close="pinModalBackdrop">Batal</button>
+          </div>
+          <div class="status" id="accountPinStatusMessage" role="status"></div>
         </form>
       </div>
     </div>

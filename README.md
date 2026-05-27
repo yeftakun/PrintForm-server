@@ -18,7 +18,7 @@ UI routes:
 
 - Customer print page: `http://localhost:3000/`
 - Mitra dashboard: `http://localhost:3000/mitra/`
-- Mitra account settings: `http://localhost:3000/mitra/account/`
+- Mitra account settings: section 5 di `http://localhost:3000/mitra/`
 
 Apply Step 7 auth migration (required before enabling auth features):
 

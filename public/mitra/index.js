@@ -25,19 +25,29 @@
   const serviceSettingsStatus = document.getElementById("serviceSettingsStatus");
 
   const accountUsername = document.getElementById("accountUsername");
+  const accountEmail = document.getElementById("accountEmail");
   const accountPinStatus = document.getElementById("accountPinStatus");
   const activityList = document.getElementById("activityList");
 
   const registerModalBackdrop = document.getElementById("registerModalBackdrop");
+  const profileModalBackdrop = document.getElementById("profileModalBackdrop");
+  const passwordModalBackdrop = document.getElementById("passwordModalBackdrop");
+  const pinModalBackdrop = document.getElementById("pinModalBackdrop");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const logoutBtn = document.getElementById("logoutBtn");
   const toLoginBtn = document.getElementById("toLoginBtn");
 
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
+  const accountProfileForm = document.getElementById("accountProfileForm");
+  const accountPasswordForm = document.getElementById("accountPasswordForm");
+  const accountPinForm = document.getElementById("accountPinForm");
 
   const loginStatus = document.getElementById("loginStatus");
   const registerStatus = document.getElementById("registerStatus");
+  const accountProfileStatus = document.getElementById("accountProfileStatus");
+  const accountPasswordStatus = document.getElementById("accountPasswordStatus");
+  const accountPinStatusMessage = document.getElementById("accountPinStatusMessage");
 
   const unbindInProgress = new Set();
   let currentUser = null;
@@ -71,11 +81,17 @@
   }
 
   function openModal(modal) {
+    if (!modal) {
+      return;
+    }
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
   }
 
   function closeModal(modal) {
+    if (!modal) {
+      return;
+    }
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
   }
@@ -396,7 +412,18 @@
     dashboardUserChip.textContent = user?.username ? `@${user.username}` : "Akun Mitra";
     dashboardStoreCode.textContent = `Kode toko: ${user?.kodeToko || "-"}`;
     accountUsername.textContent = user?.username ? `@${user.username}` : "-";
+    accountEmail.textContent = user?.email || "-";
     accountPinStatus.textContent = user?.hasPin ? "Aktif" : "Belum diatur";
+    fillAccountProfileForm(user);
+  }
+
+  function fillAccountProfileForm(user) {
+    if (!accountProfileForm || !user) {
+      return;
+    }
+
+    accountProfileForm.elements.username.value = user.username || "";
+    accountProfileForm.elements.email.value = user.email || "";
   }
 
   function buildSettingsPayload() {
@@ -559,6 +586,127 @@
     }
   }
 
+  async function submitAccountProfile(event) {
+    event.preventDefault();
+    setStatus(accountProfileStatus, "Menyimpan profil...");
+
+    const username = String(accountProfileForm.elements.username.value || "").trim();
+    const email = String(accountProfileForm.elements.email.value || "").trim();
+
+    try {
+      const body = await window.MitraAuth.apiJson("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email })
+      });
+
+      const nextState = {
+        ...window.MitraAuth.getState(),
+        user: body.user
+      };
+      window.MitraAuth.saveState(nextState);
+      currentUser = body.user;
+      fillDashboardForms(body.user);
+      setStatus(accountProfileStatus, "Profil berhasil diperbarui.", "success");
+      notify({
+        title: "Profil tersimpan",
+        message: "Data akun mitra berhasil diperbarui.",
+        variant: "success"
+      });
+    } catch (err) {
+      setStatus(accountProfileStatus, err.message || "Gagal memperbarui profil.", "error");
+    }
+  }
+
+  async function submitAccountPassword(event) {
+    event.preventDefault();
+    setStatus(accountPasswordStatus, "Memperbarui password...");
+
+    const currentPassword = String(accountPasswordForm.elements.currentPassword.value || "");
+    const newPassword = String(accountPasswordForm.elements.newPassword.value || "");
+    const confirmPassword = String(accountPasswordForm.elements.confirmPassword.value || "");
+
+    if (newPassword !== confirmPassword) {
+      setStatus(accountPasswordStatus, "Konfirmasi password tidak sama.", "error");
+      accountPasswordForm.elements.confirmPassword?.focus();
+      return;
+    }
+
+    try {
+      await window.MitraAuth.apiJson("/api/auth/me/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      accountPasswordForm.reset();
+      setStatus(accountPasswordStatus, "Password berhasil diubah. Anda akan logout otomatis.", "success");
+      notify({
+        title: "Password diperbarui",
+        message: "Silakan login kembali dengan password baru.",
+        variant: "success"
+      });
+
+      setTimeout(async () => {
+        await window.MitraAuth.logoutCurrentSession();
+        closeModal(passwordModalBackdrop);
+        renderGuestState();
+      }, 900);
+    } catch (err) {
+      setStatus(accountPasswordStatus, err.message || "Gagal memperbarui password.", "error");
+    }
+  }
+
+  async function submitAccountPin(event) {
+    event.preventDefault();
+    setStatus(accountPinStatusMessage, "Menyimpan PIN...");
+
+    const currentPassword = String(accountPinForm.elements.currentPassword.value || "");
+    const pin = String(accountPinForm.elements.pin.value || "").trim();
+    const confirmPin = String(accountPinForm.elements.confirmPin.value || "").trim();
+
+    if (!/^\d{4,8}$/.test(pin)) {
+      setStatus(accountPinStatusMessage, "PIN harus 4-8 digit angka.", "error");
+      accountPinForm.elements.pin?.focus();
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      setStatus(accountPinStatusMessage, "Konfirmasi PIN tidak sama.", "error");
+      accountPinForm.elements.confirmPin?.focus();
+      return;
+    }
+
+    try {
+      await window.MitraAuth.apiJson("/api/auth/me/pin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, pin })
+      });
+
+      accountPinForm.reset();
+      const nextUser = {
+        ...(currentUser || window.MitraAuth.getState()?.user || {}),
+        hasPin: true
+      };
+      const nextState = {
+        ...window.MitraAuth.getState(),
+        user: nextUser
+      };
+      window.MitraAuth.saveState(nextState);
+      currentUser = nextUser;
+      fillDashboardForms(nextUser);
+      setStatus(accountPinStatusMessage, "PIN berhasil disimpan.", "success");
+      notify({
+        title: "PIN tersimpan",
+        message: "PIN akun mitra berhasil diperbarui.",
+        variant: "success"
+      });
+    } catch (err) {
+      setStatus(accountPinStatusMessage, err.message || "Gagal menyimpan PIN.", "error");
+    }
+  }
+
   async function onLogout() {
     await window.MitraAuth.logoutCurrentSession();
     renderGuestState();
@@ -621,6 +769,17 @@
       loginForm.elements.identifier?.focus();
     });
 
+    document.querySelectorAll("[data-account-modal]").forEach(button => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(button.dataset.accountModal);
+        setStatus(accountProfileStatus, "");
+        setStatus(accountPasswordStatus, "");
+        setStatus(accountPinStatusMessage, "");
+        fillAccountProfileForm(currentUser || window.MitraAuth.getState()?.user);
+        openModal(target);
+      });
+    });
+
     document.querySelectorAll("[data-close]").forEach(button => {
       button.addEventListener("click", () => {
         const targetId = button.getAttribute("data-close");
@@ -631,7 +790,7 @@
       });
     });
 
-    [registerModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -643,6 +802,9 @@
   function bindActionHandlers() {
     loginForm.addEventListener("submit", submitLogin);
     registerForm.addEventListener("submit", submitRegister);
+    accountProfileForm.addEventListener("submit", submitAccountProfile);
+    accountPasswordForm.addEventListener("submit", submitAccountPassword);
+    accountPinForm.addEventListener("submit", submitAccountPin);
     storeSettingsForm.addEventListener("submit", event => {
       event.preventDefault();
       saveDashboardSettings(storeSettingsStatus, "Pengaturan toko berhasil disimpan.");
