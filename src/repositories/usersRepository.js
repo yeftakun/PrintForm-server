@@ -259,6 +259,51 @@ async function updateUserProfile(userId, {
   return mapUserRow(res.rows[0]);
 }
 
+async function updateUserStoreSettings(userId, {
+  alamat,
+  kodeToko,
+  konfigurasiToko
+} = {}) {
+  ensureDbEnabled();
+  if (!userId) {
+    return null;
+  }
+
+  const [
+    hasAlamatColumn,
+    hasKonfigurasiTokoColumn,
+    hasKodeTokoColumn
+  ] = await Promise.all([
+    hasUserColumn("alamat"),
+    hasUserColumn("konfigurasi_toko"),
+    hasUserColumn("kode_toko")
+  ]);
+
+  if (!hasAlamatColumn || !hasKonfigurasiTokoColumn || !hasKodeTokoColumn) {
+    const err = new Error("Store settings columns are not ready: run the account/store migration first");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const returningColumns = await getUserSelectColumnsSql();
+  const res = await query(
+    `UPDATE users
+        SET alamat = $2,
+            kode_toko = $3,
+            konfigurasi_toko = $4
+      WHERE id = $1
+      RETURNING ${returningColumns}`,
+    [
+      userId,
+      alamat || null,
+      kodeToko || null,
+      konfigurasiToko || {}
+    ]
+  );
+
+  return mapUserRow(res.rows[0]);
+}
+
 async function updateUserPasswordHash(userId, passwordHash) {
   ensureDbEnabled();
   if (!userId || !passwordHash) {
@@ -311,6 +356,7 @@ module.exports = {
   getUserByStoreCode,
   createUser,
   updateUserProfile,
+  updateUserStoreSettings,
   updateUserPasswordHash,
   updateUserPinHash
 };

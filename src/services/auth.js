@@ -29,7 +29,11 @@ function toPublicUser(user) {
     username: user.username || null,
     email: user.email || null,
     role: user.role || "user",
-    createdAt: user.createdAt || null
+    createdAt: user.createdAt || null,
+    hasPin: Boolean(user.pinHash),
+    alamat: user.alamat || null,
+    konfigurasiToko: user.konfigurasiToko || {},
+    kodeToko: user.kodeToko || null
   };
 }
 

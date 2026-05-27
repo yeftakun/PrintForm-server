@@ -123,6 +123,14 @@ function getLastSeenMs(value) {
 }
 
 function getKioskDisplayName(user, ownerUserId) {
+  const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
+    ? user.konfigurasiToko
+    : {};
+  const configuredName = String(config.namaToko || config.nama_toko || "").trim();
+  if (configuredName) {
+    return configuredName;
+  }
+
   if (user?.username) {
     return user.username;
   }
@@ -139,6 +147,15 @@ function getStoreHours(user) {
     ? user.konfigurasiToko
     : {};
   return config.jamOperasional || config.jam_operasional || "Setiap hari 08.00 - 21.00";
+}
+
+function getStoreOperationalStatus(user) {
+  const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
+    ? user.konfigurasiToko
+    : {};
+  return String(config.statusToko || config.status_toko || "open").toLowerCase() === "closed"
+    ? "closed"
+    : "open";
 }
 
 function summarizeStoreClients(storeClients) {
@@ -174,6 +191,8 @@ function summarizeStoreClients(storeClients) {
 
 function toPublicStore(user, storeClients = []) {
   const summary = summarizeStoreClients(storeClients);
+  const operationalStatus = getStoreOperationalStatus(user);
+  const isClosed = operationalStatus === "closed";
   return {
     id: user.id,
     ownerUserId: user.id,
@@ -181,15 +200,18 @@ function toPublicStore(user, storeClients = []) {
     displayName: getStoreDisplayName(user, user.id),
     alamat: user.alamat || "Alamat belum diatur",
     jamOperasional: getStoreHours(user),
-    status: summary.status,
-    readiness: summary.readiness,
-    canStartSession: summary.canStartSession,
+    status: isClosed ? "closed" : summary.status,
+    readiness: isClosed ? "closed" : summary.readiness,
+    canStartSession: !isClosed && summary.canStartSession,
     targetClientId: summary.targetClientId,
     targetClientName: summary.targetClientName,
     clientCount: summary.clientCount,
     onlineClientCount: summary.onlineClientCount,
     readyClientCount: summary.readyClientCount,
-    lastSeen: summary.lastSeen
+    lastSeen: summary.lastSeen,
+    operationalStatus,
+    kontak: user.konfigurasiToko?.kontak || null,
+    layanan: user.konfigurasiToko?.layanan || {}
   };
 }
 

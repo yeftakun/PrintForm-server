@@ -11,6 +11,7 @@ const {
   getUserById,
   createUser,
   updateUserProfile,
+  updateUserStoreSettings,
   updateUserPasswordHash,
   updateUserPinHash
 } = require("../repositories/usersRepository");
@@ -79,6 +80,68 @@ function normalizePin(value) {
     return null;
   }
   return pin;
+}
+
+function normalizeOptionalText(value, maxLength = 255) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.slice(0, maxLength);
+}
+
+function normalizeStoreCode(value) {
+  const code = String(value || "").trim();
+  if (!code) {
+    return "";
+  }
+
+  if (!/^[a-zA-Z0-9._-]{3,64}$/.test(code)) {
+    return null;
+  }
+
+  return code;
+}
+
+function normalizeStoreStatus(value) {
+  return String(value || "").trim().toLowerCase() === "closed" ? "closed" : "open";
+}
+
+function normalizeColorMode(value) {
+  const mode = String(value || "").trim().toLowerCase();
+  if (mode === "color" || mode === "bw") {
+    return mode;
+  }
+  return "both";
+}
+
+function normalizePaperTypes(value) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || "").split(",");
+
+  const normalized = list
+    .map(item => String(item || "").trim().toUpperCase())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  return [...new Set(normalized)];
+}
+
+function normalizeNonNegativeNumber(value, fallback = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    return fallback;
+  }
+  return Math.round(number);
+}
+
+function normalizeFileLimitMb(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 25;
+  }
+  return Math.min(500, Math.max(1, Math.round(number)));
 }
 
 function getRequesterIp(req) {
@@ -402,6 +465,69 @@ router.patch("/me", requireAuth, asyncHandler(async (req, res) => {
     detail: {
       updatedUsername: hasUsername,
       updatedEmail: hasEmail
+    }
+  });
+
+  res.json({ user: toPublicUser(updatedUser) });
+}));
+
+router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
+  const kodeToko = normalizeStoreCode(req.body?.kodeToko);
+  if (kodeToko === null) {
+    res.status(400).json({ error: "kodeToko must be 3-64 chars (a-z, A-Z, 0-9, ., _, -)" });
+    return;
+  }
+
+  if (kodeToko && String(kodeToko).toLowerCase() !== String(req.user.kodeToko || "").toLowerCase()) {
+    const existingStoreUser = await getUserByStoreCode(kodeToko);
+    if (existingStoreUser && existingStoreUser.id !== req.user.id) {
+      res.status(409).json({ error: "kodeToko already exists" });
+      return;
+    }
+  }
+
+  const currentConfig = req.user.konfigurasiToko && typeof req.user.konfigurasiToko === "object"
+    ? req.user.konfigurasiToko
+    : {};
+  const requestedService = req.body?.layanan && typeof req.body.layanan === "object"
+    ? req.body.layanan
+    : {};
+
+  const konfigurasiToko = {
+    ...currentConfig,
+    namaToko: normalizeOptionalText(req.body?.storeName, 80),
+    statusToko: normalizeStoreStatus(req.body?.statusToko),
+    jamOperasional: normalizeOptionalText(req.body?.jamOperasional, 120),
+    kontak: normalizeOptionalText(req.body?.kontak, 80),
+    layanan: {
+      ...(currentConfig.layanan && typeof currentConfig.layanan === "object" ? currentConfig.layanan : {}),
+      jenisKertas: normalizePaperTypes(requestedService.jenisKertas),
+      modeWarna: normalizeColorMode(requestedService.modeWarna),
+      hargaDasar: normalizeNonNegativeNumber(requestedService.hargaDasar, 0),
+      batasFileMb: normalizeFileLimitMb(requestedService.batasFileMb)
+    }
+  };
+
+  const updatedUser = await updateUserStoreSettings(req.user.id, {
+    alamat: normalizeOptionalText(req.body?.alamat, 500),
+    kodeToko,
+    konfigurasiToko
+  });
+
+  if (!updatedUser) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "user.store_settings.updated",
+    targetType: "user",
+    targetId: req.user.id,
+    detail: {
+      updatedStoreSettings: true,
+      hasKodeToko: Boolean(kodeToko)
     }
   });
 

@@ -39,8 +39,13 @@ function renderStore(store) {
   storeNotFound?.classList.add("hidden");
   document.body.classList.remove("store-not-found-mode");
   const displayName = store.displayName || "Toko Percetakan";
-  const isReady = store.status === "online" && store.canStartSession;
-  const statusText = isReady ? "Siap menerima tugas" : "Belum siap menerima tugas";
+  const isClosed = store.operationalStatus === "closed" || store.status === "closed";
+  const isReady = !isClosed && store.status === "online" && store.canStartSession;
+  const statusText = isClosed
+    ? "Toko sedang tutup"
+    : isReady
+      ? "Siap menerima tugas"
+      : "Belum siap menerima tugas";
 
   storeName.textContent = displayName;
   storeNameSummary.textContent = displayName;
@@ -49,7 +54,11 @@ function renderStore(store) {
   storeAddress.textContent = store.alamat || "Alamat belum diatur";
   storeHours.textContent = store.jamOperasional || "Setiap hari 08.00 - 21.00";
   storeStatus.textContent = statusText;
-  storeStatusBadge.textContent = isReady ? "Tersedia / Siap menerima tugas" : "Offline / Belum siap";
+  storeStatusBadge.textContent = isClosed
+    ? "Tutup"
+    : isReady
+      ? "Tersedia / Siap menerima tugas"
+      : "Offline / Belum siap";
   storeStatusBadge.className = isReady
     ? "store-status-badge online"
     : "store-status-badge offline";
@@ -58,8 +67,10 @@ function renderStore(store) {
     : "store-summary-status-icon offline";
   confirmStoreBtn.disabled = !isReady;
   setPageStatus(
-    confirmStoreBtn.disabled
-      ? "Toko sedang offline. Halaman tetap dapat dilihat, tetapi sesi belum bisa dibuat."
+    isClosed
+      ? "Toko sedang tutup. Halaman tetap dapat dilihat, tetapi sesi belum bisa dibuat."
+      : confirmStoreBtn.disabled
+        ? "Toko sedang offline. Halaman tetap dapat dilihat, tetapi sesi belum bisa dibuat."
       : ""
   );
 }

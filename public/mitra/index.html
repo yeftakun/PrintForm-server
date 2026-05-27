@@ -15,12 +15,6 @@
             <span class="brand-glow" aria-hidden="true"></span>
             <span>Mitra PrintForm</span>
           </a>
-
-          <div class="top-actions hidden" id="userActions">
-            <span class="auth-chip" id="userChip">@user</span>
-            <button class="btn btn-outline btn-compact" id="openAccountBtn" type="button">Akun</button>
-            <button class="btn btn-ghost btn-compact" id="logoutBtn" type="button">Logout</button>
-          </div>
         </header>
 
         <div class="auth-grid">
@@ -143,33 +137,246 @@
         </div>
       </section>
 
-      <section class="panel hidden" id="linkedClientsSection">
-        <div class="panel-head">
-          <div>
-            <h2>Client Terhubung ke Akun</h2>
-            <p>Daftar client yang sedang terikat pada akun mitra yang login saat ini.</p>
+      <section class="partner-dashboard hidden" id="dashboardShell" aria-labelledby="dashboardTitle">
+        <header class="dashboard-header">
+          <a href="/mitra/" class="dashboard-brand" aria-label="Mitra PrintForm">
+            <span class="dashboard-brand-mark" aria-hidden="true">P</span>
+            <span id="dashboardTitle">Mitra PrintForm</span>
+          </a>
+
+          <div class="dashboard-actions">
+            <button class="btn btn-outline btn-compact" id="downloadClientBtn" type="button">Download Klien</button>
+            <span class="auth-chip" id="dashboardUserChip">@user</span>
+            <button class="btn btn-ghost btn-compact" id="logoutBtn" type="button">Logout</button>
           </div>
-          <button class="btn btn-outline" id="refreshLinkedClientsBtn" type="button">Muat Ulang</button>
-        </div>
-        <div class="status" id="linkedClientsStatus" role="status"></div>
-        <div class="table-wrap">
-          <table class="clients-table">
-            <thead>
-              <tr>
-                <th>Nama Client</th>
-                <th>Client ID</th>
-                <th>Status / Kesiapan</th>
-                <th>Printer Aktif</th>
-                <th>Terakhir Aktif</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="linkedClientsBody">
-              <tr>
-                <td colspan="6" class="muted-cell">Silakan login untuk melihat daftar client.</td>
-              </tr>
-            </tbody>
-          </table>
+        </header>
+
+        <div class="dashboard-layout">
+          <aside class="dashboard-sidebar" aria-label="Navigasi dashboard mitra">
+            <a href="#dashboardStats">Statistik</a>
+            <a href="#linkedClientsSection">Klien Desktop</a>
+            <a href="#storeSettingsSection">Pengaturan Toko</a>
+            <a href="#serviceSettingsSection">Layanan</a>
+            <a href="#accountSettingsSection">Akun</a>
+            <a href="#activitySection">Aktivitas</a>
+            <a href="#helpSection">Bantuan</a>
+          </aside>
+
+          <div class="dashboard-main">
+            <section class="dashboard-section dashboard-intro">
+              <div>
+                <p class="dashboard-kicker">Dashboard Mitra</p>
+                <h1>Kelola toko dan client cetak</h1>
+              </div>
+              <div class="dashboard-meta">
+                <span id="dashboardStoreCode">Kode toko: -</span>
+                <span id="dashboardLastSync">Sinkron: -</span>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="dashboardStats" aria-labelledby="dashboardStatsTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 1</p>
+                  <h2 id="dashboardStatsTitle">Kartu Statistik</h2>
+                </div>
+              </div>
+              <div class="stat-grid">
+                <article class="stat-card">
+                  <span>Client Online</span>
+                  <strong id="statClientOnline">0</strong>
+                </article>
+                <article class="stat-card">
+                  <span>Tugas Hari Ini</span>
+                  <strong id="statJobsToday">0</strong>
+                </article>
+                <article class="stat-card">
+                  <span>Selesai</span>
+                  <strong id="statJobsDone">0</strong>
+                </article>
+                <article class="stat-card">
+                  <span>Gagal</span>
+                  <strong id="statJobsFailed">0</strong>
+                </article>
+                <article class="stat-card">
+                  <span>File Terhapus</span>
+                  <strong id="statFilesDeleted">0</strong>
+                </article>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="linkedClientsSection" aria-labelledby="linkedClientsTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 2</p>
+                  <h2 id="linkedClientsTitle">Status Klien Desktop</h2>
+                </div>
+                <div class="section-actions">
+                  <button class="btn btn-ghost btn-compact" id="refreshLinkedClientsBtn" type="button">Refresh</button>
+                  <button class="btn btn-outline btn-compact" id="connectClientBtn" type="button">Hubungkan Client Baru</button>
+                </div>
+              </div>
+              <div class="status" id="linkedClientsStatus" role="status"></div>
+              <div class="table-wrap">
+                <table class="clients-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Client</th>
+                      <th>Client ID</th>
+                      <th>Status / Kesiapan</th>
+                      <th>Printer Aktif</th>
+                      <th>Terakhir Aktif</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="linkedClientsBody">
+                    <tr>
+                      <td colspan="6" class="muted-cell">Silakan login untuk melihat daftar client.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="storeSettingsSection" aria-labelledby="storeSettingsTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 3</p>
+                  <h2 id="storeSettingsTitle">Pengaturan Toko</h2>
+                </div>
+              </div>
+              <form class="dashboard-form" id="storeSettingsForm">
+                <label class="field">
+                  <span>Nama Toko</span>
+                  <input type="text" name="storeName" maxlength="80" placeholder="Nama toko Anda">
+                </label>
+                <label class="field">
+                  <span>Kode Toko</span>
+                  <input type="text" name="kodeToko" maxlength="64" placeholder="contoh: TOKO-001">
+                </label>
+                <label class="field">
+                  <span>Status</span>
+                  <select name="storeStatus">
+                    <option value="open">Buka</option>
+                    <option value="closed">Tutup</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Jam Operasional</span>
+                  <input type="text" name="storeHours" maxlength="120" placeholder="Setiap hari 08.00 - 21.00">
+                </label>
+                <label class="field">
+                  <span>Kontak</span>
+                  <input type="text" name="storeContact" maxlength="80" placeholder="Nomor WhatsApp / telepon">
+                </label>
+                <label class="field dashboard-form-wide">
+                  <span>Alamat</span>
+                  <textarea name="storeAddress" rows="3" maxlength="500" placeholder="Alamat toko"></textarea>
+                </label>
+                <div class="form-footer dashboard-form-wide">
+                  <button class="btn btn-primary" type="submit">Simpan Pengaturan Toko</button>
+                  <div class="status" id="storeSettingsStatus" role="status"></div>
+                </div>
+              </form>
+            </section>
+
+            <section class="dashboard-section" id="serviceSettingsSection" aria-labelledby="serviceSettingsTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 4</p>
+                  <h2 id="serviceSettingsTitle">Pengaturan Layanan</h2>
+                </div>
+              </div>
+              <form class="dashboard-form" id="serviceSettingsForm">
+                <label class="field dashboard-form-wide">
+                  <span>Jenis Kertas</span>
+                  <input type="text" name="paperTypes" placeholder="A4, A5, F4">
+                </label>
+                <label class="field">
+                  <span>Mode Warna</span>
+                  <select name="colorMode">
+                    <option value="both">Warna dan hitam putih</option>
+                    <option value="color">Warna saja</option>
+                    <option value="bw">Hitam putih saja</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Harga Dasar</span>
+                  <input type="number" name="basePrice" min="0" step="500" placeholder="0">
+                </label>
+                <label class="field">
+                  <span>Batas File (MB)</span>
+                  <input type="number" name="fileLimitMb" min="1" max="500" step="1" placeholder="25">
+                </label>
+                <div class="form-footer dashboard-form-wide">
+                  <button class="btn btn-primary" type="submit">Simpan Pengaturan Layanan</button>
+                  <div class="status" id="serviceSettingsStatus" role="status"></div>
+                </div>
+              </form>
+            </section>
+
+            <section class="dashboard-section" id="accountSettingsSection" aria-labelledby="accountSettingsTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 5</p>
+                  <h2 id="accountSettingsTitle">Pengaturan Akun</h2>
+                </div>
+              </div>
+              <div class="account-summary-grid">
+                <article class="mini-panel">
+                  <span>Username</span>
+                  <strong id="accountUsername">-</strong>
+                </article>
+                <article class="mini-panel">
+                  <span>Password</span>
+                  <strong>Tersimpan</strong>
+                </article>
+                <article class="mini-panel">
+                  <span>PIN</span>
+                  <strong id="accountPinStatus">Belum dicek</strong>
+                </article>
+              </div>
+              <div class="section-actions account-actions">
+                <a class="btn btn-outline btn-compact" href="/mitra/account/">Ganti Password</a>
+                <a class="btn btn-ghost btn-compact" href="/mitra/account/">Kelola PIN</a>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="activitySection" aria-labelledby="activityTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 6</p>
+                  <h2 id="activityTitle">Aktivitas Terakhir</h2>
+                </div>
+              </div>
+              <div class="activity-list" id="activityList">
+                <p class="muted-cell">Belum ada aktivitas.</p>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="helpSection" aria-labelledby="helpTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Section 7</p>
+                  <h2 id="helpTitle">Bantuan</h2>
+                </div>
+              </div>
+              <div class="help-grid">
+                <button class="help-card" type="button" data-help-action="download">
+                  <strong>Download aplikasi desktop</strong>
+                  <span>Ambil installer klien untuk komputer toko.</span>
+                </button>
+                <button class="help-card" type="button" data-help-action="install">
+                  <strong>Panduan instalasi</strong>
+                  <span>Langkah login, pairing, dan memilih printer.</span>
+                </button>
+                <button class="help-card" type="button" data-help-action="troubleshoot">
+                  <strong>Troubleshooting</strong>
+                  <span>Cek koneksi, printer aktif, dan status antrean.</span>
+                </button>
+              </div>
+            </section>
+          </div>
         </div>
       </section>
     </main>
