@@ -9,6 +9,7 @@ const {
   getUserByEmail,
   getUserByIdentifier,
   getUserById,
+  getUserByStoreCode,
   createUser,
   updateUserProfile,
   updateUserStoreSettings,
