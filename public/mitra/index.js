@@ -26,6 +26,10 @@
   const serviceSettingsStatus = document.getElementById("serviceSettingsStatus");
   const storeOperationalSummary = document.getElementById("storeOperationalSummary");
   const openOperationalHoursBtn = document.getElementById("openOperationalHoursBtn");
+  const storeQrCanvas = document.getElementById("storeQrCanvas");
+  const storeQrUrl = document.getElementById("storeQrUrl");
+  const storeQrStatus = document.getElementById("storeQrStatus");
+  const downloadStoreQrBtn = document.getElementById("downloadStoreQrBtn");
 
   const accountUsername = document.getElementById("accountUsername");
   const accountEmail = document.getElementById("accountEmail");
@@ -143,6 +147,234 @@
       .replace(/>/g, "&gt;")
       .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  function getStoreNameValue() {
+    return String(storeSettingsForm.elements.storeName.value || currentUser?.username || "Nama Toko").trim();
+  }
+
+  function getStoreCodeValue() {
+    return String(storeSettingsForm.elements.kodeToko.value || currentUser?.kodeToko || "").trim();
+  }
+
+  function getStoreQrUrl() {
+    const code = getStoreCodeValue();
+    if (!code) {
+      return "";
+    }
+    return `${window.location.origin}/p/${encodeURIComponent(code)}`;
+  }
+
+  function getQrMatrix() {
+    const qrText = getStoreQrUrl();
+    if (!qrText || !window.PrintFormQr?.createMatrixForText) {
+      return null;
+    }
+    return window.PrintFormQr.createMatrixForText(qrText);
+  }
+
+  function renderStoreQr() {
+    const qrText = getStoreQrUrl();
+    storeQrUrl.textContent = qrText || "Isi kode toko untuk membuat QR.";
+    downloadStoreQrBtn.disabled = !qrText;
+
+    if (!qrText) {
+      setStatus(storeQrStatus, "");
+      const ctx = storeQrCanvas.getContext("2d");
+      ctx.clearRect(0, 0, storeQrCanvas.width, storeQrCanvas.height);
+      return;
+    }
+
+    try {
+      const matrix = getQrMatrix();
+      window.PrintFormQr.drawMatrixToCanvas(storeQrCanvas, matrix, {
+        pixelSize: 5,
+        foreground: "#241006",
+        background: "#ffffff"
+      });
+      setStatus(storeQrStatus, "");
+    } catch (err) {
+      setStatus(storeQrStatus, err.message || "Gagal membuat QR.", "error");
+    }
+  }
+
+  function drawRoundRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function drawCenteredText(ctx, text, x, y, maxWidth, fontSize, weight, color) {
+    let size = fontSize;
+    do {
+      ctx.font = `${weight} ${size}px Arial, sans-serif`;
+      if (ctx.measureText(text).width <= maxWidth || size <= 24) {
+        break;
+      }
+      size -= 2;
+    } while (size > 24);
+
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y);
+  }
+
+  function drawPosterQrMatrix(ctx, matrix, x, y, size, foreground) {
+    const quiet = 4;
+    const moduleSize = size / (matrix.length + quiet * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = foreground;
+    matrix.forEach((row, rowIndex) => {
+      row.forEach((isDark, colIndex) => {
+        if (isDark) {
+          ctx.fillRect(
+            x + (colIndex + quiet) * moduleSize,
+            y + (rowIndex + quiet) * moduleSize,
+            Math.ceil(moduleSize),
+            Math.ceil(moduleSize)
+          );
+        }
+      });
+    });
+  }
+
+  function downloadStoreQrPoster() {
+    const qrText = getStoreQrUrl();
+    if (!qrText) {
+      setStatus(storeQrStatus, "Isi kode toko sebelum download QR.", "error");
+      return;
+    }
+
+    try {
+      const matrix = getQrMatrix();
+      const storeName = getStoreNameValue();
+      const storeCode = getStoreCodeValue();
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1440;
+      const ctx = canvas.getContext("2d");
+
+      const accent = "#c65327";
+      const ink = "#241006";
+      const softLine = "#efcdbd";
+      const softBg = "#fffaf7";
+
+      ctx.fillStyle = softBg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = softLine;
+      ctx.lineWidth = 3;
+      drawRoundRect(ctx, 22, 18, 1036, 1404, 24);
+      ctx.stroke();
+
+      drawCenteredText(ctx, "PrintForm", 540, 100, 520, 48, "700", ink);
+      ctx.strokeStyle = softLine;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(338, 163);
+      ctx.lineTo(520, 163);
+      ctx.moveTo(568, 163);
+      ctx.lineTo(752, 163);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(544, 163, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawCenteredText(ctx, storeName, 540, 260, 780, 82, "800", accent);
+
+      const cardX = 242;
+      const cardY = 325;
+      const cardW = 596;
+      const cardH = 684;
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = softLine;
+      ctx.lineWidth = 3;
+      drawRoundRect(ctx, cardX, cardY, cardW, cardH, 26);
+      ctx.fill();
+      ctx.stroke();
+      drawPosterQrMatrix(ctx, matrix, cardX + 54, cardY + 48, 488, "#241006");
+
+      const pillX = cardX + 58;
+      const pillY = cardY + 588;
+      const pillW = cardW - 116;
+      const gradient = ctx.createLinearGradient(pillX, pillY, pillX + pillW, pillY);
+      gradient.addColorStop(0, "#d65b2c");
+      gradient.addColorStop(1, "#bb431d");
+      ctx.fillStyle = gradient;
+      drawRoundRect(ctx, pillX, pillY, pillW, 68, 34);
+      ctx.fill();
+      drawCenteredText(ctx, storeCode || "Kode Toko", 540, pillY + 35, pillW - 40, 40, "800", "#ffffff");
+
+      ctx.strokeStyle = softLine;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(210, 1072);
+      ctx.lineTo(362, 1072);
+      ctx.moveTo(720, 1072);
+      ctx.lineTo(872, 1072);
+      ctx.stroke();
+      ctx.fillStyle = "#f3e2d9";
+      drawRoundRect(ctx, 382, 1038, 316, 68, 34);
+      ctx.fill();
+      ctx.strokeStyle = softLine;
+      ctx.stroke();
+      drawCenteredText(ctx, "Cara Pakai", 548, 1072, 220, 34, "800", ink);
+
+      const steps = [
+        ["1", "Scan QR"],
+        ["2", "Upload dokumen & atur cetak"],
+        ["3", "Cetak di mitra"]
+      ];
+      steps.forEach(([number, label], index) => {
+        const y = 1150 + index * 68;
+        ctx.fillStyle = "#f3e2d9";
+        ctx.beginPath();
+        ctx.arc(316, y, 29, 0, Math.PI * 2);
+        ctx.fill();
+        drawCenteredText(ctx, number, 316, y, 40, 30, "800", ink);
+        ctx.fillStyle = ink;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.font = "700 30px Arial, sans-serif";
+        ctx.fillText(label, 366, y);
+      });
+
+      ctx.strokeStyle = softLine;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(212, 1342);
+      ctx.lineTo(520, 1342);
+      ctx.moveTo(568, 1342);
+      ctx.lineTo(876, 1342);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(544, 1342, 8, 0, Math.PI * 2);
+      ctx.fill();
+      drawCenteredText(ctx, "Layanan cetak yang lebih praktis dan privat", 540, 1390, 660, 27, "700", ink);
+
+      const link = document.createElement("a");
+      const safeName = (storeName || storeCode || "toko")
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "toko";
+      link.download = `printform-qr-${safeName}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (err) {
+      setStatus(storeQrStatus, err.message || "Gagal download QR.", "error");
+    }
   }
 
   function formatReadiness(readiness) {
@@ -670,6 +902,7 @@
     storeSettingsForm.elements.storeContact.value = config.kontak || "";
     storeSettingsForm.elements.storeAddress.value = user?.alamat || "";
     updateOperationalUi();
+    renderStoreQr();
 
     renderPaperTypeOptions(paperTypes);
     setColorModeSelection(selectedColorModes);
@@ -1114,6 +1347,9 @@
     accountPinForm.addEventListener("submit", submitAccountPin);
     storeSettingsForm.elements.storeStatus.addEventListener("change", onStoreStatusChange);
     saveOperationalHoursBtn.addEventListener("click", onSaveOperationalHours);
+    storeSettingsForm.elements.storeName.addEventListener("input", renderStoreQr);
+    storeSettingsForm.elements.kodeToko.addEventListener("input", renderStoreQr);
+    downloadStoreQrBtn.addEventListener("click", downloadStoreQrPoster);
     serviceSettingsForm.querySelectorAll('input[name="colorModes"]').forEach(input => {
       input.addEventListener("change", updateColorPriceInputStates);
     });

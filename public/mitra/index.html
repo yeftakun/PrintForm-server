@@ -282,6 +282,19 @@
                   <div class="status" id="storeSettingsStatus" role="status"></div>
                 </div>
               </form>
+              <div class="store-qr-panel">
+                <div class="store-qr-preview">
+                  <canvas id="storeQrCanvas" width="180" height="180" aria-label="QR toko"></canvas>
+                </div>
+                <div class="store-qr-copy">
+                  <span>QR Toko</span>
+                  <strong id="storeQrUrl">-</strong>
+                  <div class="section-actions">
+                    <button class="btn btn-outline btn-compact" id="downloadStoreQrBtn" type="button">Download QR</button>
+                  </div>
+                  <div class="status" id="storeQrStatus" role="status"></div>
+                </div>
+              </div>
             </section>
 
             <section class="dashboard-section" id="serviceSettingsSection" aria-labelledby="serviceSettingsTitle">
@@ -749,6 +762,7 @@
 
     <script src="/shared/alerts.js"></script>
     <script src="/mitra/auth-client.js"></script>
+    <script src="/mitra/qr.js"></script>
     <script src="/mitra/index.js"></script>
   </body>
 </html>
