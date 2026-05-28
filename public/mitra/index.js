@@ -588,6 +588,7 @@
     const name = String(plan?.name || "").toLowerCase();
     if (code.includes("starter") || name === "starter") return "Pilih Starter";
     if (code.includes("pro") || name === "pro") return "Pilih Pro";
+    if (code.includes("credit") || name === "buy credit") return "Top Up";
     return "Pilih Plan";
   }
 
@@ -1387,7 +1388,9 @@
     creditTotalActive.textContent = formatInteger(balance.totalCredits || 0);
     creditUsed.textContent = formatInteger(balance.usedCredits || 0);
     creditRemaining.textContent = formatInteger(balance.remainingCredits || 0);
-    creditNearestExpiry.textContent = balance.nearestExpiration ? formatDate(balance.nearestExpiration) : "-";
+    creditNearestExpiry.textContent = balance.nearestExpiration
+      ? `${formatDate(balance.nearestExpiration)} · ${formatInteger(balance.nearestExpirationCredits || 0)} kredit`
+      : "-";
 
     const items = Object.values(balance.breakdown || {});
     if (items.length === 0) {

@@ -641,12 +641,25 @@ async function getCreditBalance(userId) {
      ORDER BY source_type ASC`,
     [userId]
   );
+  const nearestRes = await query(
+    `SELECT expires_at,
+            SUM(GREATEST(total_credits - used_credits, 0))::int AS remaining_credits
+     FROM credits
+     WHERE user_id = $1
+       AND status = 'active'
+       AND starts_at <= now()
+       AND expires_at > now()
+       AND total_credits > used_credits
+     GROUP BY expires_at
+     ORDER BY expires_at ASC
+     LIMIT 1`,
+    [userId]
+  );
 
   const breakdown = {};
   let totalCredits = 0;
   let usedCredits = 0;
   let remainingCredits = 0;
-  let nearestExpiration = null;
 
   for (const row of activeRes.rows) {
     const source = row.source_type || "unknown";
@@ -661,17 +674,17 @@ async function getCreditBalance(userId) {
     totalCredits += item.totalCredits;
     usedCredits += item.usedCredits;
     remainingCredits += item.remainingCredits;
-    if (item.nearestExpiresAt && (!nearestExpiration || new Date(item.nearestExpiresAt) < new Date(nearestExpiration))) {
-      nearestExpiration = item.nearestExpiresAt;
-    }
   }
+
+  const nearestRow = nearestRes.rows[0] || null;
 
   return {
     totalCredits,
     usedCredits,
     remainingCredits,
     breakdown,
-    nearestExpiration
+    nearestExpiration: toIso(nearestRow?.expires_at),
+    nearestExpirationCredits: toInt(nearestRow?.remaining_credits)
   };
 }
 
