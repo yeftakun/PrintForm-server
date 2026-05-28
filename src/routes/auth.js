@@ -555,6 +555,18 @@ router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
     requestedService.modeWarnaPilihan || requestedService.modeWarna
   );
   const hargaModeWarna = normalizeColorModePrices(requestedService.hargaModeWarna);
+  const nextServiceConfig = {
+    ...(currentConfig.layanan && typeof currentConfig.layanan === "object" ? currentConfig.layanan : {}),
+    jenisKertas: normalizePaperTypes(requestedService.jenisKertas),
+    modeWarna: colorModeFromSelection(modeWarnaPilihan),
+    modeWarnaPilihan,
+    hargaDasar: normalizeNonNegativeNumber(requestedService.hargaDasar, 0),
+    hargaModeWarna
+  };
+
+  if (Object.prototype.hasOwnProperty.call(requestedService, "batasFileMb")) {
+    nextServiceConfig.batasFileMb = normalizeFileLimitMb(requestedService.batasFileMb);
+  }
 
   const konfigurasiToko = {
     ...currentConfig,
@@ -564,15 +576,7 @@ router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
     waktuOperasional,
     forceOpenOutsideOperationalHours: normalizeBoolean(req.body?.forceOpenOutsideOperationalHours, false),
     kontak: normalizeOptionalText(req.body?.kontak, 80),
-    layanan: {
-      ...(currentConfig.layanan && typeof currentConfig.layanan === "object" ? currentConfig.layanan : {}),
-      jenisKertas: normalizePaperTypes(requestedService.jenisKertas),
-      modeWarna: colorModeFromSelection(modeWarnaPilihan),
-      modeWarnaPilihan,
-      hargaDasar: normalizeNonNegativeNumber(requestedService.hargaDasar, 0),
-      hargaModeWarna,
-      batasFileMb: normalizeFileLimitMb(requestedService.batasFileMb)
-    }
+    layanan: nextServiceConfig
   };
 
   const updatedUser = await updateUserStoreSettings(req.user.id, {

@@ -1446,7 +1446,7 @@ body.mitra-dashboard-active .page {
   min-width: 0;
   min-height: 0;
   display: grid;
-  gap: 12px;
+  gap: 14px;
   align-content: start;
   overflow-y: auto;
   padding: 14px;
@@ -1467,7 +1467,7 @@ body.mitra-dashboard-active .page {
 
 .dashboard-section {
   min-width: 0;
-  padding: 16px;
+  padding: 18px;
   border: 1px solid #e6e9ee;
   border-radius: 14px;
   background: #ffffff;
@@ -1530,16 +1530,16 @@ body.mitra-dashboard-active .page {
 
 .dashboard-section-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .jobs-filter-bar {
@@ -1688,7 +1688,8 @@ body.mitra-dashboard-active .page {
   min-width: 0;
   display: grid;
   gap: 8px;
-  padding: 13px;
+  min-height: 104px;
+  padding: 14px;
   border: 1px solid #ebedf1;
   border-radius: 12px;
   background: #fbfcfd;
@@ -1704,7 +1705,7 @@ body.mitra-dashboard-active .page {
 
 .stat-card strong {
   color: #121418;
-  font-size: 1.55rem;
+  font-size: clamp(1.45rem, 2.4vw, 1.7rem);
   line-height: 1;
 }
 
@@ -1756,11 +1757,16 @@ body.mitra-dashboard-active .page {
   line-height: 1;
 }
 
-.credit-summary-grid,
+.credit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
 .plans-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(218px, 1fr));
+  gap: 12px;
 }
 
 .credit-breakdown {
@@ -1772,8 +1778,10 @@ body.mitra-dashboard-active .page {
 
 .billing-pricing-block {
   display: grid;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 14px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #eef0f3;
 }
 
 .billing-pricing-block h3 {
@@ -1796,10 +1804,12 @@ body.mitra-dashboard-active .page {
 }
 
 .plan-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 16px;
+  min-height: 252px;
+  padding: 18px 16px 16px;
   border: 1px solid #ebedf1;
   border-radius: 12px;
   background: #fbfcfd;
@@ -1807,7 +1817,8 @@ body.mitra-dashboard-active .page {
 
 .plan-card h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
+  line-height: 1.2;
 }
 
 .plan-card p {
@@ -1829,6 +1840,13 @@ body.mitra-dashboard-active .page {
   font-weight: 900;
 }
 
+.plan-label-slot {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+
 .plan-savings-label {
   justify-self: start;
   min-height: 24px;
@@ -1845,7 +1863,7 @@ body.mitra-dashboard-active .page {
 
 .plan-price {
   color: #121418;
-  font-size: 1.5rem;
+  font-size: clamp(1.45rem, 2.6vw, 1.72rem);
   font-weight: 900;
   line-height: 1;
 }
@@ -1855,6 +1873,17 @@ body.mitra-dashboard-active .page {
   display: grid;
   gap: 8px;
   margin: 0;
+}
+
+.plan-meta-list {
+  margin-top: auto;
+}
+
+.plan-card > .btn {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0;
+  border-radius: 999px;
 }
 
 .plan-meta-list div,
@@ -1966,14 +1995,42 @@ body.mitra-dashboard-active .page {
 }
 
 .store-clients-panel {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e6e9ee;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #ebedf1;
+  border-radius: 12px;
+  background: #fbfcfd;
 }
 
 .store-clients-panel h3 {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.store-clients-panel .dashboard-section-head {
+  margin-bottom: 8px;
+}
+
+.store-clients-panel .status {
+  min-height: 0;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+}
+
+.store-clients-panel .table-wrap {
+  margin-top: 0;
+  background: #fff;
+}
+
+.store-clients-panel .clients-table th,
+.store-clients-panel .clients-table td {
+  padding: 10px 12px;
+  font-size: 0.84rem;
+}
+
+.store-clients-panel .clients-table th {
+  font-size: 0.7rem;
 }
 
 .orders-table {
@@ -2180,13 +2237,13 @@ body.mitra-dashboard-active .page {
 }
 
 .service-check-field {
-  gap: 9px;
+  gap: 8px;
 }
 
 .service-checkbox-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 7px;
 }
 
 .service-check-label {
@@ -2194,13 +2251,13 @@ body.mitra-dashboard-active .page {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 42px;
-  padding: 9px 10px;
+  min-height: 38px;
+  padding: 8px 10px;
   border: 1px solid #ebedf1;
   border-radius: 10px;
   background: #fbfcfd;
   color: var(--ink);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 800;
 }
 
@@ -2213,17 +2270,23 @@ body.mitra-dashboard-active .page {
 .color-price-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .color-price-item {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(132px, 0.48fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
   min-width: 0;
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid #ebedf1;
   border-radius: 12px;
   background: #fbfcfd;
+}
+
+.color-price-item .service-check-label {
+  min-height: 40px;
 }
 
 .price-input-wrap {
@@ -2236,7 +2299,7 @@ body.mitra-dashboard-active .page {
 }
 
 .price-input-wrap input {
-  min-height: 42px !important;
+  min-height: 40px !important;
 }
 
 .price-input-wrap input:disabled {
@@ -2254,7 +2317,8 @@ body.mitra-dashboard-active .page {
 .mini-panel {
   display: grid;
   gap: 7px;
-  padding: 12px;
+  min-height: 62px;
+  padding: 12px 14px;
   border: 1px solid #ebedf1;
   border-radius: 12px;
   background: #fbfcfd;
@@ -2263,9 +2327,14 @@ body.mitra-dashboard-active .page {
 .mini-panel strong {
   overflow: hidden;
   color: #15171c;
-  font-size: 0.95rem;
+  font-size: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.credit-summary-grid .mini-panel strong {
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .account-actions {
@@ -2334,9 +2403,7 @@ body.mitra-dashboard-active .page {
 }
 
 @media (max-width: 1120px) {
-  .stat-grid,
-  .credit-summary-grid,
-  .plans-grid {
+  .stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -2406,6 +2473,10 @@ body.mitra-dashboard-active .page {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .plan-card {
+    min-height: 0;
+  }
+
   .jobs-filter-bar {
     grid-template-columns: 1fr;
   }
@@ -2442,6 +2513,10 @@ body.mitra-dashboard-active .page {
 
   .service-checkbox-grid,
   .color-price-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .color-price-item {
     grid-template-columns: 1fr;
   }
 }

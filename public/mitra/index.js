@@ -1435,7 +1435,7 @@
               <dd>${escapeHtml(getPlanDurationText(plan))}</dd>
             </div>
           </dl>
-          ${isProPlan(plan) ? '<span class="plan-savings-label">Paling Hemat</span>' : ""}
+          <span class="plan-label-slot">${isProPlan(plan) ? '<span class="plan-savings-label">Paling Hemat</span>' : ""}</span>
           <button
             class="btn btn-primary btn-compact"
             type="button"
@@ -1867,10 +1867,6 @@
     serviceSettingsForm.elements.priceColor.value = Number.isFinite(Number(modePrices.color))
       ? String(Number(modePrices.color))
       : String(legacyBasePrice || "");
-    serviceSettingsForm.elements.fileLimitMb.value = Number.isFinite(Number(service.batasFileMb))
-      ? String(Number(service.batasFileMb))
-      : "25";
-
     dashboardUserChip.textContent = user?.username ? `@${user.username}` : "Akun Mitra";
     dashboardStoreCode.textContent = `Kode toko: ${user?.kodeToko || "-"}`;
     accountUsername.textContent = user?.username ? `@${user.username}` : "-";
@@ -1914,8 +1910,7 @@
         hargaModeWarna: {
           bw: Number.isFinite(priceBw) ? priceBw : 0,
           color: Number.isFinite(priceColor) ? priceColor : 0
-        },
-        batasFileMb: Number(serviceSettingsForm.elements.fileLimitMb.value || 25)
+        }
       }
     };
   }
