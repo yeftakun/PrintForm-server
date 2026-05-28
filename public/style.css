@@ -3278,6 +3278,7 @@ th {
   max-height: calc(100vh - 36px);
   padding: 22px;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 18px;
   animation: session-drawer-in 180ms ease-out;
 }
@@ -3291,7 +3292,11 @@ th {
 
 .session-detail-content {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .session-detail-row {
@@ -3312,6 +3317,21 @@ th {
   overflow-wrap: anywhere;
   color: #1d1b16;
   font-size: 0.92rem;
+}
+
+.session-detail-wide-row,
+.session-detail-price-row {
+  grid-column: 1 / -1;
+}
+
+.session-detail-price-row {
+  border-color: rgba(207, 84, 45, 0.28);
+  background: #fff3ea;
+}
+
+.session-detail-price-row strong {
+  color: #c94b26;
+  font-size: 1.08rem;
 }
 
 .session-detail-actions {
@@ -3770,6 +3790,10 @@ th {
     max-height: calc(100vh - 70px);
     padding: 16px;
     border-radius: 22px 22px 0 0;
+  }
+
+  .session-detail-content {
+    grid-template-columns: 1fr;
   }
 
   .session-proof-all-btn,

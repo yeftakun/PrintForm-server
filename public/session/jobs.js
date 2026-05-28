@@ -87,12 +87,14 @@ function formatCurrency(value) {
   }).format(Number(value));
 }
 
-function getColorDetectionText(job) {
-  const detection = job.printConfig?.colorDetection;
-  if (!detection || typeof detection !== "object") {
-    return "-";
-  }
-  return `${Number(detection.bwPages || 0)} BW, ${Number(detection.colorPages || 0)} warna`;
+function getJobEstimatedPrice(job) {
+  const price = Number(job?.printConfig?.estimatedPrice);
+  return Number.isFinite(price) && price > 0 ? price : 0;
+}
+
+function formatEstimatedPrice(job) {
+  const price = getJobEstimatedPrice(job);
+  return price > 0 ? formatCurrency(price) : "-";
 }
 
 function setJobDetailOpen(isOpen) {
@@ -104,9 +106,10 @@ function setJobDetailOpen(isOpen) {
   document.body.classList.toggle("session-modal-open", isOpen || !document.getElementById("jobsModal")?.classList.contains("hidden"));
 }
 
-function renderDetailRow(label, value) {
+function renderDetailRow(label, value, className = "") {
+  const extraClass = className ? ` ${className}` : "";
   return `
-    <div class="session-detail-row">
+    <div class="session-detail-row${extraClass}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value || "-")}</strong>
     </div>`;
@@ -129,12 +132,11 @@ function openJobDetail(jobId) {
 
   jobDetailContent.innerHTML = [
     renderDetailRow("ID", job.id),
-    renderDetailRow("Nama Dokumen", job.originalName),
+    renderDetailRow("Nama Dokumen", job.originalName, "session-detail-wide-row"),
     renderDetailRow("Alias", job.alias || "-"),
     renderDetailRow("Diklaim Oleh", getClaimedBy(job)),
-    renderDetailRow("Konfigurasi", getJobConfigText(job) || "-"),
-    renderDetailRow("Deteksi Warna", getColorDetectionText(job)),
-    renderDetailRow("Estimasi Harga", formatCurrency(job.printConfig?.estimatedPrice)),
+    renderDetailRow("Konfigurasi", getJobConfigText(job) || "-", "session-detail-wide-row"),
+    renderDetailRow("Estimasi Harga", formatEstimatedPrice(job), "session-detail-price-row"),
     renderDetailRow("Status", formatStatus(job.status)),
     renderDetailRow("Waktu", formatJobTime(job.createdAt))
   ].join("");
@@ -213,10 +215,11 @@ function drawKeyValue(ctx, label, value, x, y, maxWidth) {
 function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
   const completedJobs = jobs.filter(isCompletedJob);
   const context = getReceiptContext();
+  const totalPrice = completedJobs.reduce((sum, job) => sum + getJobEstimatedPrice(job), 0);
   const width = 576;
   const margin = 34;
   const contentWidth = width - (margin * 2);
-  const estimatedHeight = Math.max(820, 640 + (completedJobs.length * 230));
+  const estimatedHeight = Math.max(860, 700 + (completedJobs.length * 255));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = estimatedHeight;
@@ -259,6 +262,7 @@ function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
       y += 25;
     });
     y = drawKeyValue(ctx, "Config", getJobConfigText(job) || "-", margin + 18, y + 4, contentWidth - 18);
+    y = drawKeyValue(ctx, "Harga", formatEstimatedPrice(job), margin + 18, y + 4, contentWidth - 18);
     y = drawKeyValue(ctx, "Status", formatStatus(job.status), margin + 18, y + 4, contentWidth - 18);
     y = drawKeyValue(ctx, "Waktu", new Date(job.createdAt).toLocaleString(), margin + 18, y + 4, contentWidth - 18);
     y += 16;
@@ -268,6 +272,8 @@ function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
 
   drawReceiptText(ctx, `Total tugas selesai: ${completedJobs.length}`, margin, y, { size: 22, weight: "700" });
   y += 36;
+  drawReceiptText(ctx, `Total harga: ${formatCurrency(totalPrice)}`, margin, y, { size: 26, weight: "700" });
+  y += 42;
   drawReceiptText(ctx, "Simpan bukti ini untuk pengecekan tugas cetak.", width / 2, y, { size: 18, align: "center" });
   y += 28;
   drawReceiptText(ctx, "Terima kasih", width / 2, y, { size: 22, weight: "700", align: "center" });
