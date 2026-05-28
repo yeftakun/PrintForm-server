@@ -134,6 +134,39 @@ function normalizeColorMode(value) {
   return "both";
 }
 
+function normalizeColorModeSelection(value) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || "").split(",");
+  const normalized = list
+    .flatMap(item => {
+      const mode = String(item || "").trim().toLowerCase();
+      return mode === "both" ? ["bw", "color"] : [mode];
+    })
+    .filter(mode => mode === "bw" || mode === "color");
+
+  return [...new Set(normalized)].length > 0 ? [...new Set(normalized)] : ["bw"];
+}
+
+function colorModeFromSelection(selection) {
+  const modes = new Set(selection);
+  if (modes.has("bw") && modes.has("color")) {
+    return "both";
+  }
+  if (modes.has("color")) {
+    return "color";
+  }
+  return "bw";
+}
+
+function normalizeColorModePrices(value) {
+  const prices = value && typeof value === "object" ? value : {};
+  return {
+    bw: normalizeNonNegativeNumber(prices.bw, 0),
+    color: normalizeNonNegativeNumber(prices.color, 0)
+  };
+}
+
 function normalizePaperTypes(value) {
   const list = Array.isArray(value)
     ? value
@@ -517,6 +550,10 @@ router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
   );
   const jamOperasional = normalizeOptionalText(req.body?.jamOperasional, 500)
     || summarizeOperationalSchedule(waktuOperasional);
+  const modeWarnaPilihan = normalizeColorModeSelection(
+    requestedService.modeWarnaPilihan || requestedService.modeWarna
+  );
+  const hargaModeWarna = normalizeColorModePrices(requestedService.hargaModeWarna);
 
   const konfigurasiToko = {
     ...currentConfig,
@@ -529,8 +566,10 @@ router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
     layanan: {
       ...(currentConfig.layanan && typeof currentConfig.layanan === "object" ? currentConfig.layanan : {}),
       jenisKertas: normalizePaperTypes(requestedService.jenisKertas),
-      modeWarna: normalizeColorMode(requestedService.modeWarna),
+      modeWarna: colorModeFromSelection(modeWarnaPilihan),
+      modeWarnaPilihan,
       hargaDasar: normalizeNonNegativeNumber(requestedService.hargaDasar, 0),
+      hargaModeWarna,
       batasFileMb: normalizeFileLimitMb(requestedService.batasFileMb)
     }
   };

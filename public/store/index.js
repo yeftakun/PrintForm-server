@@ -9,6 +9,7 @@ const storeHours = document.getElementById("storeHours");
 const storeStatus = document.getElementById("storeStatus");
 const storeStatusBadge = document.getElementById("storeStatusBadge");
 const storeSummaryStatusIcon = document.getElementById("storeSummaryStatusIcon");
+const storeServiceChips = document.getElementById("storeServiceChips");
 const confirmStoreBtn = document.getElementById("confirmStoreBtn");
 const storePageStatus = document.getElementById("storePageStatus");
 const storeLayout = document.querySelector(".store-layout");
@@ -33,6 +34,39 @@ function setPageStatus(text, kind = "") {
     : "status store-page-status";
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderServiceChips(layanan) {
+  const service = layanan && typeof layanan === "object" ? layanan : {};
+  const paperTypes = Array.isArray(service.jenisKertas) && service.jenisKertas.length > 0
+    ? service.jenisKertas
+    : ["A4", "F4"];
+  const colorModes = Array.isArray(service.modeWarnaPilihan) && service.modeWarnaPilihan.length > 0
+    ? service.modeWarnaPilihan
+    : String(service.modeWarna || "both") === "color"
+      ? ["color"]
+      : String(service.modeWarna || "both") === "bw"
+        ? ["bw"]
+        : ["bw", "color"];
+  const chips = [
+    "Cetak PDF",
+    ...(colorModes.includes("bw") ? ["Hitam Putih"] : []),
+    ...(colorModes.includes("color") ? ["Warna"] : []),
+    ...paperTypes
+  ];
+
+  storeServiceChips.innerHTML = chips
+    .map(item => `<span>${escapeHtml(item)}</span>`)
+    .join("");
+}
+
 function renderStore(store) {
   currentStore = store;
   storeLayout?.classList.remove("hidden");
@@ -54,6 +88,7 @@ function renderStore(store) {
   storeAddress.textContent = store.alamat || "Alamat belum diatur";
   storeHours.textContent = store.jamOperasional || "Setiap hari 08.00 - 21.00";
   storeStatus.textContent = statusText;
+  renderServiceChips(store.layanan);
   storeStatusBadge.textContent = isClosed
     ? "Tutup"
     : isReady

@@ -73,6 +73,20 @@
     open: "08:00",
     close: "21:00"
   }));
+  const PAPER_SIZE_OPTIONS = [
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+    "B4",
+    "B5",
+    "F4",
+    "Letter",
+    "Legal",
+    "Folio",
+    "Kwarto",
+    "Amplop"
+  ];
   let currentUser = null;
   let latestClients = [];
   let latestJobs = [];
@@ -345,6 +359,74 @@
     });
   }
 
+  function renderPaperTypeOptions(selectedTypes = []) {
+    const selectedSet = new Set(selectedTypes.map(item => String(item || "").trim().toUpperCase()));
+    const options = [
+      ...PAPER_SIZE_OPTIONS,
+      ...selectedTypes.filter(item => !PAPER_SIZE_OPTIONS.some(option => option.toUpperCase() === String(item || "").toUpperCase()))
+    ];
+
+    const uniqueOptions = [...new Map(options.map(option => [String(option).toUpperCase(), option])).values()];
+    const group = document.getElementById("paperTypesGroup");
+    group.innerHTML = uniqueOptions.map(option => {
+      const value = String(option).trim();
+      return `
+        <label class="service-check-label">
+          <input type="checkbox" name="paperTypes" value="${escapeHtml(value)}" ${selectedSet.has(value.toUpperCase()) ? "checked" : ""}>
+          <span>${escapeHtml(value)}</span>
+        </label>
+      `;
+    }).join("");
+  }
+
+  function getSelectedPaperTypes() {
+    return Array.from(serviceSettingsForm.querySelectorAll('input[name="paperTypes"]:checked'))
+      .map(input => String(input.value || "").trim())
+      .filter(Boolean);
+  }
+
+  function getSelectedColorModes() {
+    return Array.from(serviceSettingsForm.querySelectorAll('input[name="colorModes"]:checked'))
+      .map(input => String(input.value || "").trim())
+      .filter(value => value === "bw" || value === "color");
+  }
+
+  function legacyColorModeFromSelection(selectedModes) {
+    const modes = new Set(selectedModes);
+    if (modes.has("bw") && modes.has("color")) {
+      return "both";
+    }
+    if (modes.has("color")) {
+      return "color";
+    }
+    return "bw";
+  }
+
+  function colorSelectionFromLegacy(mode) {
+    const normalized = String(mode || "both").toLowerCase();
+    if (normalized === "color") {
+      return ["color"];
+    }
+    if (normalized === "bw") {
+      return ["bw"];
+    }
+    return ["bw", "color"];
+  }
+
+  function setColorModeSelection(selectedModes) {
+    const selectedSet = new Set(selectedModes);
+    serviceSettingsForm.querySelectorAll('input[name="colorModes"]').forEach(input => {
+      input.checked = selectedSet.has(input.value);
+    });
+    updateColorPriceInputStates();
+  }
+
+  function updateColorPriceInputStates() {
+    const selectedModes = new Set(getSelectedColorModes());
+    serviceSettingsForm.elements.priceBw.disabled = !selectedModes.has("bw");
+    serviceSettingsForm.elements.priceColor.disabled = !selectedModes.has("color");
+  }
+
   function setLinkedClientsEmpty(text) {
     linkedClientsBody.innerHTML = `<tr><td colspan="6" class="muted-cell">${escapeHtml(text)}</td></tr>`;
   }
@@ -563,9 +645,18 @@
   function fillDashboardForms(user) {
     const config = getStoreConfig(user);
     const service = getServiceConfig(user);
-    const paperTypes = Array.isArray(service.jenisKertas)
-      ? service.jenisKertas.join(", ")
-      : "A4, A5, F4";
+    const paperTypes = Array.isArray(service.jenisKertas) && service.jenisKertas.length > 0
+      ? service.jenisKertas
+      : ["A4", "F4"];
+    const selectedColorModes = Array.isArray(service.modeWarnaPilihan) && service.modeWarnaPilihan.length > 0
+      ? service.modeWarnaPilihan
+      : colorSelectionFromLegacy(service.modeWarna);
+    const modePrices = service.hargaModeWarna && typeof service.hargaModeWarna === "object"
+      ? service.hargaModeWarna
+      : {};
+    const legacyBasePrice = Number.isFinite(Number(service.hargaDasar))
+      ? Number(service.hargaDasar)
+      : 0;
 
     storeSettingsForm.elements.storeName.value = config.namaToko || user?.username || "";
     storeSettingsForm.elements.kodeToko.value = user?.kodeToko || "";
@@ -580,11 +671,14 @@
     storeSettingsForm.elements.storeAddress.value = user?.alamat || "";
     updateOperationalUi();
 
-    serviceSettingsForm.elements.paperTypes.value = paperTypes;
-    serviceSettingsForm.elements.colorMode.value = service.modeWarna || "both";
-    serviceSettingsForm.elements.basePrice.value = Number.isFinite(Number(service.hargaDasar))
-      ? String(Number(service.hargaDasar))
-      : "";
+    renderPaperTypeOptions(paperTypes);
+    setColorModeSelection(selectedColorModes);
+    serviceSettingsForm.elements.priceBw.value = Number.isFinite(Number(modePrices.bw))
+      ? String(Number(modePrices.bw))
+      : String(legacyBasePrice || "");
+    serviceSettingsForm.elements.priceColor.value = Number.isFinite(Number(modePrices.color))
+      ? String(Number(modePrices.color))
+      : String(legacyBasePrice || "");
     serviceSettingsForm.elements.fileLimitMb.value = Number.isFinite(Number(service.batasFileMb))
       ? String(Number(service.batasFileMb))
       : "25";
@@ -607,10 +701,13 @@
   }
 
   function buildSettingsPayload() {
-    const paperTypes = String(serviceSettingsForm.elements.paperTypes.value || "")
-      .split(",")
-      .map(item => item.trim())
-      .filter(Boolean);
+    const paperTypes = getSelectedPaperTypes();
+    const selectedColorModes = getSelectedColorModes();
+    const safeColorModes = selectedColorModes.length > 0 ? selectedColorModes : ["bw"];
+    const priceBw = Number(serviceSettingsForm.elements.priceBw.value || 0);
+    const priceColor = Number(serviceSettingsForm.elements.priceColor.value || 0);
+    const basePrices = safeColorModes.map(mode => mode === "color" ? priceColor : priceBw);
+    const hargaDasar = basePrices.find(price => Number.isFinite(price) && price > 0) || 0;
 
     return {
       storeName: String(storeSettingsForm.elements.storeName.value || "").trim(),
@@ -623,8 +720,13 @@
       alamat: String(storeSettingsForm.elements.storeAddress.value || "").trim(),
       layanan: {
         jenisKertas: paperTypes,
-        modeWarna: String(serviceSettingsForm.elements.colorMode.value || "both"),
-        hargaDasar: Number(serviceSettingsForm.elements.basePrice.value || 0),
+        modeWarna: legacyColorModeFromSelection(safeColorModes),
+        modeWarnaPilihan: safeColorModes,
+        hargaDasar,
+        hargaModeWarna: {
+          bw: Number.isFinite(priceBw) ? priceBw : 0,
+          color: Number.isFinite(priceColor) ? priceColor : 0
+        },
         batasFileMb: Number(serviceSettingsForm.elements.fileLimitMb.value || 25)
       }
     };
@@ -1012,6 +1114,9 @@
     accountPinForm.addEventListener("submit", submitAccountPin);
     storeSettingsForm.elements.storeStatus.addEventListener("change", onStoreStatusChange);
     saveOperationalHoursBtn.addEventListener("click", onSaveOperationalHours);
+    serviceSettingsForm.querySelectorAll('input[name="colorModes"]').forEach(input => {
+      input.addEventListener("change", updateColorPriceInputStates);
+    });
     storeSettingsForm.addEventListener("submit", event => {
       event.preventDefault();
       updateOperationalUi({ autoCloseOutsideHours: true });
