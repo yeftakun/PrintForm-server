@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Payment Mitra PrintForm</title>
+    <link rel="stylesheet" href="/mitra/style.css">
+    <link rel="stylesheet" href="/shared/alerts.css">
+  </head>
+  <body class="mitra-payment-page">
+    <main class="page payment-page">
+      <section class="partner-dashboard payment-shell" aria-labelledby="paymentTitle">
+        <header class="dashboard-header">
+          <a href="/mitra/" class="dashboard-brand" aria-label="Mitra PrintForm">
+            <span class="dashboard-brand-mark" aria-hidden="true">P</span>
+            <span>Mitra PrintForm</span>
+          </a>
+          <div class="dashboard-actions">
+            <a class="btn btn-ghost btn-compact" href="/mitra/#pricingSection">Kembali</a>
+            <span class="auth-chip" id="paymentUserChip">@user</span>
+          </div>
+        </header>
+
+        <div class="payment-page-main">
+          <section class="dashboard-section">
+            <div class="dashboard-section-head">
+              <div>
+                <p class="dashboard-kicker">Payment Page</p>
+                <h1 id="paymentTitle">Pembayaran Manual</h1>
+              </div>
+            </div>
+            <div class="payment-layout">
+              <div class="payment-summary-panel">
+                <span>Plan</span>
+                <strong id="paymentPlanName">-</strong>
+                <dl class="payment-summary-list">
+                  <div class="payment-quantity-control" id="paymentQuantityControl">
+                    <dt>Quantity</dt>
+                    <dd>
+                      <input type="number" id="paymentQuantityInput" min="1" max="99" step="1" value="1">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Harga awal</dt>
+                    <dd id="paymentSubtotal">Rp0</dd>
+                  </div>
+                  <div>
+                    <dt>Quantity final</dt>
+                    <dd id="paymentQuantity">1</dd>
+                  </div>
+                  <div>
+                    <dt>Jumlah kredit</dt>
+                    <dd id="paymentCredits">0</dd>
+                  </div>
+                  <div>
+                    <dt>Durasi berlaku</dt>
+                    <dd id="paymentDuration">-</dd>
+                  </div>
+                  <div>
+                    <dt>Potongan harga</dt>
+                    <dd id="paymentDiscount">Rp0</dd>
+                  </div>
+                  <div class="payment-total-row">
+                    <dt>Total bayar</dt>
+                    <dd id="paymentTotal">Rp0</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="payment-action-panel">
+                <label class="field">
+                  <span>Kode Kupon</span>
+                  <input type="text" id="couponCodeInput" placeholder="Masukkan kode kupon">
+                </label>
+                <div class="section-actions">
+                  <button class="btn btn-outline btn-compact" id="checkCouponBtn" type="button">Cek Kupon</button>
+                  <button class="btn btn-primary btn-compact" id="createOrderBtn" type="button">Buat Order</button>
+                </div>
+                <div class="payment-instruction-box hidden" id="paymentInstructionBox">
+                  <span>Instruksi pembayaran</span>
+                  <p id="paymentInstructionText">-</p>
+                </div>
+                <div class="section-actions hidden" id="paymentResultActions">
+                  <a class="btn btn-outline btn-compact" href="/mitra/#ordersSection">Lihat Order</a>
+                  <a class="btn btn-ghost btn-compact" href="/mitra/#pricingSection">Pilih Plan Lain</a>
+                </div>
+                <div class="status" id="paymentStatus" role="status"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/shared/alerts.js"></script>
+    <script src="/mitra/auth-client.js"></script>
+    <script src="/mitra/payment/index.js"></script>
+  </body>
+</html>

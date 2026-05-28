@@ -14,6 +14,7 @@ const {
   listActivePlans,
   calculateOrderPricing,
   createOrder,
+  cancelOrderForUser,
   listOrdersForUser,
   getOrderByIdForUser,
   attachPaymentProof,
@@ -142,6 +143,23 @@ router.get("/orders/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Order tidak ditemukan." });
     return;
   }
+  res.json({ order });
+}));
+
+router.post("/orders/:id/cancel", asyncHandler(async (req, res) => {
+  const order = await cancelOrderForUser(req.params.id, req.user.id);
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "billing.order.cancelled",
+    targetType: "order",
+    targetId: order.id,
+    detail: {
+      planId: order.planId,
+      totalIdr: order.totalIdr
+    }
+  });
   res.json({ order });
 }));
 

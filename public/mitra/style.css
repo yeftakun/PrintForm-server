@@ -415,6 +415,9 @@ textarea {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   appearance: none;
   border: none;
   border-radius: 999px;
@@ -424,6 +427,7 @@ textarea {
   color: var(--ink);
   background: transparent;
   cursor: pointer;
+  text-decoration: none;
   transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease, background 160ms ease;
 }
 
@@ -1327,6 +1331,13 @@ body.mitra-dashboard-active .page {
   display: block;
 }
 
+.mitra-payment-page .page {
+  width: min(100%, 1040px);
+  min-height: 100vh;
+  display: block;
+  padding: 16px;
+}
+
 .partner-dashboard {
   height: calc(100vh - 32px);
   min-height: 640px;
@@ -1438,6 +1449,18 @@ body.mitra-dashboard-active .page {
   gap: 12px;
   align-content: start;
   overflow-y: auto;
+  padding: 14px;
+  background: #f6f7f9;
+}
+
+.payment-shell {
+  height: auto;
+  min-height: calc(100vh - 32px);
+  overflow: visible;
+}
+
+.payment-page-main {
+  min-height: calc(100vh - 94px);
   padding: 14px;
   background: #f6f7f9;
 }
@@ -1783,6 +1806,12 @@ body.mitra-dashboard-active .page {
   line-height: 1.4;
 }
 
+.plan-card .plan-note {
+  color: #93370d;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .plan-price {
   color: #121418;
   font-size: 1.5rem;
@@ -1836,6 +1865,19 @@ body.mitra-dashboard-active .page {
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   padding: 0 9px;
+}
+
+.payment-quantity-control dd {
+  width: 96px;
+}
+
+.payment-quantity-control input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 0 9px;
+  text-align: right;
 }
 
 .payment-layout {

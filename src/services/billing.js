@@ -161,10 +161,26 @@ function mapPaymentProof(row) {
 
 function normalizePlanQuantity(plan, quantity) {
   const type = String(plan?.plan_type || "").toLowerCase();
-  if (type === "credit_pack" || type === "topup" || type === "buy_credit") {
-    return normalizePositiveInteger(quantity, 1, 99);
+  if (type === "free") {
+    return 1;
   }
-  return 1;
+  return normalizePositiveInteger(quantity, 1, 99);
+}
+
+async function userHasActiveCredits(userId, client = null) {
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM credits
+      WHERE user_id = $1
+        AND status = 'active'
+        AND starts_at <= now()
+        AND expires_at > now()
+    ) AS exists`,
+    [userId]
+  );
+  return Boolean(res.rows[0]?.exists);
 }
 
 async function listActivePlans() {
@@ -372,6 +388,12 @@ async function createOrder({ userId, planId, quantity = 1, couponCode = null }) 
   ensureDbBilling();
   return withTransaction(async client => {
     const pricing = await calculateOrderPricing({ userId, planId, quantity, couponCode }, client);
+    if (String(pricing.plan.planType || "").toLowerCase() === "free" && await userHasActiveCredits(userId, client)) {
+      const err = new Error("Plan Free hanya bisa dipilih saat tidak ada plan atau kredit aktif.");
+      err.statusCode = 409;
+      err.code = "FREE_PLAN_ALREADY_ACTIVE";
+      throw err;
+    }
     const orderId = createOpaqueId("ord");
     const isPaidImmediately = pricing.totalIdr === 0;
     const status = isPaidImmediately ? "paid" : "pending_payment";
@@ -437,6 +459,35 @@ async function createOrder({ userId, planId, quantity = 1, couponCode = null }) 
         expiresAt: toIso(credit.expires_at)
       } : null
     };
+  });
+}
+
+async function cancelOrderForUser(orderId, userId) {
+  ensureDbBilling();
+  return withTransaction(async client => {
+    const res = await client.query(
+      "SELECT id, status FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE",
+      [orderId, userId]
+    );
+    const order = res.rows[0];
+    if (!order) {
+      const err = new Error("Order tidak ditemukan.");
+      err.statusCode = 404;
+      err.code = "ORDER_NOT_FOUND";
+      throw err;
+    }
+    if (order.status !== "pending_payment") {
+      const err = new Error("Hanya order pending payment yang dapat dibatalkan.");
+      err.statusCode = 409;
+      err.code = "ORDER_NOT_CANCELABLE";
+      throw err;
+    }
+
+    await client.query(
+      "UPDATE orders SET status = 'cancelled', updated_at = now() WHERE id = $1 AND user_id = $2",
+      [orderId, userId]
+    );
+    return getOrderByIdForUser(orderId, userId, client);
   });
 }
 
@@ -723,6 +774,7 @@ module.exports = {
   listActivePlans,
   calculateOrderPricing,
   createOrder,
+  cancelOrderForUser,
   listOrdersForUser,
   getOrderByIdForUser,
   attachPaymentProof,

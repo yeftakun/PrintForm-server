@@ -58,20 +58,6 @@
   const creditBreakdown = document.getElementById("creditBreakdown");
   const billingStatus = document.getElementById("billingStatus");
   const plansGrid = document.getElementById("plansGrid");
-  const paymentSection = document.getElementById("paymentSection");
-  const paymentPlanName = document.getElementById("paymentPlanName");
-  const paymentSubtotal = document.getElementById("paymentSubtotal");
-  const paymentQuantity = document.getElementById("paymentQuantity");
-  const paymentCredits = document.getElementById("paymentCredits");
-  const paymentDuration = document.getElementById("paymentDuration");
-  const paymentDiscount = document.getElementById("paymentDiscount");
-  const paymentTotal = document.getElementById("paymentTotal");
-  const couponCodeInput = document.getElementById("couponCodeInput");
-  const checkCouponBtn = document.getElementById("checkCouponBtn");
-  const createOrderBtn = document.getElementById("createOrderBtn");
-  const paymentInstructionBox = document.getElementById("paymentInstructionBox");
-  const paymentInstructionText = document.getElementById("paymentInstructionText");
-  const paymentStatus = document.getElementById("paymentStatus");
   const refreshOrdersBtn = document.getElementById("refreshOrdersBtn");
   const ordersTableBody = document.getElementById("ordersTableBody");
   const paymentProofModalBackdrop = document.getElementById("paymentProofModalBackdrop");
@@ -155,9 +141,6 @@
   let latestPlans = [];
   let latestOrders = [];
   let latestCreditBalance = null;
-  let selectedPaymentPlan = null;
-  let selectedPaymentQuantity = 1;
-  let selectedPaymentPricing = null;
   let activePaymentProofOrderId = null;
   let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
   let manualStoreStatus = "open";
@@ -596,11 +579,6 @@
       return "1 minggu";
     }
     return "-";
-  }
-
-  function isTopupPlan(plan) {
-    const type = String(plan?.planType || "").toLowerCase();
-    return type === "credit_pack" || type === "topup" || type === "buy_credit";
   }
 
   function getOrderStatusLabel(status) {
@@ -1410,7 +1388,8 @@
     }
 
     plansGrid.innerHTML = latestPlans.map(plan => {
-      const topup = isTopupPlan(plan);
+      const isFree = String(plan.planType || "").toLowerCase() === "free";
+      const freeDisabled = isFree && Number(latestCreditBalance?.totalCredits || 0) > 0;
       return `
         <article class="plan-card">
           <div>
@@ -1428,31 +1407,16 @@
               <dd>${escapeHtml(getPlanDurationText(plan))}</dd>
             </div>
           </dl>
-          ${topup ? `
-            <label class="plan-quantity-row">
-              <span>Quantity</span>
-              <input type="number" min="1" max="99" step="1" value="1" data-plan-quantity="${escapeHtml(plan.id)}">
-            </label>
-          ` : ""}
-          <button class="btn btn-primary btn-compact" type="button" data-select-plan="${escapeHtml(plan.id)}">Pilih Plan</button>
+          <button
+            class="btn btn-primary btn-compact"
+            type="button"
+            data-select-plan="${escapeHtml(plan.id)}"
+            ${freeDisabled ? "disabled" : ""}
+          >Pilih Plan</button>
+          ${freeDisabled ? '<p class="plan-note">Plan Free tersedia setelah tidak ada plan atau kredit aktif.</p>' : ""}
         </article>
       `;
     }).join("");
-  }
-
-  function renderPaymentPricing(pricing) {
-    selectedPaymentPricing = pricing || null;
-    const plan = pricing?.plan || selectedPaymentPlan;
-    if (!plan) {
-      return;
-    }
-    paymentPlanName.textContent = plan.name || "-";
-    paymentSubtotal.textContent = formatCurrency(pricing?.subtotalIdr || 0);
-    paymentQuantity.textContent = formatInteger(pricing?.quantity || selectedPaymentQuantity || 1);
-    paymentCredits.textContent = formatInteger(pricing?.totalCredits || (plan.creditsPerUnit || 0) * (selectedPaymentQuantity || 1));
-    paymentDuration.textContent = getPlanDurationText(plan);
-    paymentDiscount.textContent = formatCurrency(pricing?.discountIdr || 0);
-    paymentTotal.textContent = formatCurrency(pricing?.totalIdr || 0);
   }
 
   function renderOrders() {
@@ -1470,7 +1434,10 @@
       const canUpload = order.status === "pending_payment";
       let action = "";
       if (canUpload) {
-        action = `<button class="btn btn-outline btn-compact" type="button" data-upload-proof-order="${escapeHtml(order.id)}">Upload Bukti Pembayaran</button>`;
+        action = `
+          <button class="btn btn-outline btn-compact" type="button" data-upload-proof-order="${escapeHtml(order.id)}">Upload Bukti Pembayaran</button>
+          <button class="btn btn-ghost btn-compact" type="button" data-cancel-order="${escapeHtml(order.id)}">Batalkan Order</button>
+        `;
       } else if (order.status === "waiting_verification") {
         action = "<small>Pembayaran sedang menunggu verifikasi.</small>";
       } else if (order.status === "paid") {
@@ -1499,7 +1466,6 @@
   function renderBillingData() {
     renderCreditBalance();
     renderPlans();
-    renderPaymentPricing(selectedPaymentPricing);
     renderOrders();
   }
 
@@ -1726,116 +1692,16 @@
     }
   }
 
-  function getPlanQuantity(planId) {
-    const input = Array.from(document.querySelectorAll("[data-plan-quantity]"))
-      .find(item => item.getAttribute("data-plan-quantity") === planId);
-    const quantity = Number.parseInt(input?.value, 10);
-    return Number.isInteger(quantity) && quantity > 0 ? Math.min(quantity, 99) : 1;
-  }
-
-  async function quoteSelectedPayment({ includeCoupon = false } = {}) {
-    if (!selectedPaymentPlan) {
-      return null;
-    }
-    const couponCode = includeCoupon ? String(couponCodeInput.value || "").trim() : "";
-    const pricing = await window.MitraAuth.apiJson("/api/billing/coupons/validate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        planId: selectedPaymentPlan.id,
-        quantity: selectedPaymentQuantity,
-        couponCode
-      })
-    });
-    renderPaymentPricing(pricing.pricing);
-    return pricing.pricing;
-  }
-
-  async function selectPlan(planId) {
+  function selectPlan(planId) {
     const plan = latestPlans.find(item => item.id === planId);
     if (!plan) {
       return;
     }
-    selectedPaymentPlan = plan;
-    selectedPaymentQuantity = isTopupPlan(plan) ? getPlanQuantity(plan.id) : 1;
-    selectedPaymentPricing = null;
-    couponCodeInput.value = "";
-    paymentInstructionBox.classList.add("hidden");
-    paymentInstructionText.textContent = "-";
-    setStatus(paymentStatus, "Menghitung rincian pembayaran...");
-    paymentSection.classList.remove("hidden");
-    renderPaymentPricing({
-      plan,
-      quantity: selectedPaymentQuantity,
-      subtotalIdr: (plan.priceIdr || 0) * selectedPaymentQuantity,
-      discountIdr: 0,
-      totalIdr: (plan.priceIdr || 0) * selectedPaymentQuantity,
-      totalCredits: (plan.creditsPerUnit || 0) * selectedPaymentQuantity
+    const params = new URLSearchParams({
+      planId: plan.id,
+      quantity: "1"
     });
-
-    try {
-      await quoteSelectedPayment({ includeCoupon: false });
-      setStatus(paymentStatus, "");
-      paymentSection.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (err) {
-      setStatus(paymentStatus, err.message || "Gagal menghitung pembayaran.", "error");
-    }
-  }
-
-  async function checkCoupon() {
-    if (!selectedPaymentPlan) {
-      setStatus(paymentStatus, "Pilih plan terlebih dahulu.", "error");
-      return;
-    }
-    if (!String(couponCodeInput.value || "").trim()) {
-      setStatus(paymentStatus, "Masukkan kode kupon.", "error");
-      return;
-    }
-    setStatus(paymentStatus, "Memeriksa kupon...");
-    try {
-      await quoteSelectedPayment({ includeCoupon: true });
-      setStatus(paymentStatus, "Kupon valid dan perhitungan diperbarui.", "success");
-    } catch (err) {
-      setStatus(paymentStatus, err.message || "Kupon tidak dapat digunakan.", "error");
-    }
-  }
-
-  async function createSelectedOrder() {
-    if (!selectedPaymentPlan) {
-      setStatus(paymentStatus, "Pilih plan terlebih dahulu.", "error");
-      return;
-    }
-    setStatus(paymentStatus, "Membuat order...");
-    try {
-      const result = await window.MitraAuth.apiJson("/api/billing/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: selectedPaymentPlan.id,
-          quantity: selectedPaymentQuantity,
-          couponCode: String(couponCodeInput.value || "").trim()
-        })
-      });
-
-      if (result.order?.paymentInstruction) {
-        paymentInstructionText.textContent = result.order.paymentInstruction;
-        paymentInstructionBox.classList.remove("hidden");
-      } else {
-        paymentInstructionBox.classList.add("hidden");
-      }
-
-      setStatus(
-        paymentStatus,
-        result.order?.status === "paid"
-          ? "Order paid otomatis dan kredit sudah ditambahkan."
-          : "Order dibuat. Silakan lakukan pembayaran manual lalu upload bukti pembayaran.",
-        "success"
-      );
-      await loadDashboardData();
-      document.getElementById("ordersSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (err) {
-      setStatus(paymentStatus, err.message || "Gagal membuat order.", "error");
-    }
+    window.location.href = `/mitra/payment/?${params.toString()}`;
   }
 
   function openPaymentProofModal(orderId) {
@@ -1843,6 +1709,38 @@
     paymentProofForm.reset();
     setStatus(paymentProofStatus, "");
     openModal(paymentProofModalBackdrop);
+  }
+
+  async function cancelOrder(orderId) {
+    const safeOrderId = String(orderId || "").trim();
+    if (!safeOrderId) {
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: "Batalkan order?",
+      message: "Order pending payment ini akan dibatalkan.",
+      okText: "Batalkan",
+      cancelText: "Kembali",
+      variant: "warning"
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    setStatus(billingStatus, "Membatalkan order...");
+    try {
+      await window.MitraAuth.apiJson(`/api/billing/orders/${encodeURIComponent(safeOrderId)}/cancel`, {
+        method: "POST"
+      });
+      notify({
+        title: "Order dibatalkan",
+        message: "Order berhasil dibatalkan.",
+        variant: "success"
+      });
+      await loadDashboardData();
+    } catch (err) {
+      setStatus(billingStatus, err.message || "Gagal membatalkan order.", "error");
+    }
   }
 
   async function submitPaymentProof(event) {
@@ -2452,8 +2350,6 @@
     refreshLinkedClientsBtn.addEventListener("click", loadDashboardData);
     refreshBillingBtn.addEventListener("click", loadDashboardData);
     refreshOrdersBtn.addEventListener("click", loadDashboardData);
-    checkCouponBtn.addEventListener("click", checkCoupon);
-    createOrderBtn.addEventListener("click", createSelectedOrder);
     paymentProofForm.addEventListener("submit", submitPaymentProof);
     plansGrid.addEventListener("click", event => {
       const button = event.target instanceof Element ? event.target.closest("[data-select-plan]") : null;
@@ -2462,24 +2358,16 @@
       }
       selectPlan(button.getAttribute("data-select-plan"));
     });
-    plansGrid.addEventListener("input", event => {
-      const input = event.target;
-      if (!(input instanceof HTMLInputElement) || !input.matches("[data-plan-quantity]")) {
-        return;
-      }
-      if (selectedPaymentPlan?.id === input.getAttribute("data-plan-quantity")) {
-        selectedPaymentQuantity = getPlanQuantity(selectedPaymentPlan.id);
-        quoteSelectedPayment({ includeCoupon: Boolean(String(couponCodeInput.value || "").trim()) }).catch(err => {
-          setStatus(paymentStatus, err.message || "Gagal menghitung pembayaran.", "error");
-        });
-      }
-    });
     ordersTableBody.addEventListener("click", event => {
       const button = event.target instanceof Element ? event.target.closest("[data-upload-proof-order]") : null;
-      if (!button) {
+      if (button) {
+        openPaymentProofModal(button.getAttribute("data-upload-proof-order"));
         return;
       }
-      openPaymentProofModal(button.getAttribute("data-upload-proof-order"));
+      const cancelButton = event.target instanceof Element ? event.target.closest("[data-cancel-order]") : null;
+      if (cancelButton) {
+        cancelOrder(cancelButton.getAttribute("data-cancel-order"));
+      }
     });
     openFundEstimateModalBtn.addEventListener("click", () => {
       syncFundEstimateInputs();
