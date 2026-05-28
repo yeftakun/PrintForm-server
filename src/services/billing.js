@@ -363,6 +363,20 @@ async function createCreditBatchForOrder({ client, orderId, userId, plan, quanti
 
   const now = new Date();
   const id = createOpaqueId("cr");
+  const sourceType = getCreditSourceType(plan);
+  if (sourceType !== "free") {
+    await client.query(
+      `UPDATE credits
+       SET status = 'expired',
+           expires_at = LEAST(expires_at, $2)
+       WHERE user_id = $1
+         AND source_type = 'free'
+         AND status = 'active'
+         AND starts_at <= $2
+         AND expires_at > $2`,
+      [userId, now]
+    );
+  }
   const res = await client.query(
     `INSERT INTO credits (
       id, user_id, plan_id, order_id, source_type,
@@ -375,7 +389,7 @@ async function createCreditBatchForOrder({ client, orderId, userId, plan, quanti
       userId,
       plan.id,
       orderId,
-      getCreditSourceType(plan),
+      sourceType,
       credits,
       now,
       getCreditExpiresAt(plan, now)

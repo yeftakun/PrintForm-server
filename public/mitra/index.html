@@ -155,9 +155,7 @@
         <div class="dashboard-layout">
           <aside class="dashboard-sidebar" aria-label="Navigasi dashboard mitra">
             <a href="#dashboardStats">Statistik</a>
-            <a href="#creditSection">Kredit</a>
-            <a href="#pricingSection">Plan</a>
-            <a href="#ordersSection">Order</a>
+            <a href="#creditSection">Billing</a>
             <a href="#linkedClientsSection">Klien Desktop</a>
             <a href="#storeSettingsSection">Pengaturan Toko</a>
             <a href="#serviceSettingsSection">Layanan</a>
@@ -217,9 +215,10 @@
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Billing</p>
-                  <h2 id="creditTitle">Saldo Kredit</h2>
+                  <h2 id="creditTitle">Billing Mitra</h2>
                 </div>
                 <div class="section-actions">
+                  <button class="btn btn-outline btn-compact" id="openOrdersModalBtn" type="button">Daftar Order</button>
                   <button class="btn btn-ghost btn-compact" id="refreshBillingBtn" type="button">Refresh Billing</button>
                 </div>
               </div>
@@ -244,50 +243,15 @@
               <div class="credit-breakdown" id="creditBreakdown">
                 <p class="muted-cell">Belum ada kredit aktif.</p>
               </div>
+              <div class="billing-pricing-block" aria-labelledby="pricingTitle">
+                <div>
+                  <h3 id="pricingTitle">Pricing &amp; Top Up Kredit</h3>
+                </div>
+                <div class="plans-grid" id="plansGrid">
+                  <p class="muted-cell">Memuat plan...</p>
+                </div>
+              </div>
               <div class="status" id="billingStatus" role="status"></div>
-            </section>
-
-            <section class="dashboard-section" id="pricingSection" aria-labelledby="pricingTitle">
-              <div class="dashboard-section-head">
-                <div>
-                  <p class="dashboard-kicker">Plan Mitra</p>
-                  <h2 id="pricingTitle">Pricing &amp; Top Up Kredit</h2>
-                </div>
-              </div>
-              <div class="plans-grid" id="plansGrid">
-                <p class="muted-cell">Memuat plan...</p>
-              </div>
-            </section>
-
-            <section class="dashboard-section" id="ordersSection" aria-labelledby="ordersTitle">
-              <div class="dashboard-section-head">
-                <div>
-                  <p class="dashboard-kicker">Order Mitra</p>
-                  <h2 id="ordersTitle">Daftar Order</h2>
-                </div>
-                <div class="section-actions">
-                  <button class="btn btn-ghost btn-compact" id="refreshOrdersBtn" type="button">Refresh Order</button>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table class="clients-table orders-table">
-                  <thead>
-                    <tr>
-                      <th>Waktu</th>
-                      <th>Plan</th>
-                      <th>Qty</th>
-                      <th>Total</th>
-                      <th>Status</th>
-                      <th>Bukti / Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="ordersTableBody">
-                    <tr>
-                      <td colspan="6" class="muted-cell">Belum ada order.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
             </section>
 
             <section class="dashboard-section" id="linkedClientsSection" aria-labelledby="linkedClientsTitle">
@@ -655,6 +619,43 @@
         <div class="form-footer jobs-filter-footer">
           <button class="btn btn-ghost" id="resetJobsFilterModalBtn" type="button">Reset Filter</button>
           <button class="btn btn-primary" id="applyJobsFilterBtn" type="button">Terapkan</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="ordersModalBackdrop" aria-hidden="true">
+      <div class="modal modal-jobs-wide" role="dialog" aria-modal="true" aria-labelledby="ordersModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="ordersModalTitle">Daftar Order</h2>
+            <p>Order plan dan top up kredit milik akun mitra ini.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="ordersModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="jobs-filter-bar">
+          <div></div>
+          <div class="jobs-filter-actions">
+            <button class="btn btn-ghost btn-compact" id="refreshOrdersBtn" type="button">Refresh Order</button>
+          </div>
+        </div>
+        <div class="table-wrap jobs-table-wrap">
+          <table class="clients-table orders-table">
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>Plan</th>
+                <th>Qty</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Bukti / Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <tr>
+                <td colspan="6" class="muted-cell">Belum ada order.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

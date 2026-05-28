@@ -58,6 +58,8 @@
   const creditBreakdown = document.getElementById("creditBreakdown");
   const billingStatus = document.getElementById("billingStatus");
   const plansGrid = document.getElementById("plansGrid");
+  const openOrdersModalBtn = document.getElementById("openOrdersModalBtn");
+  const ordersModalBackdrop = document.getElementById("ordersModalBackdrop");
   const refreshOrdersBtn = document.getElementById("refreshOrdersBtn");
   const ordersTableBody = document.getElementById("ordersTableBody");
   const paymentProofModalBackdrop = document.getElementById("paymentProofModalBackdrop");
@@ -579,6 +581,28 @@
       return "1 minggu";
     }
     return "-";
+  }
+
+  function getPlanCtaLabel(plan) {
+    const code = String(plan?.code || "").toLowerCase();
+    const name = String(plan?.name || "").toLowerCase();
+    if (code.includes("starter") || name === "starter") return "Pilih Starter";
+    if (code.includes("pro") || name === "pro") return "Pilih Pro";
+    return "Pilih Plan";
+  }
+
+  function getPlanUnitPriceText(plan) {
+    const code = String(plan?.code || "").toLowerCase();
+    const name = String(plan?.name || "").toLowerCase();
+    if (code.includes("starter") || name === "starter") return "± Rp13 / tugas";
+    if (code.includes("pro") || name === "pro") return "± Rp8 / tugas";
+    return "";
+  }
+
+  function isProPlan(plan) {
+    const code = String(plan?.code || "").toLowerCase();
+    const name = String(plan?.name || "").toLowerCase();
+    return code.includes("pro") || name === "pro";
   }
 
   function getOrderStatusLabel(status) {
@@ -1390,6 +1414,7 @@
     plansGrid.innerHTML = latestPlans.map(plan => {
       const isFree = String(plan.planType || "").toLowerCase() === "free";
       const freeDisabled = isFree && Number(latestCreditBalance?.totalCredits || 0) > 0;
+      const unitPrice = getPlanUnitPriceText(plan);
       return `
         <article class="plan-card">
           <div>
@@ -1397,6 +1422,7 @@
             <p>${escapeHtml(plan.description || "")}</p>
           </div>
           <div class="plan-price">${escapeHtml(formatCurrency(plan.priceIdr || 0))}</div>
+          ${unitPrice ? `<span class="plan-unit-price">${escapeHtml(unitPrice)}</span>` : ""}
           <dl class="plan-meta-list">
             <div>
               <dt>Kredit</dt>
@@ -1407,13 +1433,13 @@
               <dd>${escapeHtml(getPlanDurationText(plan))}</dd>
             </div>
           </dl>
+          ${isProPlan(plan) ? '<span class="plan-savings-label">Paling Hemat</span>' : ""}
           <button
             class="btn btn-primary btn-compact"
             type="button"
             data-select-plan="${escapeHtml(plan.id)}"
             ${freeDisabled ? "disabled" : ""}
-          >Pilih Plan</button>
-          ${freeDisabled ? '<p class="plan-note">Plan Free tersedia setelah tidak ada plan atau kredit aktif.</p>' : ""}
+          >${escapeHtml(getPlanCtaLabel(plan))}</button>
         </article>
       `;
     }).join("");
@@ -2300,7 +2326,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -2350,6 +2376,10 @@
     refreshLinkedClientsBtn.addEventListener("click", loadDashboardData);
     refreshBillingBtn.addEventListener("click", loadDashboardData);
     refreshOrdersBtn.addEventListener("click", loadDashboardData);
+    openOrdersModalBtn.addEventListener("click", () => {
+      renderOrders();
+      openModal(ordersModalBackdrop);
+    });
     paymentProofForm.addEventListener("submit", submitPaymentProof);
     plansGrid.addEventListener("click", event => {
       const button = event.target instanceof Element ? event.target.closest("[data-select-plan]") : null;
