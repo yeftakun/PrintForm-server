@@ -28,6 +28,34 @@ const uploadOrientationInput = uploadForm.querySelector('select[name="orientatio
 const uploadPageRangeInput = uploadForm.querySelector('input[name="pageRange"]');
 const uploadContentScaleInput = uploadForm.querySelector('[name="contentScale"]');
 let previewDebounceTimer = null;
+const PAPER_SIZE_LABELS = {
+  A3: "A3",
+  A4: "A4",
+  A5: "A5",
+  A6: "A6",
+  B4: "B4",
+  B5: "B5",
+  F4: "F4 (Folio)",
+  LETTER: "Letter",
+  LEGAL: "Legal",
+  FOLIO: "Folio",
+  KWARTO: "Kwarto",
+  AMPLOP: "Amplop"
+};
+const PAPER_DIMENSIONS_MM = {
+  A3: [297, 420],
+  A4: [210, 297],
+  A5: [148, 210],
+  A6: [105, 148],
+  B4: [250, 353],
+  B5: [176, 250],
+  F4: [215, 330],
+  LETTER: [216, 279],
+  LEGAL: [216, 356],
+  FOLIO: [216, 330],
+  KWARTO: [216, 279],
+  AMPLOP: [110, 220]
+};
 
 const previewState = {
   fileName: "",
@@ -180,6 +208,88 @@ function getStoreServiceConfig() {
   return safeParseJson(sessionStorage.getItem("printformSessionStoreServices")) || {};
 }
 
+function canonicalPaperSize(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return PAPER_SIZE_LABELS[normalized] ? normalized : "";
+}
+
+function getPaperSizeLabel(value) {
+  const canonical = canonicalPaperSize(value);
+  return PAPER_SIZE_LABELS[canonical] || String(value || "-");
+}
+
+function getConfiguredPaperSizes() {
+  const service = getStoreServiceConfig();
+  const paperTypes = Array.isArray(service.jenisKertas) ? service.jenisKertas : [];
+  const normalized = paperTypes
+    .map(canonicalPaperSize)
+    .filter(Boolean);
+  return [...new Set(normalized)].length > 0 ? [...new Set(normalized)] : ["A4", "F4"];
+}
+
+function colorSelectionFromLegacy(mode) {
+  const normalized = String(mode || "both").trim().toLowerCase();
+  if (normalized === "color") {
+    return ["color"];
+  }
+  if (normalized === "bw") {
+    return ["bw"];
+  }
+  return ["bw", "color"];
+}
+
+function getConfiguredColorModes() {
+  const service = getStoreServiceConfig();
+  const selected = Array.isArray(service.modeWarnaPilihan) && service.modeWarnaPilihan.length > 0
+    ? service.modeWarnaPilihan
+    : colorSelectionFromLegacy(service.modeWarna);
+  const normalized = selected
+    .map(value => String(value || "").trim().toLowerCase())
+    .filter(value => value === "bw" || value === "color");
+  return [...new Set(normalized)].length > 0 ? [...new Set(normalized)] : ["bw", "color"];
+}
+
+function setSelectOptions(select, options, currentValue) {
+  if (!select) {
+    return "";
+  }
+
+  const current = String(currentValue || select.value || "").trim();
+  select.innerHTML = "";
+  options.forEach((option, index) => {
+    const item = new Option(option.label, option.value, index === 0, false);
+    select.appendChild(item);
+  });
+
+  const allowedValues = new Set(options.map(option => option.value));
+  const nextValue = allowedValues.has(current) ? current : options[0]?.value || "";
+  if (nextValue) {
+    select.value = nextValue;
+    Array.from(select.options).forEach(option => {
+      option.defaultSelected = option.value === nextValue;
+    });
+  }
+  return nextValue;
+}
+
+function applyServiceOptions() {
+  const paperSizes = getConfiguredPaperSizes();
+  const colorModes = getConfiguredColorModes();
+  setSelectOptions(
+    uploadPaperSizeInput,
+    paperSizes.map(value => ({ value, label: PAPER_SIZE_LABELS[value] || value })),
+    previewState.paperSize
+  );
+  setSelectOptions(
+    uploadColorModeInput,
+    colorModes.map(value => ({
+      value,
+      label: value === "bw" ? "Hitam Putih" : "Berwarna"
+    })),
+    previewState.colorMode
+  );
+}
+
 function getPrintPrices() {
   const service = getStoreServiceConfig();
   const prices = service.hargaModeWarna && typeof service.hargaModeWarna === "object"
@@ -320,7 +430,7 @@ function updateColorAnalysisEstimate() {
 function updatePreviewSummary() {
   previewFileName.textContent = previewState.fileName || "-";
   previewFileSize.textContent = formatPreviewFileSize(previewState.fileSizeBytes);
-  previewPaperSize.textContent = previewState.paperSize || "-";
+  previewPaperSize.textContent = getPaperSizeLabel(previewState.paperSize);
   previewCopies.textContent = String(previewState.copies || "-");
   previewColorMode.textContent = previewState.colorMode === "bw" ? "Hitam Putih" : "Warna";
   previewOrientation.textContent = previewState.orientation === "landscape" ? "Landscape" : "Portrait";
@@ -806,16 +916,8 @@ async function renderVisualPreview(file) {
      // Orientation "Landscape" should rotate the PAPER, not just the content.
      
      // Calculate Aspect Ratio
-     let widthMm = 210;
-     let heightMm = 297; // A4
-     
-     if (previewState.paperSize === 'A5') {
-         widthMm = 148;
-         heightMm = 210;
-     } else if (previewState.paperSize === 'F4') {
-         widthMm = 215;
-         heightMm = 330;
-     }
+     const dimensions = PAPER_DIMENSIONS_MM[canonicalPaperSize(previewState.paperSize)] || PAPER_DIMENSIONS_MM.A4;
+     let [widthMm, heightMm] = dimensions;
      
      if (previewState.orientation === 'landscape') {
          // Swap
@@ -884,6 +986,7 @@ function renderPreviewState() {
 }
 
 export function resetPreviewState() {
+  applyServiceOptions();
   previewState.fileName = "";
   previewState.fileSizeBytes = 0;
   lastTotalPages = 1;
@@ -978,6 +1081,7 @@ export function getPreviewSubmission() {
 }
 
 export function initPreview() {
+  applyServiceOptions();
   if (uploadFileInput) {
     uploadFileInput.addEventListener("change", handleFileSelection);
   }

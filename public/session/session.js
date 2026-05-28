@@ -71,6 +71,7 @@ function clearSessionState() {
   sessionStorage.removeItem("printformSessionStoreCode");
   sessionStorage.removeItem("printformSessionStoreAddress");
   sessionStorage.removeItem("printformSessionStoreHours");
+  sessionStorage.removeItem("printformSessionStoreServices");
   sessionStorage.removeItem("printformSessionAlias");
   setSessionUi(false);
   callbacks.resetPreviewState();

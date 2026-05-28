@@ -17,6 +17,7 @@ const { query } = require("../db");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const { getSessions } = require("../repositories/sessionsRepository");
 const { getClients } = require("../repositories/clientsRepository");
+const { getUserById } = require("../repositories/usersRepository");
 const {
   normalizePaperSize,
   normalizeCopies,
@@ -183,6 +184,56 @@ function isAllowedUploadFile(file) {
 
 async function removeFileSafe(filePath) {
   await secureDelete(filePath);
+}
+
+async function removeUploadedDocument(req) {
+  if (req?.file?.path) {
+    await removeFileSafe(req.file.path);
+  }
+}
+
+function getAllowedPaperSizesFromService(service = {}) {
+  const values = Array.isArray(service.jenisKertas) ? service.jenisKertas : [];
+  const normalized = values.map(normalizePaperSize).filter(Boolean);
+  const unique = [...new Set(normalized)];
+  return unique.length > 0 ? unique : ["A4", "F4"];
+}
+
+function colorSelectionFromLegacy(mode) {
+  const normalized = String(mode || "both").toLowerCase();
+  if (normalized === "color") {
+    return ["color"];
+  }
+  if (normalized === "bw") {
+    return ["bw"];
+  }
+  return ["bw", "color"];
+}
+
+function getAllowedColorModesFromService(service = {}) {
+  const values = Array.isArray(service.modeWarnaPilihan) && service.modeWarnaPilihan.length > 0
+    ? service.modeWarnaPilihan
+    : colorSelectionFromLegacy(service.modeWarna);
+  const normalized = values
+    .map(value => normalizeColorMode(value))
+    .filter(Boolean);
+  const unique = [...new Set(normalized)];
+  return unique.length > 0 ? unique : ["bw", "color"];
+}
+
+async function getSessionServiceConfig(session) {
+  const ownerUserId = String(session?.ownerUserId || "").trim();
+  if (!ownerUserId) {
+    return {};
+  }
+
+  const user = await getUserById(ownerUserId);
+  const storeConfig = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
+    ? user.konfigurasiToko
+    : {};
+  return storeConfig.layanan && typeof storeConfig.layanan === "object"
+    ? storeConfig.layanan
+    : {};
 }
 
 function isAccessibleClientForUser(client, user) {
@@ -1081,17 +1132,17 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
   const sessionId = typeof req.body.sessionId === "string" ? req.body.sessionId : null;
 
   if (!paperSize) {
-    await removeFileSafe(req.file.path);
-    res.status(400).json({ error: "paperSize must be A4 or A5" });
+    await removeUploadedDocument(req);
+    res.status(400).json({ error: "paperSize is not supported" });
     return;
   }
   if (!copies) {
-    await removeFileSafe(req.file.path);
+    await removeUploadedDocument(req);
     res.status(400).json({ error: "copies must be 1-999" });
     return;
   }
   if (!sessionId) {
-    await removeFileSafe(req.file.path);
+    await removeUploadedDocument(req);
     res.status(400).json({ error: "sessionId is required" });
     return;
   }
@@ -1100,21 +1151,35 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
   const sessions = await getSessions();
   const session = sessions.find(s => s.id === sessionId);
   if (!session) {
-    await removeFileSafe(req.file.path);
+    await removeUploadedDocument(req);
     res.status(400).json({ error: "sessionId not found" });
     return;
   }
 
   if (!isSessionActive(session)) {
-    await removeFileSafe(req.file.path);
+    await removeUploadedDocument(req);
     res.status(400).json({ error: "Session is not active" });
     return;
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);
   if (!canAccessSessionForUser(session, req.user, accessibleClientIds)) {
-    await removeFileSafe(req.file.path);
+    await removeUploadedDocument(req);
     res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
+  const serviceConfig = await getSessionServiceConfig(session);
+  const allowedPaperSizes = getAllowedPaperSizesFromService(serviceConfig);
+  const allowedColorModes = getAllowedColorModesFromService(serviceConfig);
+  if (!allowedPaperSizes.includes(paperSize)) {
+    await removeUploadedDocument(req);
+    res.status(400).json({ error: "Ukuran kertas tidak tersedia di toko ini." });
+    return;
+  }
+  if (!allowedColorModes.includes(colorMode)) {
+    await removeUploadedDocument(req);
+    res.status(400).json({ error: "Mode warna tidak tersedia di toko ini." });
     return;
   }
 

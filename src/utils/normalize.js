@@ -1,9 +1,20 @@
 function normalizePaperSize(value) {
   const v = String(value || "").toUpperCase().trim();
-  if (v === "A4" || v === "A5" || v === "F4") {
-    return v;
-  }
-  return null;
+  const allowed = {
+    A3: "A3",
+    A4: "A4",
+    A5: "A5",
+    A6: "A6",
+    B4: "B4",
+    B5: "B5",
+    F4: "F4",
+    LETTER: "Letter",
+    LEGAL: "Legal",
+    FOLIO: "Folio",
+    KWARTO: "Kwarto",
+    AMPLOP: "Amplop"
+  };
+  return allowed[v] || null;
 }
 
 function normalizeCopies(value) {
