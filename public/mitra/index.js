@@ -80,7 +80,6 @@
   const accountUsername = document.getElementById("accountUsername");
   const accountEmail = document.getElementById("accountEmail");
   const accountPinStatus = document.getElementById("accountPinStatus");
-  const activityList = document.getElementById("activityList");
 
   const registerModalBackdrop = document.getElementById("registerModalBackdrop");
   const operationalHoursModalBackdrop = document.getElementById("operationalHoursModalBackdrop");
@@ -1597,53 +1596,10 @@
     });
   }
 
-  function renderActivity(clients, jobs) {
-    const clientItems = clients
-      .filter(client => client.lastSeen)
-      .map(client => ({
-        type: "Client",
-        title: client.name || client.id || "Client",
-        meta: `${String(client.status || "offline").toUpperCase()} - ${formatReadiness(client.readiness)}`,
-        date: client.lastSeen,
-        time: new Date(client.lastSeen).getTime()
-      }));
-
-    const jobItems = jobs
-      .filter(job => job.createdAt || job.updatedAt)
-      .map(job => ({
-        type: "Job",
-        title: job.alias || job.originalName || job.id || "Tugas cetak",
-        meta: formatStatusLabel(job.status),
-        date: job.updatedAt || job.createdAt,
-        time: new Date(job.updatedAt || job.createdAt).getTime()
-      }));
-
-    const items = [...clientItems, ...jobItems]
-      .filter(item => Number.isFinite(item.time))
-      .sort((a, b) => b.time - a.time)
-      .slice(0, 8);
-
-    if (items.length === 0) {
-      activityList.innerHTML = '<p class="muted-cell">Belum ada aktivitas.</p>';
-      return;
-    }
-
-    activityList.innerHTML = items.map(item => `
-      <article class="activity-item">
-        <span>${escapeHtml(item.type)}</span>
-        <div>
-          <strong>${escapeHtml(item.title)}</strong>
-          <small>${escapeHtml(item.meta)} - ${escapeHtml(formatDateTime(item.date))}</small>
-        </div>
-      </article>
-    `).join("");
-  }
-
   function renderDashboardData() {
     renderLinkedClients(latestClients);
     renderStats(latestClients, latestJobs);
     renderBillingData();
-    renderActivity(latestClients, latestJobs);
     renderAllJobsTable();
     dashboardLastSync.textContent = `Sinkron: ${new Date().toLocaleTimeString("id-ID", {
       hour: "2-digit",
