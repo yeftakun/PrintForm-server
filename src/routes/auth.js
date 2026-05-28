@@ -174,7 +174,10 @@ function normalizePaperTypes(value) {
     : String(value || "").split(",");
 
   const normalized = list
-    .map(item => String(item || "").trim().toUpperCase())
+    .map(item => {
+      const paperType = String(item || "").trim().toUpperCase();
+      return paperType === "FOLIO" ? "F4" : paperType;
+    })
     .filter(Boolean)
     .slice(0, 12);
 

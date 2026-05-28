@@ -132,10 +132,22 @@
     "F4",
     "Letter",
     "Legal",
-    "Folio",
     "Kwarto",
     "Amplop"
   ];
+  const PAPER_SIZE_META = {
+    A3: { label: "A3", size: "297 x 420 mm" },
+    A4: { label: "A4", size: "210 x 297 mm" },
+    A5: { label: "A5", size: "148 x 210 mm" },
+    A6: { label: "A6", size: "105 x 148 mm" },
+    B4: { label: "B4", size: "250 x 353 mm" },
+    B5: { label: "B5", size: "176 x 250 mm" },
+    F4: { label: "F4 / Folio", size: "215 x 330 mm" },
+    LETTER: { label: "Letter", size: "216 x 279 mm" },
+    LEGAL: { label: "Legal", size: "216 x 356 mm" },
+    KWARTO: { label: "Kwarto", size: "216 x 279 mm" },
+    AMPLOP: { label: "Amplop", size: "110 x 220 mm" }
+  };
   let currentUser = null;
   let latestClients = [];
   let latestJobs = [];
@@ -1260,21 +1272,34 @@
     });
   }
 
+  function canonicalPaperType(value) {
+    const normalized = String(value || "").trim().toUpperCase();
+    if (normalized === "FOLIO") {
+      return "F4";
+    }
+    if (PAPER_SIZE_META[normalized]) {
+      return normalized;
+    }
+    return normalized;
+  }
+
   function renderPaperTypeOptions(selectedTypes = []) {
-    const selectedSet = new Set(selectedTypes.map(item => String(item || "").trim().toUpperCase()));
+    const selectedSet = new Set(selectedTypes.map(canonicalPaperType));
     const options = [
       ...PAPER_SIZE_OPTIONS,
-      ...selectedTypes.filter(item => !PAPER_SIZE_OPTIONS.some(option => option.toUpperCase() === String(item || "").toUpperCase()))
+      ...selectedTypes.filter(item => !PAPER_SIZE_OPTIONS.some(option => canonicalPaperType(option) === canonicalPaperType(item)))
     ];
 
-    const uniqueOptions = [...new Map(options.map(option => [String(option).toUpperCase(), option])).values()];
+    const uniqueOptions = [...new Map(options.map(option => [canonicalPaperType(option), option])).values()];
     const group = document.getElementById("paperTypesGroup");
     group.innerHTML = uniqueOptions.map(option => {
-      const value = String(option).trim();
+      const value = canonicalPaperType(option);
+      const meta = PAPER_SIZE_META[value] || { label: String(option).trim(), size: "Ukuran khusus" };
       return `
         <label class="service-check-label">
-          <input type="checkbox" name="paperTypes" value="${escapeHtml(value)}" ${selectedSet.has(value.toUpperCase()) ? "checked" : ""}>
-          <span>${escapeHtml(value)}</span>
+          <input type="checkbox" name="paperTypes" value="${escapeHtml(value)}" ${selectedSet.has(value) ? "checked" : ""}>
+          <span>${escapeHtml(meta.label)}</span>
+          <small>${escapeHtml(meta.size)}</small>
         </label>
       `;
     }).join("");
@@ -1282,7 +1307,7 @@
 
   function getSelectedPaperTypes() {
     return Array.from(serviceSettingsForm.querySelectorAll('input[name="paperTypes"]:checked'))
-      .map(input => String(input.value || "").trim())
+      .map(input => canonicalPaperType(input.value))
       .filter(Boolean);
   }
 

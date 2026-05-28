@@ -59,7 +59,7 @@ function renderServiceChips(layanan) {
     "Cetak PDF",
     ...(colorModes.includes("bw") ? ["Hitam Putih"] : []),
     ...(colorModes.includes("color") ? ["Warna"] : []),
-    ...paperTypes
+    ...paperTypes.map(item => String(item || "").trim().toUpperCase() === "FOLIO" ? "F4" : item)
   ];
 
   storeServiceChips.innerHTML = chips

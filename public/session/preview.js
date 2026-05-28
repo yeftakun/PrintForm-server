@@ -38,7 +38,6 @@ const PAPER_SIZE_LABELS = {
   F4: "F4 (Folio)",
   LETTER: "Letter",
   LEGAL: "Legal",
-  FOLIO: "Folio",
   KWARTO: "Kwarto",
   AMPLOP: "Amplop"
 };
@@ -52,7 +51,6 @@ const PAPER_DIMENSIONS_MM = {
   F4: [215, 330],
   LETTER: [216, 279],
   LEGAL: [216, 356],
-  FOLIO: [216, 330],
   KWARTO: [216, 279],
   AMPLOP: [110, 220]
 };
@@ -210,6 +208,9 @@ function getStoreServiceConfig() {
 
 function canonicalPaperSize(value) {
   const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "FOLIO") {
+    return "F4";
+  }
   return PAPER_SIZE_LABELS[normalized] ? normalized : "";
 }
 

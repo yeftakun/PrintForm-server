@@ -10,7 +10,7 @@ function normalizePaperSize(value) {
     F4: "F4",
     LETTER: "Letter",
     LEGAL: "Legal",
-    FOLIO: "Folio",
+    FOLIO: "F4",
     KWARTO: "Kwarto",
     AMPLOP: "Amplop"
   };

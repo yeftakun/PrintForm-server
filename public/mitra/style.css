@@ -2246,6 +2246,13 @@ body.mitra-dashboard-active .page {
   gap: 7px;
 }
 
+.service-checkbox-grid .service-check-label {
+  flex-wrap: wrap;
+  align-content: center;
+  min-height: 52px;
+  gap: 6px 8px;
+}
+
 .service-check-label {
   display: flex;
   align-items: center;
@@ -2265,6 +2272,19 @@ body.mitra-dashboard-active .page {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
+}
+
+.service-checkbox-grid .service-check-label > span {
+  min-width: 0;
+}
+
+.service-checkbox-grid .service-check-label small {
+  flex-basis: 100%;
+  margin-left: 24px;
+  color: #667085;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .color-price-grid {
