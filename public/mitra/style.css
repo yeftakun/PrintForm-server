@@ -688,9 +688,13 @@ textarea {
 .modal-jobs-wide {
   width: min(1120px, calc(100vw - 32px));
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 16px;
   overflow: hidden;
+}
+
+.jobs-filter-modal {
+  width: min(560px, calc(100vw - 32px));
 }
 
 .modal-header {
@@ -1509,12 +1513,22 @@ body.mitra-dashboard-active .page {
 
 .jobs-filter-bar {
   display: grid;
-  grid-template-columns: minmax(180px, 0.35fr) minmax(240px, 1fr);
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: end;
   gap: 12px;
 }
 
 .jobs-filter-bar .field {
   gap: 7px;
+}
+
+.jobs-filter-actions,
+.jobs-pagination-actions,
+.jobs-modal-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .jobs-table-wrap {
@@ -1525,6 +1539,99 @@ body.mitra-dashboard-active .page {
 
 .jobs-table {
   min-width: 1120px;
+}
+
+.job-sort-btn {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+}
+
+.job-sort-btn:hover {
+  color: var(--accent);
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+.jobs-modal-footer {
+  justify-content: space-between;
+  padding-top: 2px;
+}
+
+.jobs-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #667085;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.jobs-page-size select {
+  min-height: 36px;
+  border: 1px solid #e6e9ee;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: #fff;
+}
+
+.jobs-page-info {
+  color: #667085;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.jobs-filter-modal-body {
+  display: grid;
+  gap: 14px;
+}
+
+.jobs-filter-group {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #e6e9ee;
+  border-radius: 12px;
+}
+
+.jobs-filter-group legend {
+  padding: 0 6px;
+  color: #15171c;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.jobs-filter-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #505866;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.jobs-filter-group input[type="date"] {
+  min-height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0 10px;
+}
+
+.jobs-filter-footer {
+  margin-top: 16px;
 }
 
 .stat-card {
@@ -2013,6 +2120,12 @@ body.mitra-dashboard-active .page {
 
   .jobs-filter-bar {
     grid-template-columns: 1fr;
+  }
+
+  .jobs-filter-actions,
+  .jobs-modal-footer {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .activity-item {

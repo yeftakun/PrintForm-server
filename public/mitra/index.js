@@ -20,9 +20,22 @@
   const statJobsFailed = document.getElementById("statJobsFailed");
   const openAllJobsModalBtn = document.getElementById("openAllJobsModalBtn");
   const allJobsModalBackdrop = document.getElementById("allJobsModalBackdrop");
+  const jobsFilterModalBackdrop = document.getElementById("jobsFilterModalBackdrop");
   const allJobsTableBody = document.getElementById("allJobsTableBody");
-  const jobsStatusFilter = document.getElementById("jobsStatusFilter");
   const jobsSearchInput = document.getElementById("jobsSearchInput");
+  const openJobsFilterBtn = document.getElementById("openJobsFilterBtn");
+  const resetJobsFilterBtn = document.getElementById("resetJobsFilterBtn");
+  const refreshAllJobsBtn = document.getElementById("refreshAllJobsBtn");
+  const resetJobsFilterModalBtn = document.getElementById("resetJobsFilterModalBtn");
+  const applyJobsFilterBtn = document.getElementById("applyJobsFilterBtn");
+  const jobsDateFilterEnabled = document.getElementById("jobsDateFilterEnabled");
+  const jobsDateFilterInput = document.getElementById("jobsDateFilterInput");
+  const jobsPageSizeSelect = document.getElementById("jobsPageSizeSelect");
+  const jobsPageInfo = document.getElementById("jobsPageInfo");
+  const jobsFirstPageBtn = document.getElementById("jobsFirstPageBtn");
+  const jobsPrevPageBtn = document.getElementById("jobsPrevPageBtn");
+  const jobsNextPageBtn = document.getElementById("jobsNextPageBtn");
+  const jobsLastPageBtn = document.getElementById("jobsLastPageBtn");
 
   const storeSettingsForm = document.getElementById("storeSettingsForm");
   const serviceSettingsForm = document.getElementById("serviceSettingsForm");
@@ -101,6 +114,17 @@
   let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
   let manualStoreStatus = "open";
   let forceOpenOutsideOperationalHours = false;
+  const jobTableState = {
+    statusFilters: new Set(),
+    fileFilters: new Set(),
+    dateEnabled: false,
+    date: "",
+    search: "",
+    sortKey: "createdAt",
+    sortDirection: "desc",
+    pageSize: 20,
+    currentPage: 1
+  };
 
   function setStatus(el, text, kind = "") {
     if (!el) {
@@ -470,6 +494,99 @@
     ].filter(Boolean).join(" - ");
   }
 
+  function getJobStatusGroup(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "done" || normalized === "sent") return "done";
+    if (normalized === "failed" || normalized === "rejected") return "failed";
+    if (normalized === "printing" || normalized === "claimed") return "printing";
+    if (normalized === "ready" || normalized === "pending" || normalized === "send") return "ready";
+    if (normalized === "canceled") return "canceled";
+    return normalized || "unknown";
+  }
+
+  function toDateInputValue(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) {
+      return "";
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function getJobSortValue(job, key) {
+    if (key === "createdAt") return new Date(job.createdAt || job.updatedAt || 0).getTime() || 0;
+    if (key === "price") return getJobPrice(job);
+    if (key === "status") return formatStatusLabel(job.status).toLowerCase();
+    if (key === "fileStatus") return normalizeJobFileStatus(job);
+    if (key === "sessionId") return String(job.sessionId || "").toLowerCase();
+    if (key === "originalName") return String(job.originalName || "").toLowerCase();
+    if (key === "alias") return String(job.alias || "").toLowerCase();
+    return "";
+  }
+
+  function compareJobSortValues(left, right) {
+    if (typeof left === "number" && typeof right === "number") {
+      return left - right;
+    }
+    return String(left).localeCompare(String(right), "id-ID", { numeric: true, sensitivity: "base" });
+  }
+
+  function updateJobSortIcons() {
+    document.querySelectorAll("[data-sort-icon]").forEach(icon => {
+      const key = icon.getAttribute("data-sort-icon");
+      if (key !== jobTableState.sortKey) {
+        icon.textContent = "↕";
+        return;
+      }
+      icon.textContent = jobTableState.sortDirection === "asc" ? "↑" : "↓";
+    });
+  }
+
+  function syncJobsFilterInputs() {
+    document.querySelectorAll('input[name="jobStatusFilters"]').forEach(input => {
+      input.checked = jobTableState.statusFilters.has(input.value);
+    });
+    document.querySelectorAll('input[name="jobFileFilters"]').forEach(input => {
+      input.checked = jobTableState.fileFilters.has(input.value);
+    });
+    if (jobsDateFilterEnabled) {
+      jobsDateFilterEnabled.checked = jobTableState.dateEnabled;
+    }
+    if (jobsDateFilterInput) {
+      jobsDateFilterInput.value = jobTableState.date || "";
+      jobsDateFilterInput.disabled = !jobTableState.dateEnabled;
+    }
+  }
+
+  function readJobsFilterInputs() {
+    jobTableState.statusFilters = new Set(
+      Array.from(document.querySelectorAll('input[name="jobStatusFilters"]:checked')).map(input => input.value)
+    );
+    jobTableState.fileFilters = new Set(
+      Array.from(document.querySelectorAll('input[name="jobFileFilters"]:checked')).map(input => input.value)
+    );
+    jobTableState.dateEnabled = Boolean(jobsDateFilterEnabled?.checked);
+    jobTableState.date = jobsDateFilterInput?.value || "";
+    jobTableState.currentPage = 1;
+  }
+
+  function resetJobsFilters() {
+    jobTableState.statusFilters = new Set();
+    jobTableState.fileFilters = new Set();
+    jobTableState.dateEnabled = false;
+    jobTableState.date = "";
+    jobTableState.search = "";
+    jobTableState.currentPage = 1;
+    if (jobsSearchInput) {
+      jobsSearchInput.value = "";
+    }
+    syncJobsFilterInputs();
+    renderAllJobsTable();
+  }
+
   function isToday(value) {
     const timestamp = new Date(value);
     if (!Number.isFinite(timestamp.getTime())) {
@@ -763,31 +880,17 @@
   }
 
   function getFilteredJobs() {
-    const statusFilter = String(jobsStatusFilter?.value || "all").toLowerCase();
-    const searchText = String(jobsSearchInput?.value || "").trim().toLowerCase();
+    const searchText = String(jobTableState.search || "").trim().toLowerCase();
 
     return latestJobs
       .filter(job => {
-        const status = String(job.status || "").toLowerCase();
-        if (statusFilter === "today") {
-          return isToday(job.createdAt);
-        }
-        if (statusFilter === "done") {
-          return status === "done" || status === "sent";
-        }
-        if (statusFilter === "failed") {
-          return status === "failed" || status === "rejected";
-        }
-        if (statusFilter === "printing") {
-          return status === "printing" || status === "claimed";
-        }
-        if (statusFilter === "ready") {
-          return status === "ready" || status === "pending";
-        }
-        if (statusFilter === "canceled") {
-          return status === "canceled";
-        }
-        return true;
+        return jobTableState.statusFilters.size === 0 || jobTableState.statusFilters.has(getJobStatusGroup(job.status));
+      })
+      .filter(job => {
+        return jobTableState.fileFilters.size === 0 || jobTableState.fileFilters.has(normalizeJobFileStatus(job));
+      })
+      .filter(job => {
+        return !jobTableState.dateEnabled || !jobTableState.date || toDateInputValue(job.createdAt || job.updatedAt) === jobTableState.date;
       })
       .filter(job => {
         if (!searchText) {
@@ -803,7 +906,29 @@
         ].join(" ").toLowerCase();
         return haystack.includes(searchText);
       })
-      .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0).getTime() - new Date(a.createdAt || a.updatedAt || 0).getTime());
+      .sort((a, b) => {
+        const result = compareJobSortValues(
+          getJobSortValue(a, jobTableState.sortKey),
+          getJobSortValue(b, jobTableState.sortKey)
+        );
+        return jobTableState.sortDirection === "asc" ? result : -result;
+      });
+  }
+
+  function getJobTablePage(filteredJobs) {
+    const totalItems = filteredJobs.length;
+    const pageSize = jobTableState.pageSize === "all" ? totalItems || 1 : Number(jobTableState.pageSize || 20);
+    const totalPages = jobTableState.pageSize === "all" ? 1 : Math.max(1, Math.ceil(totalItems / pageSize));
+    jobTableState.currentPage = Math.min(Math.max(1, jobTableState.currentPage), totalPages);
+    const startIndex = jobTableState.pageSize === "all" ? 0 : (jobTableState.currentPage - 1) * pageSize;
+    const endIndex = jobTableState.pageSize === "all" ? totalItems : startIndex + pageSize;
+    return {
+      items: filteredJobs.slice(startIndex, endIndex),
+      totalItems,
+      totalPages,
+      startIndex,
+      endIndex: Math.min(endIndex, totalItems)
+    };
   }
 
   function renderAllJobsTable() {
@@ -811,33 +936,46 @@
       return;
     }
 
-    const jobs = getFilteredJobs();
-    if (jobs.length === 0) {
+    updateJobSortIcons();
+    const filteredJobs = getFilteredJobs();
+    const page = getJobTablePage(filteredJobs);
+    if (page.totalItems === 0) {
       allJobsTableBody.innerHTML = '<tr><td colspan="8" class="muted-cell">Tidak ada job yang sesuai filter.</td></tr>';
-      return;
+    } else {
+      allJobsTableBody.innerHTML = page.items.map(job => {
+        const statusClass = getJobStatusClass(job.status);
+        const fileStatus = normalizeJobFileStatus(job);
+        const fileStatusClass = fileStatus === "available" ? "online" : "offline";
+        const price = getJobPrice(job);
+        return `
+          <tr>
+            <td>${escapeHtml(formatDateTime(job.createdAt || job.updatedAt))}</td>
+            <td><code>${escapeHtml(job.sessionId || "-")}</code></td>
+            <td>
+              <strong>${escapeHtml(job.originalName || "-")}</strong>
+              <small>${escapeHtml(job.id || "-")}</small>
+            </td>
+            <td>${escapeHtml(job.alias || "-")}</td>
+            <td>${escapeHtml(getJobConfigText(job) || "-")}</td>
+            <td>${escapeHtml(price > 0 ? formatCurrency(price) : "-")}</td>
+            <td><span class="status-pill ${statusClass}">${escapeHtml(formatStatusLabel(job.status))}</span></td>
+            <td><span class="status-pill ${fileStatusClass}">${escapeHtml(fileStatus)}</span></td>
+          </tr>
+        `;
+      }).join("");
     }
 
-    allJobsTableBody.innerHTML = jobs.map(job => {
-      const statusClass = getJobStatusClass(job.status);
-      const fileStatus = normalizeJobFileStatus(job);
-      const fileStatusClass = fileStatus === "available" ? "online" : "offline";
-      const price = getJobPrice(job);
-      return `
-        <tr>
-          <td>${escapeHtml(formatDateTime(job.createdAt || job.updatedAt))}</td>
-          <td><code>${escapeHtml(job.sessionId || "-")}</code></td>
-          <td>
-            <strong>${escapeHtml(job.originalName || "-")}</strong>
-            <small>${escapeHtml(job.id || "-")}</small>
-          </td>
-          <td>${escapeHtml(job.alias || "-")}</td>
-          <td>${escapeHtml(getJobConfigText(job) || "-")}</td>
-          <td>${escapeHtml(price > 0 ? formatCurrency(price) : "-")}</td>
-          <td><span class="status-pill ${statusClass}">${escapeHtml(formatStatusLabel(job.status))}</span></td>
-          <td><span class="status-pill ${fileStatusClass}">${escapeHtml(fileStatus)}</span></td>
-        </tr>
-      `;
-    }).join("");
+    if (jobsPageInfo) {
+      jobsPageInfo.textContent = page.totalItems === 0
+        ? "0 job"
+        : `${page.startIndex + 1}-${page.endIndex} dari ${page.totalItems} job`;
+    }
+    [jobsFirstPageBtn, jobsPrevPageBtn].forEach(button => {
+      if (button) button.disabled = jobTableState.currentPage <= 1;
+    });
+    [jobsNextPageBtn, jobsLastPageBtn].forEach(button => {
+      if (button) button.disabled = jobTableState.currentPage >= page.totalPages;
+    });
   }
 
   function renderActivity(clients, jobs) {
@@ -1459,7 +1597,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, jobsFilterModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -1511,8 +1649,60 @@
       renderAllJobsTable();
       openModal(allJobsModalBackdrop);
     });
-    jobsStatusFilter.addEventListener("change", renderAllJobsTable);
-    jobsSearchInput.addEventListener("input", renderAllJobsTable);
+    openJobsFilterBtn.addEventListener("click", () => {
+      syncJobsFilterInputs();
+      openModal(jobsFilterModalBackdrop);
+    });
+    refreshAllJobsBtn.addEventListener("click", loadDashboardData);
+    resetJobsFilterBtn.addEventListener("click", resetJobsFilters);
+    resetJobsFilterModalBtn.addEventListener("click", resetJobsFilters);
+    applyJobsFilterBtn.addEventListener("click", () => {
+      readJobsFilterInputs();
+      renderAllJobsTable();
+      closeModal(jobsFilterModalBackdrop);
+    });
+    jobsDateFilterEnabled.addEventListener("change", () => {
+      jobsDateFilterInput.disabled = !jobsDateFilterEnabled.checked;
+    });
+    jobsSearchInput.addEventListener("input", () => {
+      jobTableState.search = jobsSearchInput.value;
+      jobTableState.currentPage = 1;
+      renderAllJobsTable();
+    });
+    jobsPageSizeSelect.addEventListener("change", () => {
+      jobTableState.pageSize = jobsPageSizeSelect.value === "all" ? "all" : Number(jobsPageSizeSelect.value || 20);
+      jobTableState.currentPage = 1;
+      renderAllJobsTable();
+    });
+    jobsFirstPageBtn.addEventListener("click", () => {
+      jobTableState.currentPage = 1;
+      renderAllJobsTable();
+    });
+    jobsPrevPageBtn.addEventListener("click", () => {
+      jobTableState.currentPage -= 1;
+      renderAllJobsTable();
+    });
+    jobsNextPageBtn.addEventListener("click", () => {
+      jobTableState.currentPage += 1;
+      renderAllJobsTable();
+    });
+    jobsLastPageBtn.addEventListener("click", () => {
+      jobTableState.currentPage = Number.MAX_SAFE_INTEGER;
+      renderAllJobsTable();
+    });
+    document.querySelectorAll("[data-job-sort]").forEach(button => {
+      button.addEventListener("click", () => {
+        const key = button.getAttribute("data-job-sort") || "createdAt";
+        if (jobTableState.sortKey === key) {
+          jobTableState.sortDirection = jobTableState.sortDirection === "asc" ? "desc" : "asc";
+        } else {
+          jobTableState.sortKey = key;
+          jobTableState.sortDirection = key === "createdAt" || key === "price" ? "desc" : "asc";
+        }
+        jobTableState.currentPage = 1;
+        renderAllJobsTable();
+      });
+    });
     connectClientBtn.addEventListener("click", showConnectClientInfo);
     downloadClientBtn.addEventListener("click", showDownloadInfo);
 

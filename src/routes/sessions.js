@@ -435,6 +435,10 @@ router.post("/close", asyncHandler(async (req, res) => {
         removedFileJobIds.push(job.id);
       }
 
+      const jobStatus = String(job.status || "").toLowerCase();
+      if (jobStatus === "ready" || jobStatus === "pending" || jobStatus === "send") {
+        job.status = "canceled";
+      }
       job.fileDeleted = true;
       job.fileRemoved = true;
       job.removedFileAt = job.removedFileAt || removedAt;

@@ -426,34 +426,27 @@
         </div>
         <div class="jobs-filter-bar" aria-label="Filter job">
           <label class="field">
-            <span>Status</span>
-            <select id="jobsStatusFilter">
-              <option value="all">Semua status</option>
-              <option value="today">Hari ini</option>
-              <option value="ready">Menunggu</option>
-              <option value="printing">Diproses</option>
-              <option value="done">Selesai</option>
-              <option value="failed">Gagal / ditolak</option>
-              <option value="canceled">Batal</option>
-            </select>
-          </label>
-          <label class="field">
             <span>Cari</span>
             <input type="search" id="jobsSearchInput" placeholder="Nama dokumen, alias, atau ID">
           </label>
+          <div class="jobs-filter-actions">
+            <button class="btn btn-outline btn-compact" id="openJobsFilterBtn" type="button">Filter</button>
+            <button class="btn btn-ghost btn-compact" id="resetJobsFilterBtn" type="button">Reset Filter</button>
+            <button class="btn btn-ghost btn-compact" id="refreshAllJobsBtn" type="button">Refresh Data</button>
+          </div>
         </div>
         <div class="table-wrap jobs-table-wrap">
           <table class="clients-table jobs-table">
             <thead>
               <tr>
-                <th>Waktu</th>
-                <th>Session ID</th>
-                <th>Dokumen</th>
-                <th>Alias</th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="createdAt">Waktu <span data-sort-icon="createdAt">↕</span></button></th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="sessionId">Session ID <span data-sort-icon="sessionId">↕</span></button></th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="originalName">Dokumen <span data-sort-icon="originalName">↕</span></button></th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="alias">Alias <span data-sort-icon="alias">↕</span></button></th>
                 <th>Konfigurasi</th>
-                <th>Harga</th>
-                <th>Status</th>
-                <th>File</th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="price">Harga <span data-sort-icon="price">↕</span></button></th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="status">Status <span data-sort-icon="status">↕</span></button></th>
+                <th><button class="job-sort-btn" type="button" data-job-sort="fileStatus">File <span data-sort-icon="fileStatus">↕</span></button></th>
               </tr>
             </thead>
             <tbody id="allJobsTableBody">
@@ -462,6 +455,60 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="jobs-modal-footer">
+          <label class="jobs-page-size">
+            <span>Tampilkan</span>
+            <select id="jobsPageSizeSelect">
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="all">Semua</option>
+            </select>
+          </label>
+          <span id="jobsPageInfo" class="jobs-page-info">-</span>
+          <div class="jobs-pagination-actions">
+            <button class="btn btn-ghost btn-compact" id="jobsFirstPageBtn" type="button" aria-label="Halaman pertama">⏮</button>
+            <button class="btn btn-ghost btn-compact" id="jobsPrevPageBtn" type="button" aria-label="Halaman sebelumnya">‹</button>
+            <button class="btn btn-ghost btn-compact" id="jobsNextPageBtn" type="button" aria-label="Halaman berikutnya">›</button>
+            <button class="btn btn-ghost btn-compact" id="jobsLastPageBtn" type="button" aria-label="Halaman terakhir">⏭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="jobsFilterModalBackdrop" aria-hidden="true">
+      <div class="modal jobs-filter-modal" role="dialog" aria-modal="true" aria-labelledby="jobsFilterModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="jobsFilterModalTitle">Filter Job</h2>
+            <p>Aktifkan filter yang ingin diterapkan pada tabel job.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="jobsFilterModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="jobs-filter-modal-body">
+          <fieldset class="jobs-filter-group">
+            <legend>Status</legend>
+            <label><input type="checkbox" name="jobStatusFilters" value="ready"> Menunggu</label>
+            <label><input type="checkbox" name="jobStatusFilters" value="printing"> Diproses</label>
+            <label><input type="checkbox" name="jobStatusFilters" value="done"> Selesai</label>
+            <label><input type="checkbox" name="jobStatusFilters" value="failed"> Gagal / ditolak</label>
+            <label><input type="checkbox" name="jobStatusFilters" value="canceled"> Batal</label>
+          </fieldset>
+          <fieldset class="jobs-filter-group">
+            <legend>Waktu</legend>
+            <label><input type="checkbox" id="jobsDateFilterEnabled"> Aktifkan tanggal</label>
+            <input type="date" id="jobsDateFilterInput">
+          </fieldset>
+          <fieldset class="jobs-filter-group">
+            <legend>File</legend>
+            <label><input type="checkbox" name="jobFileFilters" value="available"> available</label>
+            <label><input type="checkbox" name="jobFileFilters" value="not-available"> not-available</label>
+          </fieldset>
+        </div>
+        <div class="form-footer jobs-filter-footer">
+          <button class="btn btn-ghost" id="resetJobsFilterModalBtn" type="button">Reset Filter</button>
+          <button class="btn btn-primary" id="applyJobsFilterBtn" type="button">Terapkan</button>
         </div>
       </div>
     </div>
