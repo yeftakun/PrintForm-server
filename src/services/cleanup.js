@@ -13,16 +13,21 @@ const { getSessions, saveSessions } = require("../repositories/sessionsRepositor
 const { getClients, saveClients, deleteClientsByIds } = require("../repositories/clientsRepository");
 const { isSessionActive } = require("./status");
 const { refreshStorageUsageSnapshot } = require("./storageUsage");
-const { notifyClientRemoved, publishRealtimeEvent } = require("./realtime");
+const { notifyClientRemoved, notifyJobStatusChanged, publishRealtimeEvent } = require("./realtime");
+const { toPublicJob } = require("../utils/publicMapper");
 const { query } = require("../db");
+
+function isWaitingJobStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  return normalized === "ready" || normalized === "pending" || normalized === "send";
+}
 
 function markJobFileRemoved(job, removedAt) {
   if (!job) {
     return;
   }
 
-  const status = String(job.status || "").toLowerCase();
-  if (status === "ready" || status === "pending" || status === "send") {
+  if (isWaitingJobStatus(job.status)) {
     job.status = "canceled";
   }
   job.fileDeleted = true;
@@ -60,10 +65,26 @@ async function removeJobFiles(jobs, shouldRemove, source) {
   return removedJobIds;
 }
 
+function cancelWaitingJobsForInactiveSessions(jobs, inactiveSessionIds) {
+  const canceledJobs = [];
+
+  for (const job of jobs) {
+    if (!inactiveSessionIds.has(job.sessionId) || !isWaitingJobStatus(job.status)) {
+      continue;
+    }
+
+    const previousStatus = job.status;
+    job.status = "canceled";
+    canceledJobs.push({ job, previousStatus });
+  }
+
+  return canceledJobs;
+}
+
 async function cleanupExpiredSessions() {
   const sessions = await getSessions();
   if (sessions.length === 0) {
-    return { removedSessions: 0, removedJobs: 0 };
+    return { removedSessions: 0, removedJobs: 0, canceledJobs: 0 };
   }
 
   const expiredIds = new Set(
@@ -71,8 +92,13 @@ async function cleanupExpiredSessions() {
       .filter(s => String(s.status || "active").toLowerCase() === "active" && !isSessionActive(s))
       .map(s => s.id)
   );
-  if (expiredIds.size === 0) {
-    return { removedSessions: 0, removedJobs: 0 };
+  const inactiveIds = new Set(
+    sessions
+      .filter(s => !isSessionActive(s))
+      .map(s => s.id)
+  );
+  if (inactiveIds.size === 0) {
+    return { removedSessions: 0, removedJobs: 0, canceledJobs: 0 };
   }
 
   const expiredAt = new Date().toISOString();
@@ -89,10 +115,21 @@ async function cleanupExpiredSessions() {
     job => expiredIds.has(job.sessionId),
     "session-expired"
   );
-  await cleanupPreviewFilesBySessionIds([...expiredIds]);
-  await saveJobs(jobs);
-  await saveSessions(sessions);
-  await refreshStorageUsageSnapshot(jobs);
+  const canceledJobs = cancelWaitingJobsForInactiveSessions(jobs, inactiveIds);
+
+  if (expiredIds.size > 0) {
+    await cleanupPreviewFilesBySessionIds([...expiredIds]);
+  }
+
+  if (expiredIds.size > 0 || removedJobIds.length > 0 || canceledJobs.length > 0) {
+    await saveJobs(jobs);
+    await saveSessions(sessions);
+    await refreshStorageUsageSnapshot(jobs);
+  }
+
+  for (const { job, previousStatus } of canceledJobs) {
+    notifyJobStatusChanged(toPublicJob(job), previousStatus);
+  }
 
   if (expiredIds.size > 0) {
     publishRealtimeEvent({
@@ -104,7 +141,11 @@ async function cleanupExpiredSessions() {
     });
   }
 
-  return { removedSessions: expiredIds.size, removedJobs: removedJobIds.length };
+  return {
+    removedSessions: expiredIds.size,
+    removedJobs: removedJobIds.length,
+    canceledJobs: canceledJobs.length
+  };
 }
 
 async function cleanupPreviewFilesBySessionIds(sessionIds) {
