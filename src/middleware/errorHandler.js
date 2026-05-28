@@ -19,7 +19,12 @@ function errorHandler(err, req, res, next) {
     })
   );
 
-  res.status(statusCode).json({ error: message });
+  const payload = { error: message };
+  if (statusCode < 500 && err?.code) {
+    payload.code = err.code;
+  }
+
+  res.status(statusCode).json(payload);
 }
 
 module.exports = {

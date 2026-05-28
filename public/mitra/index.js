@@ -50,6 +50,33 @@
   const jobsPrevPageBtn = document.getElementById("jobsPrevPageBtn");
   const jobsNextPageBtn = document.getElementById("jobsNextPageBtn");
   const jobsLastPageBtn = document.getElementById("jobsLastPageBtn");
+  const refreshBillingBtn = document.getElementById("refreshBillingBtn");
+  const creditTotalActive = document.getElementById("creditTotalActive");
+  const creditUsed = document.getElementById("creditUsed");
+  const creditRemaining = document.getElementById("creditRemaining");
+  const creditNearestExpiry = document.getElementById("creditNearestExpiry");
+  const creditBreakdown = document.getElementById("creditBreakdown");
+  const billingStatus = document.getElementById("billingStatus");
+  const plansGrid = document.getElementById("plansGrid");
+  const paymentSection = document.getElementById("paymentSection");
+  const paymentPlanName = document.getElementById("paymentPlanName");
+  const paymentSubtotal = document.getElementById("paymentSubtotal");
+  const paymentQuantity = document.getElementById("paymentQuantity");
+  const paymentCredits = document.getElementById("paymentCredits");
+  const paymentDuration = document.getElementById("paymentDuration");
+  const paymentDiscount = document.getElementById("paymentDiscount");
+  const paymentTotal = document.getElementById("paymentTotal");
+  const couponCodeInput = document.getElementById("couponCodeInput");
+  const checkCouponBtn = document.getElementById("checkCouponBtn");
+  const createOrderBtn = document.getElementById("createOrderBtn");
+  const paymentInstructionBox = document.getElementById("paymentInstructionBox");
+  const paymentInstructionText = document.getElementById("paymentInstructionText");
+  const paymentStatus = document.getElementById("paymentStatus");
+  const refreshOrdersBtn = document.getElementById("refreshOrdersBtn");
+  const ordersTableBody = document.getElementById("ordersTableBody");
+  const paymentProofModalBackdrop = document.getElementById("paymentProofModalBackdrop");
+  const paymentProofForm = document.getElementById("paymentProofForm");
+  const paymentProofStatus = document.getElementById("paymentProofStatus");
 
   const storeSettingsForm = document.getElementById("storeSettingsForm");
   const serviceSettingsForm = document.getElementById("serviceSettingsForm");
@@ -125,6 +152,13 @@
   let currentUser = null;
   let latestClients = [];
   let latestJobs = [];
+  let latestPlans = [];
+  let latestOrders = [];
+  let latestCreditBalance = null;
+  let selectedPaymentPlan = null;
+  let selectedPaymentQuantity = 1;
+  let selectedPaymentPricing = null;
+  let activePaymentProofOrderId = null;
   let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
   let manualStoreStatus = "open";
   let forceOpenOutsideOperationalHours = false;
@@ -493,6 +527,23 @@
     }).format(Number(value));
   }
 
+  function formatInteger(value) {
+    return new Intl.NumberFormat("id-ID", {
+      maximumFractionDigits: 0
+    }).format(Number(value || 0));
+  }
+
+  function formatDate(value) {
+    if (!value) {
+      return "-";
+    }
+    const timestamp = new Date(value);
+    if (!Number.isFinite(timestamp.getTime())) {
+      return "-";
+    }
+    return timestamp.toLocaleDateString("id-ID", { dateStyle: "medium" });
+  }
+
   function formatNumber(value) {
     return Number.isFinite(Number(value)) ? String(Number(value)) : "0";
   }
@@ -534,6 +585,50 @@
     if (normalized === "ready" || normalized === "pending" || normalized === "send") return "ready";
     if (normalized === "canceled") return "canceled";
     return normalized || "unknown";
+  }
+
+  function getPlanDurationText(plan) {
+    const months = Number(plan?.durationMonths || 0);
+    if (months > 0) {
+      return `${months} bulan`;
+    }
+    if (String(plan?.planType || "").toLowerCase() === "free") {
+      return "1 minggu";
+    }
+    return "-";
+  }
+
+  function isTopupPlan(plan) {
+    const type = String(plan?.planType || "").toLowerCase();
+    return type === "credit_pack" || type === "topup" || type === "buy_credit";
+  }
+
+  function getOrderStatusLabel(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "pending_payment") return "Menunggu Pembayaran";
+    if (normalized === "waiting_verification") return "Menunggu Verifikasi";
+    if (normalized === "paid") return "Paid / Aktif";
+    if (normalized === "rejected") return "Ditolak";
+    if (normalized === "cancelled" || normalized === "canceled") return "Dibatalkan";
+    if (normalized === "expired") return "Kedaluwarsa";
+    return normalized || "-";
+  }
+
+  function getOrderStatusClass(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "paid") return "online";
+    if (normalized === "rejected" || normalized === "cancelled" || normalized === "canceled" || normalized === "expired") return "offline";
+    return "";
+  }
+
+  function getSourceTypeLabel(sourceType) {
+    const normalized = String(sourceType || "").toLowerCase();
+    if (normalized === "subscription") return "Subscription";
+    if (normalized === "topup") return "Top Up";
+    if (normalized === "free") return "Free";
+    if (normalized === "bonus") return "Bonus";
+    if (normalized === "refund") return "Refund";
+    return normalized || "-";
   }
 
   function toDateInputValue(value) {
@@ -1285,6 +1380,129 @@
     renderFundEstimate();
   }
 
+  function renderCreditBalance() {
+    const balance = latestCreditBalance || {};
+    creditTotalActive.textContent = formatInteger(balance.totalCredits || 0);
+    creditUsed.textContent = formatInteger(balance.usedCredits || 0);
+    creditRemaining.textContent = formatInteger(balance.remainingCredits || 0);
+    creditNearestExpiry.textContent = balance.nearestExpiration ? formatDate(balance.nearestExpiration) : "-";
+
+    const items = Object.values(balance.breakdown || {});
+    if (items.length === 0) {
+      creditBreakdown.innerHTML = '<p class="muted-cell">Belum ada kredit aktif.</p>';
+      return;
+    }
+
+    creditBreakdown.innerHTML = items.map(item => `
+      <span class="credit-breakdown-item">
+        ${escapeHtml(getSourceTypeLabel(item.sourceType))}: ${escapeHtml(formatInteger(item.remainingCredits || 0))}
+      </span>
+    `).join("");
+  }
+
+  function renderPlans() {
+    if (!plansGrid) {
+      return;
+    }
+    if (!latestPlans.length) {
+      plansGrid.innerHTML = '<p class="muted-cell">Belum ada plan aktif.</p>';
+      return;
+    }
+
+    plansGrid.innerHTML = latestPlans.map(plan => {
+      const topup = isTopupPlan(plan);
+      return `
+        <article class="plan-card">
+          <div>
+            <h3>${escapeHtml(plan.name || "-")}</h3>
+            <p>${escapeHtml(plan.description || "")}</p>
+          </div>
+          <div class="plan-price">${escapeHtml(formatCurrency(plan.priceIdr || 0))}</div>
+          <dl class="plan-meta-list">
+            <div>
+              <dt>Kredit</dt>
+              <dd>${escapeHtml(formatInteger(plan.creditsPerUnit || 0))}</dd>
+            </div>
+            <div>
+              <dt>Berlaku</dt>
+              <dd>${escapeHtml(getPlanDurationText(plan))}</dd>
+            </div>
+          </dl>
+          ${topup ? `
+            <label class="plan-quantity-row">
+              <span>Quantity</span>
+              <input type="number" min="1" max="99" step="1" value="1" data-plan-quantity="${escapeHtml(plan.id)}">
+            </label>
+          ` : ""}
+          <button class="btn btn-primary btn-compact" type="button" data-select-plan="${escapeHtml(plan.id)}">Pilih Plan</button>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function renderPaymentPricing(pricing) {
+    selectedPaymentPricing = pricing || null;
+    const plan = pricing?.plan || selectedPaymentPlan;
+    if (!plan) {
+      return;
+    }
+    paymentPlanName.textContent = plan.name || "-";
+    paymentSubtotal.textContent = formatCurrency(pricing?.subtotalIdr || 0);
+    paymentQuantity.textContent = formatInteger(pricing?.quantity || selectedPaymentQuantity || 1);
+    paymentCredits.textContent = formatInteger(pricing?.totalCredits || (plan.creditsPerUnit || 0) * (selectedPaymentQuantity || 1));
+    paymentDuration.textContent = getPlanDurationText(plan);
+    paymentDiscount.textContent = formatCurrency(pricing?.discountIdr || 0);
+    paymentTotal.textContent = formatCurrency(pricing?.totalIdr || 0);
+  }
+
+  function renderOrders() {
+    if (!ordersTableBody) {
+      return;
+    }
+    if (!latestOrders.length) {
+      ordersTableBody.innerHTML = '<tr><td colspan="6" class="muted-cell">Belum ada order.</td></tr>';
+      return;
+    }
+
+    ordersTableBody.innerHTML = latestOrders.map(order => {
+      const statusClass = getOrderStatusClass(order.status);
+      const planName = order.plan?.name || order.planId || "-";
+      const canUpload = order.status === "pending_payment";
+      let action = "";
+      if (canUpload) {
+        action = `<button class="btn btn-outline btn-compact" type="button" data-upload-proof-order="${escapeHtml(order.id)}">Upload Bukti Pembayaran</button>`;
+      } else if (order.status === "waiting_verification") {
+        action = "<small>Pembayaran sedang menunggu verifikasi.</small>";
+      } else if (order.status === "paid") {
+        action = "<small>Order berhasil/aktif.</small>";
+      } else if (order.status === "rejected") {
+        action = `<small>${escapeHtml(order.rejectedReason || "Order ditolak.")}</small>`;
+      } else {
+        action = `<small>${escapeHtml(getOrderStatusLabel(order.status))}</small>`;
+      }
+      const proofText = order.paymentProof
+        ? `<small>Bukti: ${escapeHtml(order.paymentProof.originalName || order.paymentProof.id)}</small>`
+        : "";
+      return `
+        <tr>
+          <td>${escapeHtml(formatDateTime(order.createdAt))}<small>${escapeHtml(order.id || "-")}</small></td>
+          <td>${escapeHtml(planName)}</td>
+          <td>${escapeHtml(formatInteger(order.quantity || 1))}</td>
+          <td>${escapeHtml(formatCurrency(order.totalIdr || 0))}</td>
+          <td><span class="status-pill ${statusClass}">${escapeHtml(getOrderStatusLabel(order.status))}</span></td>
+          <td><div class="order-action-stack">${action}${proofText}</div></td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderBillingData() {
+    renderCreditBalance();
+    renderPlans();
+    renderPaymentPricing(selectedPaymentPricing);
+    renderOrders();
+  }
+
   function getFilteredJobs() {
     const searchText = String(jobTableState.search || "").trim().toLowerCase();
 
@@ -1429,6 +1647,7 @@
   function renderDashboardData() {
     renderLinkedClients(latestClients);
     renderStats(latestClients, latestJobs);
+    renderBillingData();
     renderActivity(latestClients, latestJobs);
     renderAllJobsTable();
     dashboardLastSync.textContent = `Sinkron: ${new Date().toLocaleTimeString("id-ID", {
@@ -1442,14 +1661,19 @@
     if (!authState?.accessToken) {
       setLinkedClientsEmpty("Silakan login untuk melihat daftar client.");
       setStatus(linkedClientsStatus, "");
+      setStatus(billingStatus, "");
       return;
     }
 
     setStatus(linkedClientsStatus, "Memuat data dashboard...");
+    setStatus(billingStatus, "Memuat data billing...");
 
-    const [clientsResult, jobsResult] = await Promise.allSettled([
+    const [clientsResult, jobsResult, plansResult, ordersResult, creditResult] = await Promise.allSettled([
       window.MitraAuth.apiJson("/api/clients", { method: "GET" }),
-      window.MitraAuth.apiJson("/api/jobs", { method: "GET" })
+      window.MitraAuth.apiJson("/api/jobs", { method: "GET" }),
+      window.MitraAuth.apiJson("/api/billing/plans", { method: "GET" }),
+      window.MitraAuth.apiJson("/api/billing/orders", { method: "GET" }),
+      window.MitraAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
     ]);
 
     if (clientsResult.status === "fulfilled") {
@@ -1460,6 +1684,18 @@
 
     if (jobsResult.status === "fulfilled") {
       latestJobs = Array.isArray(jobsResult.value) ? jobsResult.value : [];
+    }
+
+    if (plansResult.status === "fulfilled") {
+      latestPlans = Array.isArray(plansResult.value?.plans) ? plansResult.value.plans : [];
+    }
+
+    if (ordersResult.status === "fulfilled") {
+      latestOrders = Array.isArray(ordersResult.value?.orders) ? ordersResult.value.orders : [];
+    }
+
+    if (creditResult.status === "fulfilled") {
+      latestCreditBalance = creditResult.value?.balance || null;
     }
 
     renderDashboardData();
@@ -1481,6 +1717,169 @@
         message: jobsResult.reason?.message || "Dashboard tetap menampilkan data client.",
         variant: "warning"
       });
+    }
+
+    if (plansResult.status === "rejected" || ordersResult.status === "rejected" || creditResult.status === "rejected") {
+      setStatus(billingStatus, "Sebagian data billing belum termuat.", "error");
+    } else {
+      setStatus(billingStatus, "Data billing terbaru sudah dimuat.", "success");
+    }
+  }
+
+  function getPlanQuantity(planId) {
+    const input = Array.from(document.querySelectorAll("[data-plan-quantity]"))
+      .find(item => item.getAttribute("data-plan-quantity") === planId);
+    const quantity = Number.parseInt(input?.value, 10);
+    return Number.isInteger(quantity) && quantity > 0 ? Math.min(quantity, 99) : 1;
+  }
+
+  async function quoteSelectedPayment({ includeCoupon = false } = {}) {
+    if (!selectedPaymentPlan) {
+      return null;
+    }
+    const couponCode = includeCoupon ? String(couponCodeInput.value || "").trim() : "";
+    const pricing = await window.MitraAuth.apiJson("/api/billing/coupons/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        planId: selectedPaymentPlan.id,
+        quantity: selectedPaymentQuantity,
+        couponCode
+      })
+    });
+    renderPaymentPricing(pricing.pricing);
+    return pricing.pricing;
+  }
+
+  async function selectPlan(planId) {
+    const plan = latestPlans.find(item => item.id === planId);
+    if (!plan) {
+      return;
+    }
+    selectedPaymentPlan = plan;
+    selectedPaymentQuantity = isTopupPlan(plan) ? getPlanQuantity(plan.id) : 1;
+    selectedPaymentPricing = null;
+    couponCodeInput.value = "";
+    paymentInstructionBox.classList.add("hidden");
+    paymentInstructionText.textContent = "-";
+    setStatus(paymentStatus, "Menghitung rincian pembayaran...");
+    paymentSection.classList.remove("hidden");
+    renderPaymentPricing({
+      plan,
+      quantity: selectedPaymentQuantity,
+      subtotalIdr: (plan.priceIdr || 0) * selectedPaymentQuantity,
+      discountIdr: 0,
+      totalIdr: (plan.priceIdr || 0) * selectedPaymentQuantity,
+      totalCredits: (plan.creditsPerUnit || 0) * selectedPaymentQuantity
+    });
+
+    try {
+      await quoteSelectedPayment({ includeCoupon: false });
+      setStatus(paymentStatus, "");
+      paymentSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      setStatus(paymentStatus, err.message || "Gagal menghitung pembayaran.", "error");
+    }
+  }
+
+  async function checkCoupon() {
+    if (!selectedPaymentPlan) {
+      setStatus(paymentStatus, "Pilih plan terlebih dahulu.", "error");
+      return;
+    }
+    if (!String(couponCodeInput.value || "").trim()) {
+      setStatus(paymentStatus, "Masukkan kode kupon.", "error");
+      return;
+    }
+    setStatus(paymentStatus, "Memeriksa kupon...");
+    try {
+      await quoteSelectedPayment({ includeCoupon: true });
+      setStatus(paymentStatus, "Kupon valid dan perhitungan diperbarui.", "success");
+    } catch (err) {
+      setStatus(paymentStatus, err.message || "Kupon tidak dapat digunakan.", "error");
+    }
+  }
+
+  async function createSelectedOrder() {
+    if (!selectedPaymentPlan) {
+      setStatus(paymentStatus, "Pilih plan terlebih dahulu.", "error");
+      return;
+    }
+    setStatus(paymentStatus, "Membuat order...");
+    try {
+      const result = await window.MitraAuth.apiJson("/api/billing/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: selectedPaymentPlan.id,
+          quantity: selectedPaymentQuantity,
+          couponCode: String(couponCodeInput.value || "").trim()
+        })
+      });
+
+      if (result.order?.paymentInstruction) {
+        paymentInstructionText.textContent = result.order.paymentInstruction;
+        paymentInstructionBox.classList.remove("hidden");
+      } else {
+        paymentInstructionBox.classList.add("hidden");
+      }
+
+      setStatus(
+        paymentStatus,
+        result.order?.status === "paid"
+          ? "Order paid otomatis dan kredit sudah ditambahkan."
+          : "Order dibuat. Silakan lakukan pembayaran manual lalu upload bukti pembayaran.",
+        "success"
+      );
+      await loadDashboardData();
+      document.getElementById("ordersSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      setStatus(paymentStatus, err.message || "Gagal membuat order.", "error");
+    }
+  }
+
+  function openPaymentProofModal(orderId) {
+    activePaymentProofOrderId = orderId;
+    paymentProofForm.reset();
+    setStatus(paymentProofStatus, "");
+    openModal(paymentProofModalBackdrop);
+  }
+
+  async function submitPaymentProof(event) {
+    event.preventDefault();
+    if (!activePaymentProofOrderId) {
+      setStatus(paymentProofStatus, "Order tidak valid.", "error");
+      return;
+    }
+    const formData = new FormData(paymentProofForm);
+    setStatus(paymentProofStatus, "Mengupload bukti pembayaran...");
+    try {
+      const response = await window.MitraAuth.apiFetch(
+        `/api/billing/orders/${encodeURIComponent(activePaymentProofOrderId)}/payment-proof`,
+        {
+          method: "POST",
+          body: formData
+        }
+      );
+      let body = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
+      }
+      if (!response.ok) {
+        throw new Error(body?.error || `Upload gagal (${response.status})`);
+      }
+      closeModal(paymentProofModalBackdrop);
+      activePaymentProofOrderId = null;
+      notify({
+        title: "Bukti pembayaran diupload",
+        message: "Order sekarang menunggu verifikasi admin.",
+        variant: "success"
+      });
+      await loadDashboardData();
+    } catch (err) {
+      setStatus(paymentProofStatus, err.message || "Gagal upload bukti pembayaran.", "error");
     }
   }
 
@@ -2003,7 +2402,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -2051,6 +2450,37 @@
     });
 
     refreshLinkedClientsBtn.addEventListener("click", loadDashboardData);
+    refreshBillingBtn.addEventListener("click", loadDashboardData);
+    refreshOrdersBtn.addEventListener("click", loadDashboardData);
+    checkCouponBtn.addEventListener("click", checkCoupon);
+    createOrderBtn.addEventListener("click", createSelectedOrder);
+    paymentProofForm.addEventListener("submit", submitPaymentProof);
+    plansGrid.addEventListener("click", event => {
+      const button = event.target instanceof Element ? event.target.closest("[data-select-plan]") : null;
+      if (!button) {
+        return;
+      }
+      selectPlan(button.getAttribute("data-select-plan"));
+    });
+    plansGrid.addEventListener("input", event => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || !input.matches("[data-plan-quantity]")) {
+        return;
+      }
+      if (selectedPaymentPlan?.id === input.getAttribute("data-plan-quantity")) {
+        selectedPaymentQuantity = getPlanQuantity(selectedPaymentPlan.id);
+        quoteSelectedPayment({ includeCoupon: Boolean(String(couponCodeInput.value || "").trim()) }).catch(err => {
+          setStatus(paymentStatus, err.message || "Gagal menghitung pembayaran.", "error");
+        });
+      }
+    });
+    ordersTableBody.addEventListener("click", event => {
+      const button = event.target instanceof Element ? event.target.closest("[data-upload-proof-order]") : null;
+      if (!button) {
+        return;
+      }
+      openPaymentProofModal(button.getAttribute("data-upload-proof-order"));
+    });
     openFundEstimateModalBtn.addEventListener("click", () => {
       syncFundEstimateInputs();
       renderFundEstimate();

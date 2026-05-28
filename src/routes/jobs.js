@@ -31,6 +31,7 @@ const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
 const { cleanupExpiredSessions } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot, getQuotaProjection } = require("../services/storageUsage");
+const { deductCreditForJobPrint } = require("../services/billing");
 const {
   notifyJobCreated,
   notifyJobStatusChanged,
@@ -89,6 +90,18 @@ const CLAIM_GUARDED_STATUSES = new Set([
   "rejected",
   "send"
 ]);
+
+const CREDIT_DEDUCT_JOB_STATUSES = new Set([
+  "printing",
+  "send",
+  "done"
+]);
+
+function shouldDeductCreditForStatusTransition(previousStatus, nextStatus) {
+  const previous = String(previousStatus || "").toLowerCase();
+  const next = String(nextStatus || "").toLowerCase();
+  return CREDIT_DEDUCT_JOB_STATUSES.has(next) && !CREDIT_DEDUCT_JOB_STATUSES.has(previous);
+}
 
 function normalizeColorDetection(value) {
   let payload = value;
@@ -1072,6 +1085,30 @@ router.patch("/:id", asyncHandler(async (req, res) => {
         claimedByClientId: job.claimedByClientId
       });
       return;
+    }
+
+    if (useDb && shouldDeductCreditForStatusTransition(previousStatus, normalizedStatus)) {
+      try {
+        await deductCreditForJobPrint(job);
+      } catch (err) {
+        if (err?.code === "INSUFFICIENT_CREDIT") {
+          res.status(402).json({
+            error: "Kredit mitra tidak cukup untuk mencetak tugas ini.",
+            code: "INSUFFICIENT_CREDIT",
+            jobId: job.id
+          });
+          return;
+        }
+        if (err?.code) {
+          res.status(err.statusCode || 400).json({
+            error: err.message || "Gagal memotong kredit.",
+            code: err.code,
+            jobId: job.id
+          });
+          return;
+        }
+        throw err;
+      }
     }
 
     const shouldDeleteDocument =

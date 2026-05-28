@@ -155,6 +155,9 @@
         <div class="dashboard-layout">
           <aside class="dashboard-sidebar" aria-label="Navigasi dashboard mitra">
             <a href="#dashboardStats">Statistik</a>
+            <a href="#creditSection">Kredit</a>
+            <a href="#pricingSection">Plan</a>
+            <a href="#ordersSection">Order</a>
             <a href="#linkedClientsSection">Klien Desktop</a>
             <a href="#storeSettingsSection">Pengaturan Toko</a>
             <a href="#serviceSettingsSection">Layanan</a>
@@ -207,6 +210,139 @@
                   <strong id="statEstimatedFunds">Rp0</strong>
                   <button class="stat-card-link" id="openFundEstimateModalBtn" type="button">Lanjut</button>
                 </article>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="creditSection" aria-labelledby="creditTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Billing</p>
+                  <h2 id="creditTitle">Saldo Kredit</h2>
+                </div>
+                <div class="section-actions">
+                  <button class="btn btn-ghost btn-compact" id="refreshBillingBtn" type="button">Refresh Billing</button>
+                </div>
+              </div>
+              <div class="credit-summary-grid">
+                <article class="mini-panel">
+                  <span>Total Aktif</span>
+                  <strong id="creditTotalActive">0</strong>
+                </article>
+                <article class="mini-panel">
+                  <span>Terpakai</span>
+                  <strong id="creditUsed">0</strong>
+                </article>
+                <article class="mini-panel">
+                  <span>Sisa Kredit</span>
+                  <strong id="creditRemaining">0</strong>
+                </article>
+                <article class="mini-panel">
+                  <span>Kedaluwarsa Terdekat</span>
+                  <strong id="creditNearestExpiry">-</strong>
+                </article>
+              </div>
+              <div class="credit-breakdown" id="creditBreakdown">
+                <p class="muted-cell">Belum ada kredit aktif.</p>
+              </div>
+              <div class="status" id="billingStatus" role="status"></div>
+            </section>
+
+            <section class="dashboard-section" id="pricingSection" aria-labelledby="pricingTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Plan Mitra</p>
+                  <h2 id="pricingTitle">Pricing &amp; Top Up Kredit</h2>
+                </div>
+              </div>
+              <div class="plans-grid" id="plansGrid">
+                <p class="muted-cell">Memuat plan...</p>
+              </div>
+            </section>
+
+            <section class="dashboard-section payment-section hidden" id="paymentSection" aria-labelledby="paymentTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Payment Page</p>
+                  <h2 id="paymentTitle">Pembayaran Manual</h2>
+                </div>
+              </div>
+              <div class="payment-layout">
+                <div class="payment-summary-panel">
+                  <span>Plan</span>
+                  <strong id="paymentPlanName">-</strong>
+                  <dl class="payment-summary-list">
+                    <div>
+                      <dt>Harga awal</dt>
+                      <dd id="paymentSubtotal">Rp0</dd>
+                    </div>
+                    <div>
+                      <dt>Quantity</dt>
+                      <dd id="paymentQuantity">1</dd>
+                    </div>
+                    <div>
+                      <dt>Jumlah kredit</dt>
+                      <dd id="paymentCredits">0</dd>
+                    </div>
+                    <div>
+                      <dt>Durasi berlaku</dt>
+                      <dd id="paymentDuration">-</dd>
+                    </div>
+                    <div>
+                      <dt>Potongan harga</dt>
+                      <dd id="paymentDiscount">Rp0</dd>
+                    </div>
+                    <div class="payment-total-row">
+                      <dt>Total bayar</dt>
+                      <dd id="paymentTotal">Rp0</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div class="payment-action-panel">
+                  <label class="field">
+                    <span>Kode Kupon</span>
+                    <input type="text" id="couponCodeInput" placeholder="Masukkan kode kupon">
+                  </label>
+                  <div class="section-actions">
+                    <button class="btn btn-outline btn-compact" id="checkCouponBtn" type="button">Cek Kupon</button>
+                    <button class="btn btn-primary btn-compact" id="createOrderBtn" type="button">Buat Order</button>
+                  </div>
+                  <div class="payment-instruction-box hidden" id="paymentInstructionBox">
+                    <span>Instruksi pembayaran</span>
+                    <p id="paymentInstructionText">-</p>
+                  </div>
+                  <div class="status" id="paymentStatus" role="status"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="dashboard-section" id="ordersSection" aria-labelledby="ordersTitle">
+              <div class="dashboard-section-head">
+                <div>
+                  <p class="dashboard-kicker">Order Mitra</p>
+                  <h2 id="ordersTitle">Daftar Order</h2>
+                </div>
+                <div class="section-actions">
+                  <button class="btn btn-ghost btn-compact" id="refreshOrdersBtn" type="button">Refresh Order</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="clients-table orders-table">
+                  <thead>
+                    <tr>
+                      <th>Waktu</th>
+                      <th>Plan</th>
+                      <th>Qty</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                      <th>Bukti / Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ordersTableBody">
+                    <tr>
+                      <td colspan="6" class="muted-cell">Belum ada order.</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
 
@@ -576,6 +712,33 @@
           <button class="btn btn-ghost" id="resetJobsFilterModalBtn" type="button">Reset Filter</button>
           <button class="btn btn-primary" id="applyJobsFilterBtn" type="button">Terapkan</button>
         </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="paymentProofModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="paymentProofModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="paymentProofModalTitle">Upload Bukti Pembayaran</h2>
+            <p>Upload gambar atau PDF bukti pembayaran untuk order ini.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="paymentProofModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="paymentProofForm">
+          <label class="field">
+            <span>File Bukti</span>
+            <input type="file" name="proof" accept="image/*,application/pdf" required>
+          </label>
+          <label class="field">
+            <span>Catatan</span>
+            <textarea name="userNote" rows="3" maxlength="500" placeholder="Opsional"></textarea>
+          </label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-primary" type="submit">Upload Bukti</button>
+            <button class="btn btn-ghost" type="button" data-close="paymentProofModalBackdrop">Batal</button>
+          </div>
+          <div class="status" id="paymentProofStatus" role="status"></div>
+        </form>
       </div>
     </div>
 

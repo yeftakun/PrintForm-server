@@ -1733,6 +1733,179 @@ body.mitra-dashboard-active .page {
   line-height: 1;
 }
 
+.credit-summary-grid,
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.credit-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.credit-breakdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #e6e9ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #505866;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.plan-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #ebedf1;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+
+.plan-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.plan-card p {
+  margin: 0;
+  color: #667085;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.plan-price {
+  color: #121418;
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.plan-meta-list,
+.payment-summary-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.plan-meta-list div,
+.payment-summary-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #505866;
+  font-size: 0.82rem;
+}
+
+.plan-meta-list dt,
+.payment-summary-list dt {
+  margin: 0;
+  font-weight: 700;
+}
+
+.plan-meta-list dd,
+.payment-summary-list dd {
+  margin: 0;
+  color: #15171c;
+  font-weight: 900;
+  text-align: right;
+}
+
+.plan-quantity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #667085;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.plan-quantity-row input {
+  width: 82px;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 0 9px;
+}
+
+.payment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr);
+  gap: 14px;
+}
+
+.payment-summary-panel,
+.payment-action-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #ebedf1;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+
+.payment-summary-panel > span,
+.payment-instruction-box span {
+  color: #667085;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.payment-summary-panel > strong {
+  font-size: 1.28rem;
+}
+
+.payment-total-row {
+  padding-top: 8px;
+  border-top: 1px solid #e6e9ee;
+}
+
+.payment-total-row dd {
+  color: var(--accent);
+  font-size: 1.16rem;
+}
+
+.payment-instruction-box {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #f0d8ca;
+  border-radius: 12px;
+  background: #fff8f4;
+}
+
+.payment-instruction-box p {
+  margin: 0;
+  color: #303a48;
+  line-height: 1.45;
+}
+
+.orders-table {
+  min-width: 860px;
+}
+
+.order-action-stack {
+  display: grid;
+  gap: 7px;
+}
+
+.order-action-stack small {
+  color: #667085;
+  line-height: 1.35;
+}
+
 .dashboard-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2126,7 +2299,9 @@ body.mitra-dashboard-active .page {
 }
 
 @media (max-width: 1120px) {
-  .stat-grid {
+  .stat-grid,
+  .credit-summary-grid,
+  .plans-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -2175,6 +2350,7 @@ body.mitra-dashboard-active .page {
   }
 
   .dashboard-form,
+  .payment-layout,
   .account-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -2189,7 +2365,9 @@ body.mitra-dashboard-active .page {
     padding: 13px;
   }
 
-  .stat-grid {
+  .stat-grid,
+  .credit-summary-grid,
+  .plans-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

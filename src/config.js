@@ -35,6 +35,8 @@ const databaseUrl = process.env.DATABASE_URL || "";
 
 const storageDir = process.env.STORAGE_DIR || path.join(rootDir, "storage");
 const filesDir = path.join(storageDir, "files");
+const uploadsDir = process.env.UPLOADS_DIR || path.join(rootDir, "uploads");
+const paymentProofsDir = process.env.PAYMENT_PROOFS_DIR || path.join(uploadsDir, "payment-proofs");
 const jobsFile = path.join(storageDir, "jobs.json");
 const clientsFile = path.join(storageDir, "clients.json");
 const pingsFile = path.join(storageDir, "pings.json");
@@ -50,6 +52,10 @@ const ORPHAN_GRACE_MS = Number(process.env.ORPHAN_GRACE_MS) || 2000;
 const FILE_CLEANUP_INTERVAL_MS = Number(process.env.FILE_CLEANUP_INTERVAL_MS) || 60 * 1000;
 const FILE_QUOTA_BYTES = Number(process.env.FILE_QUOTA_BYTES) || 1_073_741_824; // default 1GB
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES) || 25 * 1024 * 1024; // default 25MB
+const PAYMENT_PROOF_MAX_BYTES = Number(process.env.PAYMENT_PROOF_MAX_BYTES) || MAX_UPLOAD_BYTES;
+const PAYMENT_MANUAL_INSTRUCTIONS = process.env.PAYMENT_MANUAL_INSTRUCTIONS
+  || "Transfer manual ke rekening PrintForm, lalu upload bukti pembayaran dari halaman order.";
+const PAYMENT_ORDER_TTL_HOURS = Number(process.env.PAYMENT_ORDER_TTL_HOURS) || 24;
 const ALLOWED_UPLOAD_MIME_TYPES = parseCsvList(process.env.ALLOWED_UPLOAD_MIME_TYPES, [
   "application/pdf",
   "image/jpeg",
@@ -109,6 +115,8 @@ module.exports = {
   rootDir,
   storageDir,
   filesDir,
+  uploadsDir,
+  paymentProofsDir,
   jobsFile,
   clientsFile,
   pingsFile,
@@ -124,6 +132,9 @@ module.exports = {
   FILE_CLEANUP_INTERVAL_MS,
   FILE_QUOTA_BYTES,
   MAX_UPLOAD_BYTES,
+  PAYMENT_PROOF_MAX_BYTES,
+  PAYMENT_MANUAL_INSTRUCTIONS,
+  PAYMENT_ORDER_TTL_HOURS,
   ALLOWED_UPLOAD_MIME_TYPES,
   ALLOWED_UPLOAD_EXTENSIONS,
   AUTO_DELETE_TERMINAL_JOB_FILES,
