@@ -436,6 +436,7 @@
           </label>
           <div class="jobs-filter-actions">
             <button class="btn btn-outline btn-compact" id="openJobsFilterBtn" type="button">Filter</button>
+            <button class="btn btn-outline btn-compact" id="openJobsReportDownloadBtn" type="button">Download Laporan</button>
             <button class="btn btn-ghost btn-compact" id="resetJobsFilterBtn" type="button">Reset Filter</button>
             <button class="btn btn-ghost btn-compact" id="refreshAllJobsBtn" type="button">Refresh Data</button>
           </div>
@@ -479,6 +480,33 @@
             <button class="btn btn-ghost btn-compact" id="jobsLastPageBtn" type="button" aria-label="Halaman terakhir">⏭</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="jobsReportDownloadModalBackdrop" aria-hidden="true">
+      <div class="modal report-download-modal" role="dialog" aria-modal="true" aria-labelledby="jobsReportDownloadModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="jobsReportDownloadModalTitle">Download Laporan Job</h2>
+            <p>Pilih periode laporan, lalu unduh dalam format CSV atau XLSX.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="jobsReportDownloadModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <fieldset class="jobs-filter-group">
+          <legend>Periode</legend>
+          <label><input type="radio" name="jobsReportDownloadMode" value="day" checked> Hari</label>
+          <input type="date" id="jobsReportDownloadDayInput">
+          <label><input type="radio" name="jobsReportDownloadMode" value="range"> Rentang</label>
+          <div class="date-range-grid">
+            <input type="date" id="jobsReportDownloadStartInput" aria-label="Tanggal mulai">
+            <input type="date" id="jobsReportDownloadEndInput" aria-label="Tanggal akhir">
+          </div>
+        </fieldset>
+        <div class="report-download-actions" aria-label="Format download">
+          <button class="btn btn-primary" type="button" data-report-format="csv">Download CSV</button>
+          <button class="btn btn-outline" type="button" data-report-format="xlsx">Download XLSX</button>
+        </div>
+        <div class="status" id="jobsReportDownloadStatus" role="status"></div>
       </div>
     </div>
 

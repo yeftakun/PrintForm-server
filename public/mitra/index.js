@@ -31,6 +31,12 @@
   const allJobsTableBody = document.getElementById("allJobsTableBody");
   const jobsSearchInput = document.getElementById("jobsSearchInput");
   const openJobsFilterBtn = document.getElementById("openJobsFilterBtn");
+  const openJobsReportDownloadBtn = document.getElementById("openJobsReportDownloadBtn");
+  const jobsReportDownloadModalBackdrop = document.getElementById("jobsReportDownloadModalBackdrop");
+  const jobsReportDownloadDayInput = document.getElementById("jobsReportDownloadDayInput");
+  const jobsReportDownloadStartInput = document.getElementById("jobsReportDownloadStartInput");
+  const jobsReportDownloadEndInput = document.getElementById("jobsReportDownloadEndInput");
+  const jobsReportDownloadStatus = document.getElementById("jobsReportDownloadStatus");
   const resetJobsFilterBtn = document.getElementById("resetJobsFilterBtn");
   const refreshAllJobsBtn = document.getElementById("refreshAllJobsBtn");
   const resetJobsFilterModalBtn = document.getElementById("resetJobsFilterModalBtn");
@@ -136,6 +142,12 @@
     currentPage: 1
   };
   const fundEstimateState = {
+    dateMode: "day",
+    date: "",
+    startDate: "",
+    endDate: ""
+  };
+  const reportDownloadState = {
     dateMode: "day",
     date: "",
     startDate: "",
@@ -481,6 +493,10 @@
     }).format(Number(value));
   }
 
+  function formatNumber(value) {
+    return Number.isFinite(Number(value)) ? String(Number(value)) : "0";
+  }
+
   function getJobPrice(job) {
     const price = Number(job?.printConfig?.estimatedPrice);
     return Number.isFinite(price) && price > 0 ? price : 0;
@@ -676,8 +692,10 @@
     const today = todayDateInputValue();
     jobTableState.date = jobTableState.date || today;
     fundEstimateState.date = fundEstimateState.date || today;
+    reportDownloadState.date = reportDownloadState.date || today;
     syncJobsFilterInputs();
     syncFundEstimateInputs();
+    syncReportDownloadInputs();
   }
 
   function syncFundEstimateInputs() {
@@ -704,6 +722,272 @@
     if (fundEstimateValue) {
       fundEstimateValue.textContent = formatCurrency(calculateEstimatedFunds(fundEstimateState));
     }
+  }
+
+  function syncReportDownloadInputs() {
+    setSelectedDateMode("jobsReportDownloadMode", reportDownloadState.dateMode || "day");
+    if (jobsReportDownloadDayInput) jobsReportDownloadDayInput.value = reportDownloadState.date || todayDateInputValue();
+    if (jobsReportDownloadStartInput) jobsReportDownloadStartInput.value = reportDownloadState.startDate || "";
+    if (jobsReportDownloadEndInput) jobsReportDownloadEndInput.value = reportDownloadState.endDate || "";
+    syncDateModeInputs(
+      reportDownloadState.dateMode || "day",
+      jobsReportDownloadDayInput,
+      jobsReportDownloadStartInput,
+      jobsReportDownloadEndInput
+    );
+  }
+
+  function readReportDownloadInputs() {
+    reportDownloadState.dateMode = getSelectedDateMode("jobsReportDownloadMode", "day");
+    reportDownloadState.date = jobsReportDownloadDayInput?.value || todayDateInputValue();
+    reportDownloadState.startDate = jobsReportDownloadStartInput?.value || "";
+    reportDownloadState.endDate = jobsReportDownloadEndInput?.value || "";
+  }
+
+  function formatFilenameDate(value) {
+    const date = toDateInputValue(value) || todayDateInputValue();
+    const [year, month, day] = date.split("-");
+    return `${day}-${month}-${year}`;
+  }
+
+  function getReportFilenameBase(scope) {
+    if (scope?.dateMode === "range") {
+      const startDate = scope.startDate || todayDateInputValue();
+      const endDate = scope.endDate || startDate;
+      return `laporan_${formatFilenameDate(startDate)}_hingga_${formatFilenameDate(endDate)}`;
+    }
+    return `laporan_${formatFilenameDate(scope?.date || todayDateInputValue())}`;
+  }
+
+  function getReportJobs(scope) {
+    return latestJobs
+      .filter(job => isJobWithinDateScope(job, scope))
+      .sort((a, b) => (new Date(b.createdAt || b.updatedAt || 0).getTime() || 0) - (new Date(a.createdAt || a.updatedAt || 0).getTime() || 0));
+  }
+
+  function getReportRows(scope) {
+    return [
+      ["Waktu", "Session ID", "Job ID", "Dokumen", "Alias", "Konfigurasi", "Harga", "Status", "File"],
+      ...getReportJobs(scope).map(job => [
+        formatDateTime(job.createdAt || job.updatedAt),
+        job.sessionId || "-",
+        job.id || "-",
+        job.originalName || "-",
+        job.alias || "-",
+        getJobConfigText(job) || "-",
+        formatNumber(getJobPrice(job)),
+        formatStatusLabel(job.status),
+        normalizeJobFileStatus(job)
+      ])
+    ];
+  }
+
+  function escapeCsvValue(value) {
+    const text = String(value ?? "");
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  function createCsvBlob(rows) {
+    const content = `\ufeff${rows.map(row => row.map(escapeCsvValue).join(",")).join("\r\n")}\r\n`;
+    return new Blob([content], { type: "text/csv;charset=utf-8" });
+  }
+
+  function escapeXml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function getColumnName(index) {
+    let number = index + 1;
+    let name = "";
+    while (number > 0) {
+      const remainder = (number - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      number = Math.floor((number - 1) / 26);
+    }
+    return name;
+  }
+
+  function createWorksheetXml(rows) {
+    const sheetRows = rows.map((row, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      const cells = row.map((value, columnIndex) => {
+        const cellRef = `${getColumnName(columnIndex)}${rowNumber}`;
+        return `<c r="${cellRef}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+      }).join("");
+      return `<row r="${rowNumber}">${cells}</row>`;
+    }).join("");
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`;
+  }
+
+  function createCrc32Table() {
+    const table = new Uint32Array(256);
+    for (let index = 0; index < 256; index += 1) {
+      let value = index;
+      for (let bit = 0; bit < 8; bit += 1) {
+        value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+      }
+      table[index] = value >>> 0;
+    }
+    return table;
+  }
+
+  const CRC32_TABLE = createCrc32Table();
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (let index = 0; index < bytes.length; index += 1) {
+      crc = CRC32_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function dosDateTime(date = new Date()) {
+    const year = Math.max(1980, date.getFullYear());
+    const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+    const dosDate = ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+    return { dosDate, dosTime };
+  }
+
+  function writeUint16(bytes, offset, value) {
+    bytes[offset] = value & 0xff;
+    bytes[offset + 1] = (value >>> 8) & 0xff;
+  }
+
+  function writeUint32(bytes, offset, value) {
+    bytes[offset] = value & 0xff;
+    bytes[offset + 1] = (value >>> 8) & 0xff;
+    bytes[offset + 2] = (value >>> 16) & 0xff;
+    bytes[offset + 3] = (value >>> 24) & 0xff;
+  }
+
+  function concatBytes(parts) {
+    const length = parts.reduce((total, part) => total + part.length, 0);
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    parts.forEach(part => {
+      bytes.set(part, offset);
+      offset += part.length;
+    });
+    return bytes;
+  }
+
+  function createZipBlob(entries) {
+    const encoder = new TextEncoder();
+    const { dosDate, dosTime } = dosDateTime();
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    entries.forEach(entry => {
+      const nameBytes = encoder.encode(entry.name);
+      const dataBytes = encoder.encode(entry.content);
+      const checksum = crc32(dataBytes);
+
+      const localHeader = new Uint8Array(30 + nameBytes.length);
+      writeUint32(localHeader, 0, 0x04034b50);
+      writeUint16(localHeader, 4, 20);
+      writeUint16(localHeader, 6, 0);
+      writeUint16(localHeader, 8, 0);
+      writeUint16(localHeader, 10, dosTime);
+      writeUint16(localHeader, 12, dosDate);
+      writeUint32(localHeader, 14, checksum);
+      writeUint32(localHeader, 18, dataBytes.length);
+      writeUint32(localHeader, 22, dataBytes.length);
+      writeUint16(localHeader, 26, nameBytes.length);
+      writeUint16(localHeader, 28, 0);
+      localHeader.set(nameBytes, 30);
+      localParts.push(localHeader, dataBytes);
+
+      const centralHeader = new Uint8Array(46 + nameBytes.length);
+      writeUint32(centralHeader, 0, 0x02014b50);
+      writeUint16(centralHeader, 4, 20);
+      writeUint16(centralHeader, 6, 20);
+      writeUint16(centralHeader, 8, 0);
+      writeUint16(centralHeader, 10, 0);
+      writeUint16(centralHeader, 12, dosTime);
+      writeUint16(centralHeader, 14, dosDate);
+      writeUint32(centralHeader, 16, checksum);
+      writeUint32(centralHeader, 20, dataBytes.length);
+      writeUint32(centralHeader, 24, dataBytes.length);
+      writeUint16(centralHeader, 28, nameBytes.length);
+      writeUint16(centralHeader, 30, 0);
+      writeUint16(centralHeader, 32, 0);
+      writeUint16(centralHeader, 34, 0);
+      writeUint16(centralHeader, 36, 0);
+      writeUint32(centralHeader, 38, 0);
+      writeUint32(centralHeader, 42, offset);
+      centralHeader.set(nameBytes, 46);
+      centralParts.push(centralHeader);
+
+      offset += localHeader.length + dataBytes.length;
+    });
+
+    const localBytes = concatBytes(localParts);
+    const centralBytes = concatBytes(centralParts);
+    const end = new Uint8Array(22);
+    writeUint32(end, 0, 0x06054b50);
+    writeUint16(end, 4, 0);
+    writeUint16(end, 6, 0);
+    writeUint16(end, 8, entries.length);
+    writeUint16(end, 10, entries.length);
+    writeUint32(end, 12, centralBytes.length);
+    writeUint32(end, 16, localBytes.length);
+    writeUint16(end, 20, 0);
+
+    return new Blob([localBytes, centralBytes, end], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+  }
+
+  function createXlsxBlob(rows) {
+    return createZipBlob([
+      {
+        name: "[Content_Types].xml",
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'
+      },
+      {
+        name: "_rels/.rels",
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'
+      },
+      {
+        name: "xl/workbook.xml",
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Laporan Job" sheetId="1" r:id="rId1"/></sheets></workbook>'
+      },
+      {
+        name: "xl/_rels/workbook.xml.rels",
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'
+      },
+      {
+        name: "xl/worksheets/sheet1.xml",
+        content: createWorksheetXml(rows)
+      }
+    ]);
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadJobsReport(format) {
+    readReportDownloadInputs();
+    syncReportDownloadInputs();
+    const rows = getReportRows(reportDownloadState);
+    const filenameBase = getReportFilenameBase(reportDownloadState);
+    const extension = format === "xlsx" ? "xlsx" : "csv";
+    const blob = extension === "xlsx" ? createXlsxBlob(rows) : createCsvBlob(rows);
+    downloadBlob(blob, `${filenameBase}.${extension}`);
+    setStatus(jobsReportDownloadStatus, `${filenameBase}.${extension} dibuat.`, "success");
   }
 
   function isToday(value) {
@@ -1719,7 +2003,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -1776,6 +2060,11 @@
       renderAllJobsTable();
       openModal(allJobsModalBackdrop);
     });
+    openJobsReportDownloadBtn.addEventListener("click", () => {
+      setStatus(jobsReportDownloadStatus, "");
+      syncReportDownloadInputs();
+      openModal(jobsReportDownloadModalBackdrop);
+    });
     openJobsFilterBtn.addEventListener("click", () => {
       syncJobsFilterInputs();
       openModal(jobsFilterModalBackdrop);
@@ -1800,11 +2089,23 @@
         renderFundEstimate();
       });
     });
+    document.querySelectorAll('input[name="jobsReportDownloadMode"]').forEach(input => {
+      input.addEventListener("change", () => {
+        readReportDownloadInputs();
+        syncReportDownloadInputs();
+      });
+    });
     [fundEstimateDayInput, fundEstimateStartInput, fundEstimateEndInput].forEach(input => {
       input.addEventListener("input", () => {
         readFundEstimateInputs();
         renderFundEstimate();
       });
+    });
+    [jobsReportDownloadDayInput, jobsReportDownloadStartInput, jobsReportDownloadEndInput].forEach(input => {
+      input.addEventListener("input", readReportDownloadInputs);
+    });
+    document.querySelectorAll("[data-report-format]").forEach(button => {
+      button.addEventListener("click", () => downloadJobsReport(button.getAttribute("data-report-format")));
     });
     jobsSearchInput.addEventListener("input", () => {
       jobTableState.search = jobsSearchInput.value;

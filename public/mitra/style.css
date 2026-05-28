@@ -701,6 +701,10 @@ textarea {
   width: min(520px, calc(100vw - 32px));
 }
 
+.report-download-modal {
+  width: min(520px, calc(100vw - 32px));
+}
+
 .modal-header {
   display: block;
   margin-bottom: 0;
@@ -1649,6 +1653,14 @@ body.mitra-dashboard-active .page {
   margin-top: 16px;
 }
 
+.report-download-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .stat-card {
   min-width: 0;
   display: grid;
@@ -2186,7 +2198,8 @@ body.mitra-dashboard-active .page {
   }
 
   .jobs-filter-actions,
-  .jobs-modal-footer {
+  .jobs-modal-footer,
+  .report-download-actions {
     align-items: stretch;
     flex-direction: column;
   }
