@@ -17,6 +17,9 @@ const previewContentScale = document.getElementById("previewContentScale");
 const previewCopies = document.getElementById("previewCopies");
 const previewImpressions = document.getElementById("previewImpressions");
 const previewWarning = document.getElementById("previewWarning");
+const previewZoomInBtn = document.getElementById("previewZoomInBtn");
+const previewZoomOutBtn = document.getElementById("previewZoomOutBtn");
+const previewZoomValue = document.getElementById("previewZoomValue");
 const uploadFileInput = uploadForm.querySelector('input[name="document"]');
 const uploadPaperSizeInput = uploadForm.querySelector('select[name="paperSize"]');
 const uploadCopiesInput = uploadForm.querySelector('input[name="copies"]');
@@ -70,20 +73,65 @@ const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.1;
 
-function setPreviewZoom(newZoom) {
-  previewZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+function updatePreviewPageBaseHeight() {
   const visualArea = document.getElementById("visualPreviewArea");
   if (!visualArea) return;
+
+  const baseHeight = Math.max(180, visualArea.clientHeight - 48);
+  visualArea.style.setProperty("--preview-page-base-height", `${baseHeight}px`);
+}
+
+function updateZoomControls() {
+  if (previewZoomValue) {
+    previewZoomValue.textContent = `${Math.round(previewZoom * 100)}%`;
+  }
+  if (previewZoomOutBtn) {
+    previewZoomOutBtn.disabled = previewZoom <= MIN_ZOOM + 0.001;
+  }
+  if (previewZoomInBtn) {
+    previewZoomInBtn.disabled = previewZoom >= MAX_ZOOM - 0.001;
+  }
+}
+
+function setPreviewZoom(newZoom, anchorEvent = null) {
+  const visualArea = document.getElementById("visualPreviewArea");
+  if (!visualArea) return;
+
+  const rect = visualArea.getBoundingClientRect();
+  const anchorX = anchorEvent ? anchorEvent.clientX - rect.left : visualArea.clientWidth / 2;
+  const anchorY = anchorEvent ? anchorEvent.clientY - rect.top : visualArea.clientHeight / 2;
+  const scrollWidthBefore = Math.max(1, visualArea.scrollWidth);
+  const scrollHeightBefore = Math.max(1, visualArea.scrollHeight);
+  const scrollRatioX = (visualArea.scrollLeft + anchorX) / scrollWidthBefore;
+  const scrollRatioY = (visualArea.scrollTop + anchorY) / scrollHeightBefore;
+
+  previewZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
   visualArea.style.setProperty('--preview-zoom', previewZoom);
+  updateZoomControls();
+
+  requestAnimationFrame(() => {
+    visualArea.scrollLeft = Math.max(0, scrollRatioX * visualArea.scrollWidth - anchorX);
+    visualArea.scrollTop = Math.max(0, scrollRatioY * visualArea.scrollHeight - anchorY);
+  });
 }
 
 function handlePreviewWheel(e) {
   if (e.ctrlKey) {
     e.preventDefault();
     if (e.deltaY < 0) {
-      setPreviewZoom(previewZoom + ZOOM_STEP);
+      setPreviewZoom(previewZoom + ZOOM_STEP, e);
     } else if (e.deltaY > 0) {
-      setPreviewZoom(previewZoom - ZOOM_STEP);
+      setPreviewZoom(previewZoom - ZOOM_STEP, e);
+    }
+    return;
+  }
+
+  if (e.shiftKey) {
+    const visualArea = e.currentTarget;
+    const horizontalDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (horizontalDelta !== 0 && visualArea.scrollWidth > visualArea.clientWidth) {
+      e.preventDefault();
+      visualArea.scrollLeft += horizontalDelta;
     }
   }
 }
@@ -91,7 +139,20 @@ function handlePreviewWheel(e) {
 document.addEventListener('DOMContentLoaded', () => {
   const visualArea = document.getElementById("visualPreviewArea");
   if (visualArea) {
+    updatePreviewPageBaseHeight();
     visualArea.addEventListener('wheel', handlePreviewWheel, { passive: false });
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver(updatePreviewPageBaseHeight);
+      resizeObserver.observe(visualArea);
+    } else {
+      window.addEventListener("resize", updatePreviewPageBaseHeight);
+    }
+  }
+  if (previewZoomInBtn) {
+    previewZoomInBtn.addEventListener("click", () => setPreviewZoom(previewZoom + ZOOM_STEP));
+  }
+  if (previewZoomOutBtn) {
+    previewZoomOutBtn.addEventListener("click", () => setPreviewZoom(previewZoom - ZOOM_STEP));
   }
   setPreviewZoom(1);
 });
@@ -317,6 +378,15 @@ function setVisualPreviewMessage(text, isError = false) {
   }
   const color = isError ? "#b91c1c" : "#666";
   visualArea.innerHTML = `<div class="visual-preview-placeholder" style="color:${color}">${text}</div>`;
+}
+
+function createPreviewPagesContainer(visualArea) {
+  updatePreviewPageBaseHeight();
+  visualArea.innerHTML = "";
+  const pagesContainer = document.createElement("div");
+  pagesContainer.className = "visual-preview-pages";
+  visualArea.appendChild(pagesContainer);
+  return pagesContainer;
 }
 
 function getDocxRenderer() {
@@ -587,9 +657,9 @@ async function renderVisualPreview(file) {
         const analyzedPages = [];
         updatePageRangeInput(pdf.numPages);
 
-        visualArea.innerHTML = '';
+        const pagesContainer = createPreviewPagesContainer(visualArea);
         
-        const pagesToRender = Math.min(pdf.numPages, 20);
+        const pagesToRender = pdf.numPages;
         const scale = 1.5; // High resolution base
         
         for (let pageNum = 1; pageNum <= pagesToRender; pageNum++) {
@@ -618,7 +688,7 @@ async function renderVisualPreview(file) {
           
           wrapper.appendChild(canvas);
           container.appendChild(wrapper);
-          visualArea.appendChild(container);
+          pagesContainer.appendChild(container);
 
           // Initialize zoom to fit width relative to A4
           if (pageNum === 1) {
@@ -651,16 +721,9 @@ async function renderVisualPreview(file) {
         updateColorAnalysisEstimate();
         updatePreviewSummary();
         
-        if (pdf.numPages > 20) {
-          const note = document.createElement('div');
-          note.className = "visual-preview-placeholder";
-          note.textContent = `(+ ${pdf.numPages - 20} halaman lainnya...)`;
-          visualArea.appendChild(note);
-        }
-
       } else if (file.type.startsWith("image/")) {
         updatePageRangeInput(1);
-        visualArea.innerHTML = '';
+        const pagesContainer = createPreviewPagesContainer(visualArea);
         const container = document.createElement('div');
         container.className = `preview-page-container`;
         
@@ -694,7 +757,7 @@ async function renderVisualPreview(file) {
         };
         wrapper.appendChild(img);
         container.appendChild(wrapper);
-        visualArea.appendChild(container);
+        pagesContainer.appendChild(container);
 
       } else if (file.type === "text/plain") {
         updatePageRangeInput(1);
@@ -705,7 +768,7 @@ async function renderVisualPreview(file) {
         };
         updateColorAnalysisEstimate();
         const text = await file.text();
-        visualArea.innerHTML = '';
+        const pagesContainer = createPreviewPagesContainer(visualArea);
         const container = document.createElement('div');
         container.className = `preview-page-container`;
         
@@ -716,7 +779,7 @@ async function renderVisualPreview(file) {
         pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
         wrapper.appendChild(pre);
         container.appendChild(wrapper);
-        visualArea.appendChild(container);
+        pagesContainer.appendChild(container);
       } else {
         updatePageRangeInput(1);
         resetColorAnalysis("unknown");
