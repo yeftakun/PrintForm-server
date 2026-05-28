@@ -139,10 +139,17 @@
 
       <section class="partner-dashboard hidden" id="dashboardShell" aria-labelledby="dashboardTitle">
         <header class="dashboard-header">
-          <a href="/mitra/" class="dashboard-brand" aria-label="Mitra PrintForm">
-            <span class="dashboard-brand-mark" aria-hidden="true">P</span>
-            <span id="dashboardTitle">Mitra PrintForm</span>
-          </a>
+          <div class="dashboard-title-row">
+            <button class="dashboard-menu-btn" id="dashboardSidebarToggle" type="button" aria-label="Buka menu dashboard" aria-controls="dashboardSidebar" aria-expanded="false">
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+            </button>
+            <a href="/mitra/" class="dashboard-brand" aria-label="Mitra PrintForm">
+              <span class="dashboard-brand-mark" aria-hidden="true">P</span>
+              <span id="dashboardTitle">Mitra PrintForm</span>
+            </a>
+          </div>
           <span class="store-override-badge hidden" id="storeOverrideBadge">Toko buka di luar waktu operasional</span>
 
           <div class="dashboard-actions">
@@ -153,17 +160,22 @@
         </header>
 
         <div class="dashboard-layout">
-          <aside class="dashboard-sidebar" aria-label="Navigasi dashboard mitra">
-            <a href="#dashboardStats">Ringkasan</a>
-            <a href="#creditSection">Billing</a>
-            <a href="#storeSettingsSection">Toko</a>
-            <a href="#serviceSettingsSection">Layanan</a>
-            <a href="#accountSettingsSection">Akun</a>
-            <a href="#helpSection">Bantuan</a>
+          <div class="dashboard-sidebar-backdrop" id="dashboardSidebarBackdrop" aria-hidden="true"></div>
+          <aside class="dashboard-sidebar" id="dashboardSidebar" aria-label="Navigasi dashboard mitra">
+            <div class="dashboard-sidebar-head">
+              <strong>Menu Mitra</strong>
+              <button class="dashboard-sidebar-close" id="dashboardSidebarClose" type="button" aria-label="Tutup menu dashboard">×</button>
+            </div>
+            <a href="#dashboardStats" data-dashboard-target="dashboardStats">Ringkasan</a>
+            <a href="#creditSection" data-dashboard-target="creditSection">Billing</a>
+            <a href="#storeSettingsSection" data-dashboard-target="storeSettingsSection">Toko</a>
+            <a href="#serviceSettingsSection" data-dashboard-target="serviceSettingsSection">Layanan</a>
+            <a href="#accountSettingsSection" data-dashboard-target="accountSettingsSection">Akun</a>
+            <a href="#helpSection" data-dashboard-target="helpSection">Bantuan</a>
           </aside>
 
           <div class="dashboard-main">
-            <section class="dashboard-section dashboard-intro">
+            <section class="dashboard-section dashboard-intro" data-dashboard-panel="dashboardStats">
               <div>
                 <p class="dashboard-kicker">Selamat Datang</p>
                 <h1>Dashboard Mitra - Kelola Toko Anda</h1>
@@ -174,7 +186,7 @@
               </div>
             </section>
 
-            <section class="dashboard-section" id="dashboardStats" aria-labelledby="dashboardStatsTitle">
+            <section class="dashboard-section" id="dashboardStats" data-dashboard-panel="dashboardStats" aria-labelledby="dashboardStatsTitle">
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Ringkasan</p>
@@ -209,7 +221,7 @@
               </div>
             </section>
 
-            <section class="dashboard-section" id="creditSection" aria-labelledby="creditTitle">
+            <section class="dashboard-section" id="creditSection" data-dashboard-panel="creditSection" aria-labelledby="creditTitle">
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Billing</p>
@@ -252,7 +264,7 @@
               <div class="status" id="billingStatus" role="status"></div>
             </section>
 
-            <section class="dashboard-section" id="storeSettingsSection" aria-labelledby="storeSettingsTitle">
+            <section class="dashboard-section" id="storeSettingsSection" data-dashboard-panel="storeSettingsSection" aria-labelledby="storeSettingsTitle">
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Toko</p>
@@ -342,7 +354,7 @@
               </div>
             </section>
 
-            <section class="dashboard-section" id="serviceSettingsSection" aria-labelledby="serviceSettingsTitle">
+            <section class="dashboard-section" id="serviceSettingsSection" data-dashboard-panel="serviceSettingsSection" aria-labelledby="serviceSettingsTitle">
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Layanan</p>
@@ -386,7 +398,7 @@
               </form>
             </section>
 
-            <section class="dashboard-section" id="accountSettingsSection" aria-labelledby="accountSettingsTitle">
+            <section class="dashboard-section" id="accountSettingsSection" data-dashboard-panel="accountSettingsSection" aria-labelledby="accountSettingsTitle">
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Akun</p>
@@ -418,7 +430,7 @@
               </div>
             </section>
 
-            <section class="dashboard-section" id="helpSection" aria-labelledby="helpTitle">
+            <section class="dashboard-section" id="helpSection" data-dashboard-panel="helpSection" aria-labelledby="helpTitle">
               <div class="dashboard-section-head">
                 <div>
                   <p class="dashboard-kicker">Bantuan</p>

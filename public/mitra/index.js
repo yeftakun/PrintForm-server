@@ -1,6 +1,13 @@
 (() => {
   const authShell = document.querySelector(".auth-shell");
   const dashboardShell = document.getElementById("dashboardShell");
+  const dashboardSidebar = document.getElementById("dashboardSidebar");
+  const dashboardSidebarToggle = document.getElementById("dashboardSidebarToggle");
+  const dashboardSidebarClose = document.getElementById("dashboardSidebarClose");
+  const dashboardSidebarBackdrop = document.getElementById("dashboardSidebarBackdrop");
+  const dashboardNavLinks = Array.from(document.querySelectorAll("[data-dashboard-target]"));
+  const dashboardPanels = Array.from(document.querySelectorAll("[data-dashboard-panel]"));
+  const dashboardMain = document.querySelector(".dashboard-main");
   const dashboardUserChip = document.getElementById("dashboardUserChip");
   const dashboardStoreCode = document.getElementById("dashboardStoreCode");
   const dashboardLastSync = document.getElementById("dashboardLastSync");
@@ -158,6 +165,7 @@
   let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
   let manualStoreStatus = "open";
   let forceOpenOutsideOperationalHours = false;
+  let activeDashboardPanel = "";
   const jobTableState = {
     statusFilters: new Set(),
     fileFilters: new Set(),
@@ -224,6 +232,58 @@
     }
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
+  }
+
+  function getDashboardTargetIds() {
+    return dashboardNavLinks
+      .map(link => link.getAttribute("data-dashboard-target"))
+      .filter(Boolean);
+  }
+
+  function getDashboardTargetFromHash() {
+    const hash = decodeURIComponent(String(window.location.hash || "").replace(/^#/, ""));
+    return getDashboardTargetIds().includes(hash) ? hash : "dashboardStats";
+  }
+
+  function openDashboardSidebar() {
+    document.body.classList.add("dashboard-sidebar-open");
+    dashboardSidebarToggle?.setAttribute("aria-expanded", "true");
+  }
+
+  function closeDashboardSidebar() {
+    document.body.classList.remove("dashboard-sidebar-open");
+    dashboardSidebarToggle?.setAttribute("aria-expanded", "false");
+  }
+
+  function activateDashboardPanel(targetId, options = {}) {
+    const nextTarget = getDashboardTargetIds().includes(targetId) ? targetId : "dashboardStats";
+    activeDashboardPanel = nextTarget;
+
+    dashboardPanels.forEach(panel => {
+      panel.hidden = panel.getAttribute("data-dashboard-panel") !== nextTarget;
+    });
+
+    dashboardNavLinks.forEach(link => {
+      const isActive = link.getAttribute("data-dashboard-target") === nextTarget;
+      link.classList.toggle("is-active", isActive);
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+
+    if (options.updateHash !== false && window.location.hash !== `#${nextTarget}`) {
+      window.history.replaceState(null, "", `#${nextTarget}`);
+    }
+
+    if (options.resetScroll !== false && dashboardMain) {
+      dashboardMain.scrollTop = 0;
+    }
+
+    if (options.closeSidebar !== false) {
+      closeDashboardSidebar();
+    }
   }
 
   function escapeHtml(value) {
@@ -1974,6 +2034,7 @@
     authShell?.classList.add("hidden");
     dashboardShell?.classList.remove("hidden");
     fillDashboardForms(user);
+    activateDashboardPanel(getDashboardTargetFromHash(), { closeSidebar: false, resetScroll: false });
     setStatus(heroStatus, "");
     heroText.textContent = "Akun sudah aktif.";
   }
@@ -1983,6 +2044,7 @@
     latestClients = [];
     latestJobs = [];
     document.body.classList.remove("mitra-dashboard-active");
+    closeDashboardSidebar();
     dashboardShell?.classList.add("hidden");
     authShell?.classList.remove("hidden");
     setLinkedClientsEmpty("Silakan login untuk melihat daftar client.");
@@ -2315,6 +2377,27 @@
   }
 
   function bindActionHandlers() {
+    dashboardNavLinks.forEach(link => {
+      link.addEventListener("click", event => {
+        event.preventDefault();
+        activateDashboardPanel(link.getAttribute("data-dashboard-target"), { closeSidebar: true });
+      });
+    });
+
+    dashboardSidebarToggle?.addEventListener("click", openDashboardSidebar);
+    dashboardSidebarClose?.addEventListener("click", closeDashboardSidebar);
+    dashboardSidebarBackdrop?.addEventListener("click", closeDashboardSidebar);
+    window.addEventListener("hashchange", () => {
+      if (document.body.classList.contains("mitra-dashboard-active")) {
+        activateDashboardPanel(getDashboardTargetFromHash(), { updateHash: false, closeSidebar: true });
+      }
+    });
+    window.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closeDashboardSidebar();
+      }
+    });
+
     loginForm.addEventListener("submit", submitLogin);
     registerForm.addEventListener("submit", submitRegister);
     accountProfileForm.addEventListener("submit", submitAccountProfile);

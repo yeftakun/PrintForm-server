@@ -1359,6 +1359,18 @@ body.mitra-dashboard-active .page {
   background: #ffffff;
 }
 
+.dashboard-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dashboard-menu-btn,
+.dashboard-sidebar-close {
+  display: none;
+}
+
 .dashboard-brand {
   display: inline-flex;
   align-items: center;
@@ -1423,6 +1435,14 @@ body.mitra-dashboard-active .page {
   background: #fafbfc;
 }
 
+.dashboard-sidebar-head {
+  display: none;
+}
+
+.dashboard-sidebar-backdrop {
+  display: none;
+}
+
 .dashboard-sidebar a {
   display: flex;
   align-items: center;
@@ -1436,10 +1456,17 @@ body.mitra-dashboard-active .page {
 }
 
 .dashboard-sidebar a:hover,
-.dashboard-sidebar a:focus-visible {
+.dashboard-sidebar a:focus-visible,
+.dashboard-sidebar a.is-active {
   color: #15171c;
   background: #f0f2f5;
   outline: none;
+}
+
+.dashboard-sidebar a.is-active {
+  border-color: #ffd8c8;
+  color: var(--accent);
+  background: #fff3ed;
 }
 
 .dashboard-main {
@@ -1471,6 +1498,10 @@ body.mitra-dashboard-active .page {
   border: 1px solid #e6e9ee;
   border-radius: 14px;
   background: #ffffff;
+}
+
+.dashboard-section[hidden] {
+  display: none !important;
 }
 
 .dashboard-intro {
@@ -2434,20 +2465,104 @@ body.mitra-dashboard-active .page {
 
 @media (max-width: 900px) {
   body.mitra-dashboard-active .page {
-    padding: 10px;
+    width: 100%;
+    min-height: 100svh;
+    padding: 0;
+    display: block;
+  }
+
+  .mitra-payment-page .page {
+    width: 100%;
+    min-height: 100svh;
+    padding: 0;
   }
 
   .partner-dashboard {
     height: auto;
-    min-height: calc(100vh - 20px);
-    border-radius: 16px;
+    min-height: 100svh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
-  .dashboard-header,
-  .dashboard-intro,
-  .dashboard-section-head {
+  .dashboard-header {
+    z-index: 5;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-items: flex-start;
+    gap: 10px;
+    min-height: 0;
+    padding: 12px 14px;
+    box-shadow: 0 10px 26px rgba(20, 24, 31, 0.07);
+  }
+
+  .dashboard-title-row {
+    width: 100%;
+  }
+
+  .dashboard-menu-btn {
+    display: inline-flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid #e6e9ee;
+    border-radius: 11px;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  .dashboard-menu-btn span {
+    width: 17px;
+    height: 2px;
+    border-radius: 99px;
+    background: #15171c;
+  }
+
+  .dashboard-brand {
+    font-size: 0.98rem;
+  }
+
+  .dashboard-brand-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .store-override-badge {
+    width: 100%;
+    min-height: 28px;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+
+  .dashboard-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+  }
+
+  .dashboard-actions .btn {
+    min-height: 38px;
+    padding: 8px 11px;
+    font-size: 0.8rem;
+  }
+
+  .dashboard-actions .auth-chip {
+    min-width: 0;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mitra-payment-page .dashboard-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .dashboard-layout {
@@ -2455,20 +2570,35 @@ body.mitra-dashboard-active .page {
     height: auto;
   }
 
-  .dashboard-sidebar {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid #eceff3;
+  .dashboard-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 48;
+    display: block;
+    background: rgba(15, 18, 20, 0.36);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
   }
 
-  .dashboard-sidebar a {
-    flex: 0 0 auto;
+  .dashboard-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 49;
+    width: min(82vw, 320px);
+    height: 100svh;
+    gap: 6px;
+    overflow-y: auto;
+    padding: 16px;
+    border-right: 1px solid #e6e9ee;
+    border-bottom: 0;
+    background: #ffffff;
+    box-shadow: 24px 0 54px rgba(20, 24, 31, 0.18);
+    transform: translateX(-105%);
+    transition: transform 220ms ease;
+    scrollbar-width: none;
   }
 
   .dashboard-form,
@@ -2476,25 +2606,304 @@ body.mitra-dashboard-active .page {
   .account-summary-grid {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 620px) {
+  .dashboard-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dashboard-sidebar-open {
+    overflow: hidden;
+  }
+
+  .dashboard-sidebar-open .dashboard-sidebar {
+    transform: translateX(0);
+  }
+
+  .dashboard-sidebar-open .dashboard-sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dashboard-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #eceff3;
+  }
+
+  .dashboard-sidebar-head strong {
+    font-size: 0.98rem;
+  }
+
+  .dashboard-sidebar-close {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #e6e9ee;
+    border-radius: 10px;
+    background: #fff;
+    color: #15171c;
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .dashboard-sidebar a {
+    width: 100%;
+    min-height: 42px;
+    padding: 0 13px;
+    border: 1px solid #e6e9ee;
+    border-radius: 11px;
+    background: #fff;
+    font-size: 0.84rem;
+  }
+
   .dashboard-main {
+    gap: 10px;
     padding: 10px;
   }
 
   .dashboard-section {
-    padding: 13px;
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .dashboard-intro {
+    display: grid;
+    align-items: start;
+    min-height: 0;
+    gap: 10px;
+  }
+
+  .dashboard-intro h1 {
+    font-size: clamp(1.06rem, 4.7vw, 1.32rem);
+  }
+
+  .dashboard-section-head {
+    display: grid;
+    align-items: start;
+    gap: 10px;
+  }
+
+  .dashboard-section-head .section-actions {
+    width: 100%;
+  }
+
+  .dashboard-section-head .section-actions .btn,
+  .dashboard-form .form-footer .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+
+  .dashboard-meta {
+    justify-content: flex-start;
+  }
+
+  .table-wrap {
+    border-radius: 12px;
+  }
+
+  .clients-table th,
+  .clients-table td {
+    padding: 10px 12px;
+    font-size: 0.84rem;
+  }
+
+  .modal-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: min(86svh, 760px);
+    padding: 48px 18px 18px;
+    border-radius: 18px;
+  }
+
+  .modal-wide,
+  .modal-jobs-wide,
+  .jobs-filter-modal,
+  .fund-estimate-modal,
+  .report-download-modal {
+    width: 100%;
+  }
+
+  .modal-jobs-wide {
+    grid-template-rows: auto auto minmax(220px, 1fr) auto;
+  }
+
+  .modal-header h2 {
+    font-size: 1.28rem;
+  }
+
+  .modal-close {
+    top: 14px;
+    right: 14px;
+  }
+}
+
+@media (max-width: 620px) {
+  body.mitra-dashboard-active {
+    background: #f6f7f9;
+  }
+
+  .dashboard-header {
+    padding: 10px 12px;
+  }
+
+  .dashboard-brand {
+    gap: 8px;
+  }
+
+  .dashboard-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mitra-payment-page .dashboard-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dashboard-actions .btn,
+  .dashboard-actions .auth-chip {
+    width: 100%;
+    min-height: 36px;
+    padding-inline: 8px;
+    font-size: 0.74rem;
+  }
+
+  .dashboard-sidebar {
+    padding: 8px 10px;
+  }
+
+  .dashboard-sidebar a {
+    min-height: 32px;
+    padding: 0 11px;
+    font-size: 0.74rem;
+  }
+
+  .dashboard-main {
+    gap: 9px;
+    padding: 9px;
+  }
+
+  .dashboard-section {
+    padding: 12px;
+    border-radius: 13px;
+  }
+
+  .dashboard-kicker {
+    margin-bottom: 4px;
+    font-size: 0.62rem;
+  }
+
+  .dashboard-section h2 {
+    font-size: 0.98rem;
+  }
+
+  .dashboard-meta span {
+    min-height: 28px;
+    font-size: 0.72rem;
   }
 
   .stat-grid,
-  .credit-summary-grid,
-  .plans-grid {
+  .credit-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .plans-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .stat-card {
+    min-height: 86px;
+    padding: 11px;
+    border-radius: 11px;
+  }
+
+  .stat-card-highlight {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .stat-card-highlight span {
+    grid-column: 1 / -1;
+  }
+
+  .stat-card-highlight .stat-card-link {
+    justify-self: end;
+  }
+
+  .stat-card span,
+  .mini-panel span {
+    font-size: 0.66rem;
+  }
+
+  .stat-card strong {
+    font-size: clamp(1.28rem, 7vw, 1.55rem);
+  }
+
+  .mini-panel {
+    min-height: 58px;
+    padding: 10px 11px;
+    border-radius: 11px;
+  }
+
+  .mini-panel strong {
+    font-size: 0.92rem;
+  }
+
+  .credit-breakdown {
+    gap: 6px;
+    margin-top: 9px;
+  }
+
+  .credit-breakdown-item {
+    min-height: 29px;
+    padding: 0 9px;
+    font-size: 0.72rem;
+  }
+
+  .billing-pricing-block {
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
   }
 
   .plan-card {
     min-height: 0;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .plan-card h3 {
+    font-size: 1rem;
+  }
+
+  .plan-card p,
+  .plan-unit-price,
+  .plan-meta-list div {
+    font-size: 0.78rem;
+  }
+
+  .plan-price {
+    font-size: 1.45rem;
+  }
+
+  .plan-label-slot {
+    min-height: 22px;
+  }
+
+  .plan-card > .btn {
+    min-height: 42px;
   }
 
   .jobs-filter-bar {
@@ -2508,13 +2917,221 @@ body.mitra-dashboard-active .page {
     flex-direction: column;
   }
 
+  .jobs-pagination-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .jobs-page-size,
+  .jobs-page-info {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
   .date-range-grid {
     grid-template-columns: 1fr;
   }
 
   .operational-summary-box,
-  .store-qr-panel,
   .operational-day-row {
+    grid-template-columns: 1fr;
+  }
+
+  .operational-summary-box {
+    align-items: stretch;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .operational-summary-box .btn {
+    width: 100%;
+  }
+
+  .store-qr-panel {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .store-qr-preview {
+    width: 92px;
+    height: 92px;
+  }
+
+  .store-qr-preview canvas {
+    width: 78px;
+    height: 78px;
+  }
+
+  .store-qr-copy .section-actions .btn {
+    width: 100%;
+  }
+
+  .store-clients-panel {
+    padding: 12px;
+  }
+
+  .store-clients-panel .dashboard-section-head {
+    display: grid;
+  }
+
+  .store-clients-panel .section-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+  }
+
+  .store-clients-panel .section-actions .btn {
+    width: 100%;
+    min-height: 38px;
+    padding-inline: 9px;
+    font-size: 0.76rem;
+  }
+
+  .service-checkbox-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .color-price-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-checkbox-grid .service-check-label {
+    min-height: 58px;
+    padding: 9px;
+  }
+
+  .service-checkbox-grid .service-check-label small {
+    margin-left: 23px;
+    font-size: 0.66rem;
+  }
+
+  .color-price-item {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .dashboard-form {
+    gap: 10px;
+  }
+
+  .dashboard-form .field input,
+  .field select {
+    min-height: 44px;
+  }
+
+  .field textarea {
+    min-height: 92px;
+  }
+
+  .form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-form .form-footer .btn,
+  .account-actions .btn,
+  .help-card {
+    width: 100%;
+  }
+
+  .account-actions,
+  .section-actions {
+    align-items: stretch;
+  }
+
+  .account-summary-grid {
+    gap: 8px;
+  }
+
+  .help-card {
+    min-height: 82px;
+    padding: 12px;
+  }
+
+  .modal {
+    padding: 46px 14px 14px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .modal-header {
+    text-align: left;
+  }
+
+  .form-modal {
+    margin-top: 20px;
+  }
+
+  .operational-days {
+    margin-top: 18px;
+  }
+
+  .operational-day-row {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 430px) {
+  .dashboard-actions {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .mitra-payment-page .dashboard-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-actions #downloadClientBtn {
+    justify-self: stretch;
+  }
+
+  .dashboard-actions #dashboardUserChip {
+    display: none;
+  }
+
+  .dashboard-actions #logoutBtn {
+    min-width: 72px;
+  }
+
+  .dashboard-main {
+    padding: 8px;
+  }
+
+  .dashboard-section {
+    padding: 11px;
+  }
+
+  .section-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-section-head .section-actions .btn {
+    width: 100%;
+  }
+
+  .stat-grid,
+  .credit-summary-grid {
+    gap: 7px;
+  }
+
+  .stat-card,
+  .mini-panel {
+    padding: 10px;
+  }
+
+  .stat-card strong {
+    font-size: 1.34rem;
+  }
+
+  .service-checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .store-qr-panel {
     grid-template-columns: 1fr;
   }
 
@@ -2522,21 +3139,44 @@ body.mitra-dashboard-active .page {
     width: 100%;
   }
 
-  .operational-summary-box {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .operational-summary-box .btn {
-    width: 100%;
-  }
-
-  .service-checkbox-grid,
-  .color-price-grid {
+  .store-clients-panel .section-actions {
     grid-template-columns: 1fr;
   }
 
-  .color-price-item {
+  .clients-table {
+    min-width: 680px;
+  }
+
+  .clients-table th,
+  .clients-table td {
+    padding: 9px 10px;
+    font-size: 0.78rem;
+  }
+
+  .clients-table code {
+    font-size: 0.72rem;
+  }
+
+  .modal {
+    max-height: 90svh;
+  }
+}
+
+@media (max-width: 360px) {
+  .stat-grid,
+  .credit-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .stat-card-highlight {
+    grid-column: auto;
+  }
+
+  .dashboard-sidebar a {
+    font-size: 0.7rem;
+  }
+
+  .store-qr-copy strong {
+    white-space: normal;
   }
 }
