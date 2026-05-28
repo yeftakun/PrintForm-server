@@ -559,6 +559,11 @@ router.get("/:id/download", asyncHandler(async (req, res) => {
     return;
   }
 
+  if (job.fileDeleted || job.fileRemoved || job.removedFileAt) {
+    res.status(404).json({ error: "Document file is not available" });
+    return;
+  }
+
   try {
     await fsp.access(job.storedPath, fs.constants.F_OK);
   } catch {
@@ -611,6 +616,11 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
 
   if (req.user && !canAccessSessionForUser(session, req.user, accessibleClientIds)) {
     res.status(403).json({ error: "Client belongs to another account" });
+    return;
+  }
+
+  if (sourceJob.fileDeleted || sourceJob.fileRemoved || sourceJob.removedFileAt) {
+    res.status(404).json({ error: "Source file missing" });
     return;
   }
 
@@ -998,6 +1008,10 @@ router.patch("/:id", asyncHandler(async (req, res) => {
 
     if (shouldDeleteDocument) {
       await removeFileSafe(job.storedPath);
+      const removedAt = new Date().toISOString();
+      job.fileDeleted = true;
+      job.fileRemoved = true;
+      job.removedFileAt = job.removedFileAt || removedAt;
       publishRealtimeEvent({
         type: "job.file.removed",
         channel: "jobs",

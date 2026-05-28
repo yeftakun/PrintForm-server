@@ -11,6 +11,8 @@ let hasJobPageRangeColumnCache = null;
 let hasJobContentScaleColumnCache = null;
 let hasJobNotesColumnCache = null;
 let hasJobEstimatedPriceColumnCache = null;
+let hasJobFileDeletedColumnCache = null;
+let hasJobRemovedFileAtColumnCache = null;
 
 async function hasColumn(columnName, cacheVar, setCacheVar) {
   if (!useDb) {
@@ -76,6 +78,14 @@ async function hasJobEstimatedPriceColumn() {
   return hasColumn("estimated_price", hasJobEstimatedPriceColumnCache, (val) => { hasJobEstimatedPriceColumnCache = val; });
 }
 
+async function hasJobFileDeletedColumn() {
+  return hasColumn("file_deleted", hasJobFileDeletedColumnCache, (val) => { hasJobFileDeletedColumnCache = val; });
+}
+
+async function hasJobRemovedFileAtColumn() {
+  return hasColumn("removed_file_at", hasJobRemovedFileAtColumnCache, (val) => { hasJobRemovedFileAtColumnCache = val; });
+}
+
 async function getJobs() {
   if (!useDb) {
     return readJobs();
@@ -90,6 +100,8 @@ async function getJobs() {
   const hasContentScale = await hasJobContentScaleColumn();
   const hasNotes = await hasJobNotesColumn();
   const hasEstimatedPrice = await hasJobEstimatedPriceColumn();
+  const hasFileDeleted = await hasJobFileDeletedColumn();
+  const hasRemovedFileAt = await hasJobRemovedFileAtColumn();
 
   const selectColumns = [
     "id", "session_id", "original_name", "stored_path", "size_bytes",
@@ -105,6 +117,8 @@ async function getJobs() {
   selectColumns.push(hasContentScale ? "content_scale" : "NULL::text AS content_scale");
   selectColumns.push(hasNotes ? "notes" : "NULL::text AS notes");
   selectColumns.push(hasEstimatedPrice ? "estimated_price" : "0::int AS estimated_price");
+  selectColumns.push(hasFileDeleted ? "file_deleted" : "false AS file_deleted");
+  selectColumns.push(hasRemovedFileAt ? "removed_file_at" : "NULL::timestamptz AS removed_file_at");
 
   const res = await query(
     `SELECT ${selectColumns.join(", ")}
@@ -123,6 +137,9 @@ async function getJobs() {
     size: Number(row.size_bytes),
     createdAt: row.created_at?.toISOString?.() || row.created_at,
     status: row.status,
+    fileDeleted: Boolean(row.file_deleted),
+    fileRemoved: Boolean(row.file_deleted || row.removed_file_at),
+    removedFileAt: row.removed_file_at?.toISOString?.() || row.removed_file_at || null,
     alias: row.alias || null,
     notes: row.notes || null,
     printConfig: {
@@ -151,15 +168,10 @@ async function saveJobs(jobs) {
   const hasContentScale = await hasJobContentScaleColumn();
   const hasNotes = await hasJobNotesColumn();
   const hasEstimatedPrice = await hasJobEstimatedPriceColumn();
+  const hasFileDeleted = await hasJobFileDeletedColumn();
+  const hasRemovedFileAt = await hasJobRemovedFileAtColumn();
 
-  const ids = jobs.map(j => j.id);
   return withTransaction(async client => {
-    if (ids.length > 0) {
-      await client.query("DELETE FROM jobs WHERE id <> ALL($1)", [ids]);
-    } else {
-      await client.query("DELETE FROM jobs");
-    }
-
     for (const j of jobs) {
       const insertColumns = [
         "id",
@@ -247,6 +259,18 @@ async function saveJobs(jobs) {
         insertColumns.push("estimated_price");
         values.push(Number.isFinite(Number(j.printConfig?.estimatedPrice)) ? Math.max(0, Math.round(Number(j.printConfig.estimatedPrice))) : 0);
         updateSetClauses.push("estimated_price = EXCLUDED.estimated_price");
+      }
+
+      if (hasFileDeleted) {
+        insertColumns.push("file_deleted");
+        values.push(Boolean(j.fileDeleted || j.fileRemoved || j.removedFileAt));
+        updateSetClauses.push("file_deleted = EXCLUDED.file_deleted");
+      }
+
+      if (hasRemovedFileAt) {
+        insertColumns.push("removed_file_at");
+        values.push(j.removedFileAt ? new Date(j.removedFileAt) : null);
+        updateSetClauses.push("removed_file_at = EXCLUDED.removed_file_at");
       }
 
       insertColumns.push("created_at", "updated_at");

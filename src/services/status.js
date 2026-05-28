@@ -94,6 +94,11 @@ function withClientStatus(client) {
 }
 
 function isSessionActive(session) {
+  const status = String(session?.status || "active").trim().toLowerCase();
+  if (status && status !== "active") {
+    return false;
+  }
+
   const lastSeen = new Date(session.lastSeen).getTime();
   return Number.isFinite(lastSeen) && Date.now() - lastSeen <= SESSION_TTL_MS;
 }

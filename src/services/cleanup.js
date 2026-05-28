@@ -13,8 +13,47 @@ const { getSessions, saveSessions } = require("../repositories/sessionsRepositor
 const { getClients, saveClients, deleteClientsByIds } = require("../repositories/clientsRepository");
 const { isSessionActive } = require("./status");
 const { refreshStorageUsageSnapshot } = require("./storageUsage");
-const { notifyJobsRemoved, notifyClientRemoved, publishRealtimeEvent } = require("./realtime");
+const { notifyClientRemoved, publishRealtimeEvent } = require("./realtime");
 const { query } = require("../db");
+
+function markJobFileRemoved(job, removedAt) {
+  if (!job) {
+    return;
+  }
+
+  job.fileDeleted = true;
+  job.fileRemoved = true;
+  job.removedFileAt = job.removedFileAt || removedAt;
+}
+
+async function removeJobFiles(jobs, shouldRemove, source) {
+  const removedAt = new Date().toISOString();
+  const removedJobIds = [];
+
+  for (const job of jobs) {
+    if (!shouldRemove(job)) {
+      continue;
+    }
+
+    if (!job.fileDeleted && job.storedPath) {
+      await secureDelete(job.storedPath);
+      removedJobIds.push(job.id);
+      publishRealtimeEvent({
+        type: "job.file.removed",
+        channel: "jobs",
+        payload: {
+          jobId: job.id,
+          status: job.status || null,
+          source
+        }
+      });
+    }
+
+    markJobFileRemoved(job, removedAt);
+  }
+
+  return removedJobIds;
+}
 
 async function cleanupExpiredSessions() {
   const sessions = await getSessions();
@@ -22,39 +61,34 @@ async function cleanupExpiredSessions() {
     return { removedSessions: 0, removedJobs: 0 };
   }
 
-  const activeSessions = sessions.filter(isSessionActive);
-  const expiredIds = new Set(sessions.filter(s => !isSessionActive(s)).map(s => s.id));
+  const expiredIds = new Set(
+    sessions
+      .filter(s => String(s.status || "active").toLowerCase() === "active" && !isSessionActive(s))
+      .map(s => s.id)
+  );
   if (expiredIds.size === 0) {
     return { removedSessions: 0, removedJobs: 0 };
   }
 
-  const jobs = await getJobs();
-  const remainingJobs = [];
-  const deleteQueue = [];
-  const removedJobIds = [];
-
-  for (const job of jobs) {
-    if (expiredIds.has(job.sessionId)) {
-      removedJobIds.push(job.id);
-      if (job.storedPath) {
-        deleteQueue.push(job.storedPath);
-      }
-    } else {
-      remainingJobs.push(job);
+  const expiredAt = new Date().toISOString();
+  for (const session of sessions) {
+    if (expiredIds.has(session.id) && String(session.status || "active").toLowerCase() === "active") {
+      session.status = "expired";
+      session.lastSeen = session.lastSeen || expiredAt;
     }
   }
 
-  await Promise.all(
-    deleteQueue.map(filePath => secureDelete(filePath))
+  const jobs = await getJobs();
+  const removedJobIds = await removeJobFiles(
+    jobs,
+    job => expiredIds.has(job.sessionId),
+    "session-expired"
   );
   await cleanupPreviewFilesBySessionIds([...expiredIds]);
-  await saveJobs(remainingJobs);
-  await saveSessions(activeSessions);
-  await refreshStorageUsageSnapshot(remainingJobs);
+  await saveJobs(jobs);
+  await saveSessions(sessions);
+  await refreshStorageUsageSnapshot(jobs);
 
-  if (removedJobIds.length > 0) {
-    notifyJobsRemoved(removedJobIds, "session-expired");
-  }
   if (expiredIds.size > 0) {
     publishRealtimeEvent({
       type: "sessions.expired",
@@ -65,7 +99,7 @@ async function cleanupExpiredSessions() {
     });
   }
 
-  return { removedSessions: expiredIds.size, removedJobs: jobs.length - remainingJobs.length };
+  return { removedSessions: expiredIds.size, removedJobs: removedJobIds.length };
 }
 
 async function cleanupPreviewFilesBySessionIds(sessionIds) {
@@ -219,29 +253,35 @@ async function cleanupStaleClients() {
   const staleIds = new Set(stale.map(c => c.id));
 
   const staleSessionIds = sessions.filter(s => staleIds.has(s.clientId)).map(s => s.id);
-  const staleJobIds = new Set(
-    jobs
-      .filter(j => staleSessionIds.includes(j.sessionId))
-      .map(j => j.id)
+  const staleSessionIdSet = new Set(staleSessionIds);
+  const removedJobIds = await removeJobFiles(
+    jobs,
+    job => staleSessionIdSet.has(job.sessionId),
+    "client-retention-cleanup"
   );
+
+  const closedAt = new Date().toISOString();
+  for (const session of sessions) {
+    if (staleSessionIdSet.has(session.id) && String(session.status || "active").toLowerCase() === "active") {
+      session.status = "expired";
+      session.lastSeen = session.lastSeen || closedAt;
+    }
+  }
 
   if (useDb) {
     if (staleSessionIds.length > 0) {
       await cleanupPreviewFilesBySessionIds(staleSessionIds);
-      // jobs tied to sessions will cascade on session delete
-      await query("DELETE FROM sessions WHERE id = ANY($1)", [staleSessionIds]);
     }
     await deleteClientsByIds([...staleIds]);
-    const currentJobs = await getJobs();
-    await refreshStorageUsageSnapshot(currentJobs);
+    await saveSessions(sessions);
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
   } else {
     const keepClients = clients.filter(c => !staleIds.has(c.id));
-    const keepSessions = sessions.filter(s => !staleIds.has(s.clientId));
-    const keepJobs = jobs.filter(j => !staleSessionIds.includes(j.sessionId));
     await saveClients(keepClients);
-    await saveSessions(keepSessions);
-    await saveJobs(keepJobs);
-    await refreshStorageUsageSnapshot(keepJobs);
+    await saveSessions(sessions);
+    await saveJobs(jobs);
+    await refreshStorageUsageSnapshot(jobs);
   }
 
   for (const clientId of staleIds) {
@@ -251,7 +291,7 @@ async function cleanupStaleClients() {
   return {
     removedClients: staleIds.size,
     removedSessions: staleSessionIds.length,
-    removedJobs: staleJobIds.size
+    removedJobs: removedJobIds.length
   };
 }
 

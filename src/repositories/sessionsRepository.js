@@ -104,14 +104,7 @@ async function saveSessions(sessions) {
 
   const hasClientIdColumn = await hasSessionClientIdColumn();
   const hasOwnerUserIdColumn = await hasSessionOwnerUserIdColumn();
-  const ids = sessions.map(s => s.id);
   return withTransaction(async client => {
-    if (ids.length > 0) {
-      await client.query("DELETE FROM sessions WHERE id <> ALL($1)", [ids]);
-    } else {
-      await client.query("DELETE FROM sessions");
-    }
-
     for (const s of sessions) {
       if (hasClientIdColumn && hasOwnerUserIdColumn) {
         await client.query(

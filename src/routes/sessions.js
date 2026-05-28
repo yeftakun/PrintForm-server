@@ -16,7 +16,6 @@ const { toPublicClient } = require("../utils/publicMapper");
 const { cleanupExpiredSessions, cleanupPreviewFilesBySessionIds } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
 const {
-  notifyJobsRemoved,
   notifyClientUpserted,
   publishRealtimeEvent,
   isClientRealtimeConnected
@@ -425,34 +424,42 @@ router.post("/close", asyncHandler(async (req, res) => {
     }
   }
 
-  const remainingSessions = sessions.filter(s => s.id !== sessionId);
-
   const jobs = await getJobs();
-  const remainingJobs = [];
-  const deleteQueue = [];
-  const removedJobIds = [];
+  const removedAt = new Date().toISOString();
+  const removedFileJobIds = [];
 
   for (const job of jobs) {
     if (job.sessionId === sessionId) {
-      removedJobIds.push(job.id);
-      if (job.storedPath) {
-        deleteQueue.push(job.storedPath);
+      if (!job.fileDeleted && job.storedPath) {
+        await secureDelete(job.storedPath);
+        removedFileJobIds.push(job.id);
       }
-    } else {
-      remainingJobs.push(job);
+
+      job.fileDeleted = true;
+      job.fileRemoved = true;
+      job.removedFileAt = job.removedFileAt || removedAt;
     }
   }
 
-  await Promise.all(
-    deleteQueue.map(filePath => secureDelete(filePath))
-  );
-  await cleanupPreviewFilesBySessionIds([sessionId]);
-  await saveJobs(remainingJobs);
-  await saveSessions(remainingSessions);
-  await refreshStorageUsageSnapshot(remainingJobs);
+  if (targetSession) {
+    targetSession.status = "closed";
+    targetSession.lastSeen = targetSession.lastSeen || removedAt;
+  }
 
-  if (removedJobIds.length > 0) {
-    notifyJobsRemoved(removedJobIds, "session-close");
+  await cleanupPreviewFilesBySessionIds([sessionId]);
+  await saveJobs(jobs);
+  await saveSessions(sessions);
+  await refreshStorageUsageSnapshot(jobs);
+
+  for (const jobId of removedFileJobIds) {
+    publishRealtimeEvent({
+      type: "job.file.removed",
+      channel: "jobs",
+      payload: {
+        jobId,
+        source: "session-close"
+      }
+    });
   }
 
   publishRealtimeEvent({
@@ -460,7 +467,8 @@ router.post("/close", asyncHandler(async (req, res) => {
     channel: "sessions",
     payload: {
       sessionId,
-      removedJobs: removedJobIds.length
+      removedJobs: 0,
+      removedFiles: removedFileJobIds.length
     }
   });
 
@@ -473,11 +481,12 @@ router.post("/close", asyncHandler(async (req, res) => {
     targetId: sessionId,
     detail: {
       ownerUserId: targetSession?.ownerUserId || null,
-      removedJobs: removedJobIds.length
+      removedJobs: 0,
+      removedFiles: removedFileJobIds.length
     }
   });
 
-  res.json({ ok: true, removedJobs: jobs.length - remainingJobs.length });
+  res.json({ ok: true, removedJobs: 0, removedFiles: removedFileJobIds.length });
 }));
 
 module.exports = router;
