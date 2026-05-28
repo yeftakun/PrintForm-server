@@ -10,6 +10,7 @@ let hasJobOrientationColumnCache = null;
 let hasJobPageRangeColumnCache = null;
 let hasJobContentScaleColumnCache = null;
 let hasJobNotesColumnCache = null;
+let hasJobEstimatedPriceColumnCache = null;
 
 async function hasColumn(columnName, cacheVar, setCacheVar) {
   if (!useDb) {
@@ -71,6 +72,10 @@ async function hasJobNotesColumn() {
   return hasColumn("notes", hasJobNotesColumnCache, (val) => { hasJobNotesColumnCache = val; });
 }
 
+async function hasJobEstimatedPriceColumn() {
+  return hasColumn("estimated_price", hasJobEstimatedPriceColumnCache, (val) => { hasJobEstimatedPriceColumnCache = val; });
+}
+
 async function getJobs() {
   if (!useDb) {
     return readJobs();
@@ -84,6 +89,7 @@ async function getJobs() {
   const hasPageRange = await hasJobPageRangeColumn();
   const hasContentScale = await hasJobContentScaleColumn();
   const hasNotes = await hasJobNotesColumn();
+  const hasEstimatedPrice = await hasJobEstimatedPriceColumn();
 
   const selectColumns = [
     "id", "session_id", "original_name", "stored_path", "size_bytes",
@@ -98,6 +104,7 @@ async function getJobs() {
   selectColumns.push(hasPageRange ? "page_range" : "NULL::text AS page_range");
   selectColumns.push(hasContentScale ? "content_scale" : "NULL::text AS content_scale");
   selectColumns.push(hasNotes ? "notes" : "NULL::text AS notes");
+  selectColumns.push(hasEstimatedPrice ? "estimated_price" : "0::int AS estimated_price");
 
   const res = await query(
     `SELECT ${selectColumns.join(", ")}
@@ -124,7 +131,8 @@ async function getJobs() {
       colorMode: row.color_mode || null,
       orientation: row.orientation || null,
       pageRange: row.page_range || null,
-      contentScale: row.content_scale || null
+      contentScale: row.content_scale || null,
+      estimatedPrice: Number(row.estimated_price || 0)
     }
   }));
 }
@@ -142,6 +150,7 @@ async function saveJobs(jobs) {
   const hasPageRange = await hasJobPageRangeColumn();
   const hasContentScale = await hasJobContentScaleColumn();
   const hasNotes = await hasJobNotesColumn();
+  const hasEstimatedPrice = await hasJobEstimatedPriceColumn();
 
   const ids = jobs.map(j => j.id);
   return withTransaction(async client => {
@@ -232,6 +241,12 @@ async function saveJobs(jobs) {
         insertColumns.push("notes");
         values.push(j.notes || null);
         updateSetClauses.push("notes = EXCLUDED.notes");
+      }
+
+      if (hasEstimatedPrice) {
+        insertColumns.push("estimated_price");
+        values.push(Number.isFinite(Number(j.printConfig?.estimatedPrice)) ? Math.max(0, Math.round(Number(j.printConfig.estimatedPrice))) : 0);
+        updateSetClauses.push("estimated_price = EXCLUDED.estimated_price");
       }
 
       insertColumns.push("created_at", "updated_at");

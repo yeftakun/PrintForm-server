@@ -76,6 +76,25 @@ function formatJobTime(value) {
   return new Date(value).toLocaleString();
 }
 
+function formatCurrency(value) {
+  if (!Number.isFinite(Number(value))) {
+    return "-";
+  }
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0
+  }).format(Number(value));
+}
+
+function getColorDetectionText(job) {
+  const detection = job.printConfig?.colorDetection;
+  if (!detection || typeof detection !== "object") {
+    return "-";
+  }
+  return `${Number(detection.bwPages || 0)} BW, ${Number(detection.colorPages || 0)} warna`;
+}
+
 function setJobDetailOpen(isOpen) {
   if (!jobDetailModal) {
     return;
@@ -114,6 +133,8 @@ function openJobDetail(jobId) {
     renderDetailRow("Alias", job.alias || "-"),
     renderDetailRow("Diklaim Oleh", getClaimedBy(job)),
     renderDetailRow("Konfigurasi", getJobConfigText(job) || "-"),
+    renderDetailRow("Deteksi Warna", getColorDetectionText(job)),
+    renderDetailRow("Estimasi Harga", formatCurrency(job.printConfig?.estimatedPrice)),
     renderDetailRow("Status", formatStatus(job.status)),
     renderDetailRow("Waktu", formatJobTime(job.createdAt))
   ].join("");
@@ -405,6 +426,12 @@ function bindUploadForm() {
     const sessionId = getSessionId();
     if (sessionId) {
       formData.append("sessionId", sessionId);
+    }
+    if (preview.colorDetection) {
+      formData.set("colorDetection", JSON.stringify(preview.colorDetection));
+      if (Number.isFinite(Number(preview.colorDetection.estimatedPrice))) {
+        formData.set("estimatedPrice", String(preview.colorDetection.estimatedPrice));
+      }
     }
     try {
       const res = await apiFetch("/api/jobs", {

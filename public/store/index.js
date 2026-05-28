@@ -179,6 +179,7 @@ confirmStoreBtn.addEventListener("click", async () => {
     sessionStorage.setItem("printformSessionStoreCode", currentStore.kodeToko || "");
     sessionStorage.setItem("printformSessionStoreAddress", currentStore.alamat || "");
     sessionStorage.setItem("printformSessionStoreHours", currentStore.jamOperasional || "");
+    sessionStorage.setItem("printformSessionStoreServices", JSON.stringify(currentStore.layanan || {}));
     sessionStorage.setItem("printformSessionAlias", body.alias || alias || "");
     window.location.href = "/session/";
   } catch {

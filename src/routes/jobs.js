@@ -89,6 +89,48 @@ const CLAIM_GUARDED_STATUSES = new Set([
   "send"
 ]);
 
+function normalizeColorDetection(value) {
+  let payload = value;
+  if (typeof value === "string") {
+    try {
+      payload = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const pages = Array.isArray(payload.pages)
+    ? payload.pages
+      .map(item => ({
+        page: Number.parseInt(item?.page, 10),
+        mode: String(item?.mode || "").toLowerCase() === "color" ? "color" : "bw",
+        colorRatio: Number.isFinite(Number(item?.colorRatio)) ? Number(item.colorRatio) : 0
+      }))
+      .filter(item => Number.isInteger(item.page) && item.page > 0)
+      .slice(0, 500)
+    : [];
+
+  const bwPages = Math.max(0, Number.parseInt(payload.bwPages, 10) || 0);
+  const colorPages = Math.max(0, Number.parseInt(payload.colorPages, 10) || 0);
+  const totalPages = Math.max(0, Number.parseInt(payload.totalPages, 10) || pages.length || bwPages + colorPages);
+  const estimatedPrice = Number.isFinite(Number(payload.estimatedPrice))
+    ? Math.max(0, Math.round(Number(payload.estimatedPrice)))
+    : null;
+
+  return {
+    status: String(payload.status || "unknown").slice(0, 32),
+    totalPages,
+    bwPages,
+    colorPages,
+    estimatedPrice,
+    pages
+  };
+}
+
 const STATUS_ALIASES = new Map([
   ["reject", "rejected"],
   ["cancelled", "canceled"]
@@ -1017,6 +1059,10 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
   const pageRange = normalizePageRange(req.body.pageRange);
   const contentScale = normalizeContentScale(req.body.contentScale);
   const notes = normalizeNotes(req.body.notes);
+  const colorDetection = normalizeColorDetection(req.body.colorDetection);
+  const estimatedPrice = Number.isFinite(Number(req.body.estimatedPrice))
+    ? Math.max(0, Math.round(Number(req.body.estimatedPrice)))
+    : colorDetection?.estimatedPrice ?? null;
 
   const sessionId = typeof req.body.sessionId === "string" ? req.body.sessionId : null;
 
@@ -1127,7 +1173,9 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
       colorMode,
       orientation,
       pageRange,
-      contentScale
+      contentScale,
+      colorDetection,
+      estimatedPrice
     },
     notes
   };
