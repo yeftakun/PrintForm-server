@@ -670,6 +670,10 @@ textarea {
   animation: modalIn 220ms ease-out;
 }
 
+.modal-wide {
+  width: min(620px, calc(100vw - 32px));
+}
+
 .modal-header {
   display: block;
   margin-bottom: 0;
@@ -1331,6 +1335,19 @@ body.mitra-dashboard-active .page {
   font-size: 0.9rem;
 }
 
+.store-override-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #fedf89;
+  border-radius: 999px;
+  color: #93370d;
+  background: #fffaeb;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .dashboard-actions,
 .section-actions {
   display: flex;
@@ -1553,6 +1570,84 @@ body.mitra-dashboard-active .page {
   font-size: 0.82rem;
 }
 
+.operational-field {
+  min-width: 0;
+}
+
+.operational-summary-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.operational-summary-box strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operational-days {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.operational-day-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) repeat(2, minmax(112px, 0.8fr));
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #ebedf1;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+
+.operational-day-row label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.operational-day-row input[type="time"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+.operational-day-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 9px !important;
+  font-size: 0.88rem !important;
+}
+
+.operational-day-toggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.operational-modal-footer {
+  margin-top: 16px;
+}
+
 .account-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1760,5 +1855,19 @@ body.mitra-dashboard-active .page {
 
   .activity-item {
     grid-template-columns: 1fr;
+  }
+
+  .operational-summary-box,
+  .operational-day-row {
+    grid-template-columns: 1fr;
+  }
+
+  .operational-summary-box {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .operational-summary-box .btn {
+    width: 100%;
   }
 }

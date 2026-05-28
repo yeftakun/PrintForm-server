@@ -3,6 +3,7 @@ const { secureDelete } = require("../utils/secureDelete");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, updateClientPresence } = require("../repositories/clientsRepository");
 const { getUserByStoreCode } = require("../repositories/usersRepository");
+const { getOperationalState } = require("../utils/storeOperational");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const {
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
@@ -164,6 +165,19 @@ router.post("/", asyncHandler(async (req, res) => {
         error: "Toko tidak ditemukan.",
         code: "STORE_NOT_FOUND",
         kodeToko
+      });
+      return;
+    }
+    const config = storeUser.konfigurasiToko && typeof storeUser.konfigurasiToko === "object"
+      ? storeUser.konfigurasiToko
+      : {};
+    const operationalState = getOperationalState(config);
+    if (operationalState.status === "closed") {
+      res.status(409).json({
+        error: "Toko sedang tutup.",
+        code: "STORE_CLOSED",
+        kodeToko,
+        isWithinOperationalHours: operationalState.isWithinHours
       });
       return;
     }

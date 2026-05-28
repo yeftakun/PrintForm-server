@@ -143,6 +143,7 @@
             <span class="dashboard-brand-mark" aria-hidden="true">P</span>
             <span id="dashboardTitle">Mitra PrintForm</span>
           </a>
+          <span class="store-override-badge hidden" id="storeOverrideBadge">Toko buka di luar waktu operasional</span>
 
           <div class="dashboard-actions">
             <button class="btn btn-outline btn-compact" id="downloadClientBtn" type="button">Download Klien</button>
@@ -255,16 +256,19 @@
                   <input type="text" name="kodeToko" maxlength="64" placeholder="contoh: TOKO-001">
                 </label>
                 <label class="field">
-                  <span>Status</span>
+                  <span>Status Toko</span>
                   <select name="storeStatus">
                     <option value="open">Buka</option>
                     <option value="closed">Tutup</option>
                   </select>
                 </label>
-                <label class="field">
-                  <span>Jam Operasional</span>
-                  <input type="text" name="storeHours" maxlength="120" placeholder="Setiap hari 08.00 - 21.00">
-                </label>
+                <div class="field operational-field">
+                  <span>Waktu Operasional</span>
+                  <div class="operational-summary-box">
+                    <strong id="storeOperationalSummary">Setiap hari 08:00 - 21:00</strong>
+                    <button class="btn btn-outline btn-compact" id="openOperationalHoursBtn" type="button">Atur Waktu</button>
+                  </div>
+                </div>
                 <label class="field">
                   <span>Kontak</span>
                   <input type="text" name="storeContact" maxlength="80" placeholder="Nomor WhatsApp / telepon">
@@ -506,6 +510,24 @@
           </p>
           <div class="status" id="registerStatus" role="status"></div>
         </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="operationalHoursModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="operationalHoursModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="operationalHoursModalTitle">Waktu Operasional</h2>
+            <p>Aktifkan hari layanan dan tentukan waktu buka serta tutup toko.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="operationalHoursModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="operational-days" id="operationalDaysList"></div>
+        <div class="form-footer account-modal-footer operational-modal-footer">
+          <button class="btn btn-primary" id="saveOperationalHoursBtn" type="button">Simpan Waktu</button>
+          <button class="btn btn-ghost" type="button" data-close="operationalHoursModalBackdrop">Batal</button>
+        </div>
+        <div class="status" id="operationalHoursStatus" role="status"></div>
       </div>
     </div>
 

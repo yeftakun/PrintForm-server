@@ -26,6 +26,11 @@ const {
 const { normalizeClientId, isValidClientId } = require("../utils/clientId");
 const { toPublicClient } = require("../utils/publicMapper");
 const {
+  getOperationalState,
+  normalizeOperationalSchedule,
+  summarizeOperationalSchedule
+} = require("../utils/storeOperational");
+const {
   getClientReadiness,
   withClientStatus,
   markClientRuntimeAuthenticated,
@@ -146,16 +151,8 @@ function getStoreHours(user) {
   const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
     ? user.konfigurasiToko
     : {};
-  return config.jamOperasional || config.jam_operasional || "Setiap hari 08.00 - 21.00";
-}
-
-function getStoreOperationalStatus(user) {
-  const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
-    ? user.konfigurasiToko
-    : {};
-  return String(config.statusToko || config.status_toko || "open").toLowerCase() === "closed"
-    ? "closed"
-    : "open";
+  const schedule = normalizeOperationalSchedule(config.waktuOperasional || config.waktu_operasional);
+  return config.jamOperasional || config.jam_operasional || summarizeOperationalSchedule(schedule);
 }
 
 function summarizeStoreClients(storeClients) {
@@ -191,7 +188,11 @@ function summarizeStoreClients(storeClients) {
 
 function toPublicStore(user, storeClients = []) {
   const summary = summarizeStoreClients(storeClients);
-  const operationalStatus = getStoreOperationalStatus(user);
+  const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
+    ? user.konfigurasiToko
+    : {};
+  const operationalState = getOperationalState(config);
+  const operationalStatus = operationalState.status;
   const isClosed = operationalStatus === "closed";
   return {
     id: user.id,
@@ -210,6 +211,9 @@ function toPublicStore(user, storeClients = []) {
     readyClientCount: summary.readyClientCount,
     lastSeen: summary.lastSeen,
     operationalStatus,
+    isWithinOperationalHours: operationalState.isWithinHours,
+    isForcedOpenOutsideOperationalHours: operationalState.isForcedOpenOutsideHours,
+    waktuOperasional: operationalState.schedule,
     kontak: user.konfigurasiToko?.kontak || null,
     layanan: user.konfigurasiToko?.layanan || {}
   };

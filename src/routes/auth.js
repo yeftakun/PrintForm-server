@@ -37,6 +37,10 @@ const {
 const { asyncHandler } = require("../utils/asyncHandler");
 const { optionalAuth, requireAuth } = require("../middleware/auth");
 const { writeAuditLogSafe } = require("../services/audit");
+const {
+  normalizeOperationalSchedule,
+  summarizeOperationalSchedule
+} = require("../utils/storeOperational");
 
 const router = express.Router();
 
@@ -105,6 +109,21 @@ function normalizeStoreCode(value) {
 
 function normalizeStoreStatus(value) {
   return String(value || "").trim().toLowerCase() === "closed" ? "closed" : "open";
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value === 1;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) return true;
+    if (["0", "false", "no", "off"].includes(normalized)) return false;
+  }
+  return fallback;
 }
 
 function normalizeColorMode(value) {
@@ -492,12 +511,20 @@ router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
   const requestedService = req.body?.layanan && typeof req.body.layanan === "object"
     ? req.body.layanan
     : {};
+  const waktuOperasional = normalizeOperationalSchedule(
+    req.body?.waktuOperasional,
+    currentConfig.waktuOperasional || currentConfig.waktu_operasional
+  );
+  const jamOperasional = normalizeOptionalText(req.body?.jamOperasional, 500)
+    || summarizeOperationalSchedule(waktuOperasional);
 
   const konfigurasiToko = {
     ...currentConfig,
     namaToko: normalizeOptionalText(req.body?.storeName, 80),
     statusToko: normalizeStoreStatus(req.body?.statusToko),
-    jamOperasional: normalizeOptionalText(req.body?.jamOperasional, 120),
+    jamOperasional,
+    waktuOperasional,
+    forceOpenOutsideOperationalHours: normalizeBoolean(req.body?.forceOpenOutsideOperationalHours, false),
     kontak: normalizeOptionalText(req.body?.kontak, 80),
     layanan: {
       ...(currentConfig.layanan && typeof currentConfig.layanan === "object" ? currentConfig.layanan : {}),

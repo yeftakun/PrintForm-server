@@ -4,6 +4,7 @@
   const dashboardUserChip = document.getElementById("dashboardUserChip");
   const dashboardStoreCode = document.getElementById("dashboardStoreCode");
   const dashboardLastSync = document.getElementById("dashboardLastSync");
+  const storeOverrideBadge = document.getElementById("storeOverrideBadge");
 
   const heroText = document.getElementById("heroText");
   const heroStatus = document.getElementById("heroStatus");
@@ -23,6 +24,8 @@
   const serviceSettingsForm = document.getElementById("serviceSettingsForm");
   const storeSettingsStatus = document.getElementById("storeSettingsStatus");
   const serviceSettingsStatus = document.getElementById("serviceSettingsStatus");
+  const storeOperationalSummary = document.getElementById("storeOperationalSummary");
+  const openOperationalHoursBtn = document.getElementById("openOperationalHoursBtn");
 
   const accountUsername = document.getElementById("accountUsername");
   const accountEmail = document.getElementById("accountEmail");
@@ -30,6 +33,7 @@
   const activityList = document.getElementById("activityList");
 
   const registerModalBackdrop = document.getElementById("registerModalBackdrop");
+  const operationalHoursModalBackdrop = document.getElementById("operationalHoursModalBackdrop");
   const profileModalBackdrop = document.getElementById("profileModalBackdrop");
   const passwordModalBackdrop = document.getElementById("passwordModalBackdrop");
   const pinModalBackdrop = document.getElementById("pinModalBackdrop");
@@ -45,14 +49,36 @@
 
   const loginStatus = document.getElementById("loginStatus");
   const registerStatus = document.getElementById("registerStatus");
+  const operationalHoursStatus = document.getElementById("operationalHoursStatus");
+  const operationalDaysList = document.getElementById("operationalDaysList");
+  const saveOperationalHoursBtn = document.getElementById("saveOperationalHoursBtn");
   const accountProfileStatus = document.getElementById("accountProfileStatus");
   const accountPasswordStatus = document.getElementById("accountPasswordStatus");
   const accountPinStatusMessage = document.getElementById("accountPinStatusMessage");
 
   const unbindInProgress = new Set();
+  const OPERATIONAL_DAYS = [
+    { key: "monday", label: "Senin" },
+    { key: "tuesday", label: "Selasa" },
+    { key: "wednesday", label: "Rabu" },
+    { key: "thursday", label: "Kamis" },
+    { key: "friday", label: "Jumat" },
+    { key: "saturday", label: "Sabtu" },
+    { key: "sunday", label: "Minggu" }
+  ];
+  const DATE_DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const DEFAULT_OPERATIONAL_SCHEDULE = OPERATIONAL_DAYS.map(day => ({
+    day: day.key,
+    enabled: true,
+    open: "08:00",
+    close: "21:00"
+  }));
   let currentUser = null;
   let latestClients = [];
   let latestJobs = [];
+  let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
+  let manualStoreStatus = "open";
+  let forceOpenOutsideOperationalHours = false;
 
   function setStatus(el, text, kind = "") {
     if (!el) {
@@ -169,6 +195,154 @@
     return config.layanan && typeof config.layanan === "object"
       ? config.layanan
       : {};
+  }
+
+  function normalizeOperationalTime(value, fallback) {
+    const text = String(value || "").trim();
+    return /^([01]\d|2[0-3]):([0-5]\d)$/.test(text) ? text : fallback;
+  }
+
+  function normalizeOperationalSchedule(value) {
+    const rows = Array.isArray(value) ? value : [];
+    return OPERATIONAL_DAYS.map(day => {
+      const fallbackRow = DEFAULT_OPERATIONAL_SCHEDULE.find(item => item.day === day.key);
+      const row = rows.find(item => String(item?.day || item?.key || "").toLowerCase() === day.key) || {};
+      return {
+        day: day.key,
+        enabled: typeof row.enabled === "boolean" ? row.enabled : Boolean(fallbackRow?.enabled),
+        open: normalizeOperationalTime(row.open || row.buka, fallbackRow?.open || "08:00"),
+        close: normalizeOperationalTime(row.close || row.tutup, fallbackRow?.close || "21:00")
+      };
+    });
+  }
+
+  function timeToMinutes(value) {
+    const [hour, minute] = String(value || "").split(":").map(Number);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+      return null;
+    }
+    return hour * 60 + minute;
+  }
+
+  function getTodayOperationalRow(schedule, date = new Date()) {
+    const todayKey = DATE_DAY_KEYS[date.getDay()];
+    return schedule.find(item => item.day === todayKey) || null;
+  }
+
+  function isWithinOperationalSchedule(schedule, date = new Date()) {
+    const today = getTodayOperationalRow(schedule, date);
+    if (!today?.enabled) {
+      return false;
+    }
+
+    const openMinutes = timeToMinutes(today.open);
+    const closeMinutes = timeToMinutes(today.close);
+    if (openMinutes === null || closeMinutes === null) {
+      return false;
+    }
+
+    const currentMinutes = date.getHours() * 60 + date.getMinutes();
+    if (openMinutes === closeMinutes) {
+      return true;
+    }
+    if (closeMinutes > openMinutes) {
+      return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+    }
+    return currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+  }
+
+  function getDayLabel(dayKey) {
+    return OPERATIONAL_DAYS.find(day => day.key === dayKey)?.label || dayKey;
+  }
+
+  function summarizeOperationalSchedule(schedule) {
+    const activeRows = schedule.filter(item => item.enabled);
+    if (activeRows.length === 0) {
+      return "Semua hari tutup";
+    }
+
+    const sameHours = activeRows.every(item => item.open === activeRows[0].open && item.close === activeRows[0].close);
+    if (activeRows.length === 7 && sameHours) {
+      return `Setiap hari ${activeRows[0].open} - ${activeRows[0].close}`;
+    }
+
+    const today = getTodayOperationalRow(schedule);
+    const todayText = today?.enabled
+      ? `${getDayLabel(today.day)} ${today.open} - ${today.close}`
+      : `${getDayLabel(today?.day)} tutup`;
+    return `${activeRows.length} hari aktif. Hari ini: ${todayText}`;
+  }
+
+  function getOperationalFormState() {
+    const selectedStatus = String(storeSettingsForm.elements.storeStatus.value || "open");
+    const isWithinHours = isWithinOperationalSchedule(currentOperationalSchedule);
+    const isForcedOpenOutsideHours = selectedStatus === "open" && !isWithinHours && forceOpenOutsideOperationalHours;
+    const effectiveStatus = selectedStatus === "closed"
+      ? "closed"
+      : isWithinHours || isForcedOpenOutsideHours
+        ? "open"
+        : "closed";
+
+    return {
+      selectedStatus,
+      effectiveStatus,
+      isWithinHours,
+      isForcedOpenOutsideHours
+    };
+  }
+
+  function updateOperationalUi({ autoCloseOutsideHours = false } = {}) {
+    if (!storeSettingsForm?.elements?.storeStatus) {
+      return;
+    }
+
+    const isWithinHours = isWithinOperationalSchedule(currentOperationalSchedule);
+    if (isWithinHours && forceOpenOutsideOperationalHours) {
+      forceOpenOutsideOperationalHours = false;
+    }
+    if (autoCloseOutsideHours && manualStoreStatus === "open") {
+      storeSettingsForm.elements.storeStatus.value = isWithinHours || forceOpenOutsideOperationalHours
+        ? "open"
+        : "closed";
+    }
+    if (manualStoreStatus === "closed") {
+      storeSettingsForm.elements.storeStatus.value = "closed";
+    }
+
+    storeOperationalSummary.textContent = summarizeOperationalSchedule(currentOperationalSchedule);
+    const state = getOperationalFormState();
+    storeOverrideBadge?.classList.toggle("hidden", !state.isForcedOpenOutsideHours);
+  }
+
+  function renderOperationalDaysModal() {
+    operationalDaysList.innerHTML = currentOperationalSchedule.map(row => `
+      <div class="operational-day-row" data-operational-day="${escapeHtml(row.day)}">
+        <label class="operational-day-toggle">
+          <input type="checkbox" name="enabled" ${row.enabled ? "checked" : ""}>
+          <span>${escapeHtml(getDayLabel(row.day))}</span>
+        </label>
+        <label>
+          <span>Buka</span>
+          <input type="time" name="open" value="${escapeHtml(row.open)}">
+        </label>
+        <label>
+          <span>Tutup</span>
+          <input type="time" name="close" value="${escapeHtml(row.close)}">
+        </label>
+      </div>
+    `).join("");
+  }
+
+  function readOperationalDaysModal() {
+    return OPERATIONAL_DAYS.map(day => {
+      const row = operationalDaysList.querySelector(`[data-operational-day="${day.key}"]`);
+      return {
+        day: day.key,
+        enabled: Boolean(row?.querySelector('[name="enabled"]')?.checked),
+        open: normalizeOperationalTime(row?.querySelector('[name="open"]')?.value, "08:00"),
+        close: normalizeOperationalTime(row?.querySelector('[name="close"]')?.value, "21:00")
+      };
+    });
   }
 
   function setLinkedClientsEmpty(text) {
@@ -395,10 +569,16 @@
 
     storeSettingsForm.elements.storeName.value = config.namaToko || user?.username || "";
     storeSettingsForm.elements.kodeToko.value = user?.kodeToko || "";
-    storeSettingsForm.elements.storeStatus.value = config.statusToko || "open";
-    storeSettingsForm.elements.storeHours.value = config.jamOperasional || "Setiap hari 08.00 - 21.00";
+    currentOperationalSchedule = normalizeOperationalSchedule(config.waktuOperasional || config.waktu_operasional);
+    forceOpenOutsideOperationalHours = Boolean(config.forceOpenOutsideOperationalHours || config.force_open_outside_operational_hours);
+    const configuredStatus = String(config.statusToko || config.status_toko || "open").toLowerCase() === "closed" ? "closed" : "open";
+    manualStoreStatus = configuredStatus;
+    const isWithinHours = isWithinOperationalSchedule(currentOperationalSchedule);
+    const shouldShowOpen = configuredStatus === "open" && (isWithinHours || forceOpenOutsideOperationalHours);
+    storeSettingsForm.elements.storeStatus.value = shouldShowOpen ? "open" : "closed";
     storeSettingsForm.elements.storeContact.value = config.kontak || "";
     storeSettingsForm.elements.storeAddress.value = user?.alamat || "";
+    updateOperationalUi();
 
     serviceSettingsForm.elements.paperTypes.value = paperTypes;
     serviceSettingsForm.elements.colorMode.value = service.modeWarna || "both";
@@ -435,8 +615,10 @@
     return {
       storeName: String(storeSettingsForm.elements.storeName.value || "").trim(),
       kodeToko: String(storeSettingsForm.elements.kodeToko.value || "").trim(),
-      statusToko: String(storeSettingsForm.elements.storeStatus.value || "open"),
-      jamOperasional: String(storeSettingsForm.elements.storeHours.value || "").trim(),
+      statusToko: manualStoreStatus,
+      jamOperasional: summarizeOperationalSchedule(currentOperationalSchedule),
+      waktuOperasional: currentOperationalSchedule,
+      forceOpenOutsideOperationalHours,
       kontak: String(storeSettingsForm.elements.storeContact.value || "").trim(),
       alamat: String(storeSettingsForm.elements.storeAddress.value || "").trim(),
       layanan: {
@@ -756,6 +938,23 @@
     window.alert(message);
   }
 
+  function onStoreStatusChange() {
+    const selectedStatus = String(storeSettingsForm.elements.storeStatus.value || "open");
+    const isWithinHours = isWithinOperationalSchedule(currentOperationalSchedule);
+    manualStoreStatus = selectedStatus;
+    forceOpenOutsideOperationalHours = selectedStatus === "open" && !isWithinHours;
+    updateOperationalUi();
+  }
+
+  function onSaveOperationalHours() {
+    const nextSchedule = readOperationalDaysModal();
+    currentOperationalSchedule = nextSchedule;
+    forceOpenOutsideOperationalHours = false;
+    updateOperationalUi({ autoCloseOutsideHours: true });
+    setStatus(operationalHoursStatus, "Waktu operasional diperbarui. Simpan pengaturan toko untuk menyimpan ke server.", "success");
+    closeModal(operationalHoursModalBackdrop);
+  }
+
   function bindModalHandlers() {
     openRegisterBtn.addEventListener("click", () => {
       setStatus(registerStatus, "");
@@ -767,6 +966,12 @@
       setStatus(loginStatus, "");
       loginForm.scrollIntoView({ behavior: "smooth", block: "center" });
       loginForm.elements.identifier?.focus();
+    });
+
+    openOperationalHoursBtn.addEventListener("click", () => {
+      setStatus(operationalHoursStatus, "");
+      renderOperationalDaysModal();
+      openModal(operationalHoursModalBackdrop);
     });
 
     document.querySelectorAll("[data-account-modal]").forEach(button => {
@@ -790,7 +995,7 @@
       });
     });
 
-    [registerModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -805,8 +1010,11 @@
     accountProfileForm.addEventListener("submit", submitAccountProfile);
     accountPasswordForm.addEventListener("submit", submitAccountPassword);
     accountPinForm.addEventListener("submit", submitAccountPin);
+    storeSettingsForm.elements.storeStatus.addEventListener("change", onStoreStatusChange);
+    saveOperationalHoursBtn.addEventListener("click", onSaveOperationalHours);
     storeSettingsForm.addEventListener("submit", event => {
       event.preventDefault();
+      updateOperationalUi({ autoCloseOutsideHours: true });
       saveDashboardSettings(storeSettingsStatus, "Pengaturan toko berhasil disimpan.");
     });
     serviceSettingsForm.addEventListener("submit", event => {
@@ -857,4 +1065,7 @@
   bindModalHandlers();
   bindActionHandlers();
   renderAuthState();
+  setInterval(() => {
+    updateOperationalUi({ autoCloseOutsideHours: true });
+  }, 60000);
 })();
