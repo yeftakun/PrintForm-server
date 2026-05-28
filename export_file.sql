@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Y6UlUWS3wrEhSyIIdEZ8z8A7s4MWibRoFY1YcpZDd7JFfUwSyA7kmlWW2dDFyGD
+\restrict 3C6yyyMz1afQ4Ih3yhhinW2mdjJwBLaN4LiD4RAH9HrNJSwLIIhx2BI70DBLovq
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -50,21 +50,6 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: api_keys; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.api_keys (
-    id text NOT NULL,
-    client_id text,
-    key_hash text,
-    created_at timestamp with time zone DEFAULT now(),
-    last_used_at timestamp with time zone
-);
-
-
-ALTER TABLE public.api_keys OWNER TO postgres;
 
 --
 -- Name: audit_logs; Type: TABLE; Schema: public; Owner: postgres
@@ -252,20 +237,6 @@ CREATE TABLE public.sessions (
 ALTER TABLE public.sessions OWNER TO postgres;
 
 --
--- Name: storage_usage; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.storage_usage (
-    id boolean DEFAULT true NOT NULL,
-    total_bytes bigint DEFAULT 0 NOT NULL,
-    file_count bigint DEFAULT 0 NOT NULL,
-    computed_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.storage_usage OWNER TO postgres;
-
---
 -- Name: users; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -286,21 +257,6 @@ CREATE TABLE public.users (
 ALTER TABLE public.users OWNER TO postgres;
 
 --
--- Name: websocket_subscriptions; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.websocket_subscriptions (
-    id text NOT NULL,
-    client_id text,
-    user_id text,
-    channel character varying(64) NOT NULL,
-    connected_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.websocket_subscriptions OWNER TO postgres;
-
---
 -- Name: audit_logs id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -312,14 +268,6 @@ ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.a
 --
 
 ALTER TABLE ONLY public.events ALTER COLUMN id SET DEFAULT nextval('public.events_id_seq'::regclass);
-
-
---
--- Data for Name: api_keys; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.api_keys (id, client_id, key_hash, created_at, last_used_at) FROM stdin;
-\.
 
 
 --
@@ -6866,6 +6814,60 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35628	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:23:07.958255+08
 35629	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:23:12.973226+08
 35630	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:23:17.964392+08
+35631	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_c66f2c58-7f9f-4e11-a1c7-03d80113079f", "previousRefreshTokenId": "rt_537f7827-871a-4f70-8cf4-9431b278fbeb"}	2026-05-28 17:21:04.513678+08
+35632	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:04.608506+08
+35633	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76", "previousRefreshTokenId": "rt_c66f2c58-7f9f-4e11-a1c7-03d80113079f"}	2026-05-28 17:21:04.646361+08
+35634	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:07.975586+08
+35635	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_058a00a7-e79d-412a-9ccd-589b95225708", "previousRefreshTokenId": "rt_d9e5d89c-1d2e-41de-9711-d14e207749f3"}	2026-05-28 17:21:11.693026+08
+35636	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:12.96274+08
+35637	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:17.972415+08
+35638	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:22.960127+08
+35640	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:28.214185+08
+35641	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:32.95969+08
+35642	system	\N	job.created	job	job_1779960095211_ywmknv	{"sessionId": "session_1779960084394_2z4m2v", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "originalName": "ds.pdf"}	2026-05-28 17:21:35.606514+08
+35643	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:38.561848+08
+35644	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:42.962623+08
+35645	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:47.960456+08
+35639	system	\N	session.created	session	session_1779960084394_2z4m2v	{"alias": "Asyel", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "targetSource": "store-code", "selectedClientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "availabilitySource": "realtime-connected"}	2026-05-28 17:21:24.475157+08
+35646	system	\N	session.closed	session	session_1779960084394_2z4m2v	{"ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "removedJobs": 0, "removedFiles": 1}	2026-05-28 17:21:49.486084+08
+35647	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:52.964527+08
+35648	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:58.220067+08
+35649	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:03.034708+08
+35650	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:07.992883+08
+35651	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:12.960054+08
+35652	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:17.955122+08
+35653	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:22.956448+08
+35654	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:27.960333+08
+35655	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:32.974364+08
+35656	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:37.958502+08
+35657	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:42.979547+08
+35658	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-28 17:22:46.248161+08
+35659	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:47.961622+08
+35660	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:52.953283+08
+35661	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:22:57.961198+08
+35662	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:02.936303+08
+35663	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:02.962877+08
+35664	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:07.958031+08
+35665	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:12.958629+08
+35666	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:17.956563+08
+35667	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:22.957048+08
+35668	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:27.959068+08
+35669	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:32.943642+08
+35670	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:37.956607+08
+35671	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:42.955052+08
+35672	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:47.954268+08
+35673	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:52.957318+08
+35674	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:23:57.955814+08
+35675	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:02.944433+08
+35676	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:07.958485+08
+35677	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:12.961066+08
+35678	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:17.956194+08
+35679	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:22.956841+08
+35680	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:27.954324+08
+35681	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:32.946087+08
+35682	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:37.955767+08
+35683	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:42.958472+08
+35684	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:47.966976+08
 \.
 
 
@@ -6874,7 +6876,7 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 --
 
 COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status, owner_user_id) FROM stdin;
-1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "OneNote (Desktop)", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Canon G1030 series	2026-05-05 06:17:48.704+08	2026-05-28 16:23:17.975+08	online	user_60da7484-9e0c-462c-bf78-357c340ae216
+1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "OneNote (Desktop)", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Canon G1030 series	2026-05-05 06:17:48.704+08	2026-05-28 17:24:48.907+08	online	user_60da7484-9e0c-462c-bf78-357c340ae216
 \.
 
 
@@ -6891,45 +6893,46 @@ COPY public.events (id, client_id, session_id, job_id, type, payload, created_at
 --
 
 COPY public.jobs (id, session_id, original_name, stored_path, size_bytes, status, alias, paper_size, copies, created_at, updated_at, owner_user_id, claimed_by_client_id, claimed_at, color_mode, orientation, page_range, content_scale, notes, estimated_price, file_status) FROM stdin;
-job_1779951752790_hpxmgx	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951752790_hpxmgx	51666	rejected	Asyel	F4	1	2026-05-28 15:02:32.798+08	2026-05-28 15:23:57.927+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 15:02:45.427+08	color	portrait	\N	100	\N	2000	not-available
-job_1779951750535_hhiud0	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951750535_hhiud0	51666	canceled	Asyel	F4	1	2026-05-28 15:02:30.538+08	2026-05-28 15:23:57.928+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951739232_bvzu54	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951739232_bvzu54	51666	canceled	Asyel	F4	1	2026-05-28 15:02:19.236+08	2026-05-28 15:23:57.932+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951736922_tiw81y	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951736922_tiw81y	51666	canceled	Asyel	F4	1	2026-05-28 15:02:16.926+08	2026-05-28 15:23:57.934+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951734362_4q2huc	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951734362_4q2huc	51666	canceled	Asyel	F4	1	2026-05-28 15:02:14.384+08	2026-05-28 15:23:57.935+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951732325_0gd5k8	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951732325_0gd5k8	51666	canceled	Asyel	F4	1	2026-05-28 15:02:12.336+08	2026-05-28 15:23:57.936+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951724817_4gcff7	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\63795dc491ec09182d39a8bf39acc5a5	51666	canceled	Asyel	F4	1	2026-05-28 15:02:04.817+08	2026-05-28 15:23:57.938+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779950293987_f08q97	session_1779950278341_rpu1ot	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779950293987_f08q97	51666	canceled	Asyel	A5	1	2026-05-28 14:38:14.014+08	2026-05-28 15:23:57.939+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779950287883_h012fw	session_1779950278341_rpu1ot	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\961848dbd2824fef772740a772832277	51666	canceled	Asyel	A5	1	2026-05-28 14:38:07.883+08	2026-05-28 15:23:57.941+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779950203311_n2lt7w	session_1779950192772_r4qk1w	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\3da80ac081407aa0fca74584aa4a9c6d	859868	canceled	Asyel	A5	1	2026-05-28 14:36:43.311+08	2026-05-28 15:23:57.943+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779942694730_x6kji4	session_1779942523226_5dnhre	dsada.pdf	d:\\code\\PrintForm-server\\storage\\files\\e0cd389c4faa5523f26579b83caed5af	3105780	done	Asyel	A4	1	2026-05-28 12:31:34.73+08	2026-05-28 15:23:57.944+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:31:39.847+08	bw	portrait	\N	100	\N	1000	not-available
-job_1779942545130_3lbx9h	session_1779942523226_5dnhre	2.1.1.pdf	d:\\code\\PrintForm-server\\storage\\files\\91a7a0cd8b7a03a535540490f9c4b5c6	671676	done	Asyel	A4	1	2026-05-28 12:29:05.13+08	2026-05-28 15:23:57.946+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:29:35.081+08	color	portrait	\N	100	\N	36000	not-available
-job_1779951748333_wstzn8	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951748333_wstzn8	51666	canceled	Asyel	F4	1	2026-05-28 15:02:28.335+08	2026-05-28 15:23:57.93+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951746249_avt5h4	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951746249_avt5h4	51666	canceled	Asyel	F4	1	2026-05-28 15:02:26.253+08	2026-05-28 15:23:57.931+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779941714668_jc9jpp	session_1779941538446_p473pn	admin,+Anisa+Tri+Wahyuni,PERANCANGAN+vol1+no1+1-12-dikompresi.pdf	d:\\code\\PrintForm-server\\storage\\files\\c34aa9f8a6ee57849e31d6865a9a4dd9	367280	done	Asyel	A4	1	2026-05-28 12:15:14.668+08	2026-05-28 15:23:58.016+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:15:21.304+08	color	portrait	1	100	\N	2000	not-available
-job_1779951835489_s8tn2n	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951835489_s8tn2n	859868	canceled	Asyel	A5	1	2026-05-28 15:03:55.503+08	2026-05-28 15:23:57.911+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951834087_px3muf	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951834087_px3muf	859868	canceled	Asyel	A5	1	2026-05-28 15:03:54.091+08	2026-05-28 15:23:57.912+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951832487_pcz8f6	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951832487_pcz8f6	859868	canceled	Asyel	A5	1	2026-05-28 15:03:52.493+08	2026-05-28 15:23:57.914+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951830852_jiake3	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951830852_jiake3	859868	canceled	Asyel	A5	1	2026-05-28 15:03:50.859+08	2026-05-28 15:23:57.915+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951829377_a2bs2u	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951829377_a2bs2u	859868	canceled	Asyel	A5	1	2026-05-28 15:03:49.381+08	2026-05-28 15:23:57.916+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951827302_wvsmuk	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951827302_wvsmuk	859868	canceled	Asyel	A5	1	2026-05-28 15:03:47.308+08	2026-05-28 15:23:57.918+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951825412_wrj8y9	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951825412_wrj8y9	859868	canceled	Asyel	A5	1	2026-05-28 15:03:45.415+08	2026-05-28 15:23:57.919+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951824185_b286po	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951824185_b286po	859868	canceled	Asyel	A5	1	2026-05-28 15:03:44.19+08	2026-05-28 15:23:57.921+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951822332_b92knc	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951822332_b92knc	859868	canceled	Asyel	A5	1	2026-05-28 15:03:42.338+08	2026-05-28 15:23:57.922+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951818768_23b83e	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\f076839be5400783465bac2fddf102b9	859868	canceled	Asyel	A5	1	2026-05-28 15:03:38.768+08	2026-05-28 15:23:57.923+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951756872_x695r3	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951756872_x695r3	51666	rejected	Asyel	F4	1	2026-05-28 15:02:36.886+08	2026-05-28 15:23:57.925+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 15:02:43.564+08	color	portrait	\N	100	\N	2000	not-available
-job_1779951754889_ysb14f	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951754889_ysb14f	51666	rejected	Asyel	F4	1	2026-05-28 15:02:34.91+08	2026-05-28 15:23:57.926+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 15:02:44.365+08	color	portrait	\N	100	\N	2000	not-available
-job_1779942135196_h656lt	session_1779942117718_wgg2bl	2.1.1.pdf	d:\\code\\PrintForm-server\\storage\\files\\bed95c9ed3a0968a18ec4aeadd7be6c3	671676	rejected	Asyel	A4	1	2026-05-28 12:22:15.197+08	2026-05-28 15:23:57.947+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:29:26.83+08	color	portrait	1-2,5,7-10	100	\N	14000	not-available
-job_1779951852502_sip2vq	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951852502_sip2vq	859868	canceled	Asyel	A5	1	2026-05-28 15:04:12.516+08	2026-05-28 15:23:57.873+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951851054_275z1z	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951851054_275z1z	859868	canceled	Asyel	A5	1	2026-05-28 15:04:11.058+08	2026-05-28 15:23:57.897+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951849825_dyfb8s	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951849825_dyfb8s	859868	canceled	Asyel	A5	1	2026-05-28 15:04:09.839+08	2026-05-28 15:23:57.898+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951848538_rd23ah	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951848538_rd23ah	859868	canceled	Asyel	A5	1	2026-05-28 15:04:08.543+08	2026-05-28 15:23:57.9+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951847109_jyokr2	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951847109_jyokr2	859868	canceled	Asyel	A5	1	2026-05-28 15:04:07.118+08	2026-05-28 15:23:57.902+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951845742_amht0v	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951845742_amht0v	859868	canceled	Asyel	A5	1	2026-05-28 15:04:05.753+08	2026-05-28 15:23:57.903+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951844288_xovfpe	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951844288_xovfpe	859868	canceled	Asyel	A5	1	2026-05-28 15:04:04.302+08	2026-05-28 15:23:57.905+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951840280_8thjwy	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951840280_8thjwy	859868	canceled	Asyel	A5	1	2026-05-28 15:04:00.3+08	2026-05-28 15:23:57.906+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951838709_rfbxzc	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951838709_rfbxzc	859868	canceled	Asyel	A5	1	2026-05-28 15:03:58.724+08	2026-05-28 15:23:57.908+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779951837263_tf9avh	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951837263_tf9avh	859868	canceled	Asyel	A5	1	2026-05-28 15:03:57.275+08	2026-05-28 15:23:57.91+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
-job_1779941825198_e4zfvd	session_1779941538446_p473pn	dsada.pdf	d:\\code\\PrintForm-server\\storage\\files\\0ce63533d68a6e954401736cdf496cf6	3105780	done	Asyel	A4	1	2026-05-28 12:17:05.198+08	2026-05-28 15:23:57.949+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:17:33.185+08	bw	portrait	\N	100	\N	1000	not-available
+job_1779960095211_ywmknv	session_1779960084394_2z4m2v	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\19f714af5f4563346782bfc1100eaf52	51666	canceled	Asyel	A5	1	2026-05-28 17:21:35.211+08	2026-05-28 17:21:49.346+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951752790_hpxmgx	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951752790_hpxmgx	51666	rejected	Asyel	F4	1	2026-05-28 15:02:32.798+08	2026-05-28 17:21:49.38+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 15:02:45.427+08	color	portrait	\N	100	\N	2000	not-available
+job_1779951750535_hhiud0	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951750535_hhiud0	51666	canceled	Asyel	F4	1	2026-05-28 15:02:30.538+08	2026-05-28 17:21:49.384+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951739232_bvzu54	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951739232_bvzu54	51666	canceled	Asyel	F4	1	2026-05-28 15:02:19.236+08	2026-05-28 17:21:49.387+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951736922_tiw81y	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951736922_tiw81y	51666	canceled	Asyel	F4	1	2026-05-28 15:02:16.926+08	2026-05-28 17:21:49.389+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951734362_4q2huc	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951734362_4q2huc	51666	canceled	Asyel	F4	1	2026-05-28 15:02:14.384+08	2026-05-28 17:21:49.391+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951732325_0gd5k8	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951732325_0gd5k8	51666	canceled	Asyel	F4	1	2026-05-28 15:02:12.336+08	2026-05-28 17:21:49.392+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951724817_4gcff7	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\63795dc491ec09182d39a8bf39acc5a5	51666	canceled	Asyel	F4	1	2026-05-28 15:02:04.817+08	2026-05-28 17:21:49.394+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779950293987_f08q97	session_1779950278341_rpu1ot	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779950293987_f08q97	51666	canceled	Asyel	A5	1	2026-05-28 14:38:14.014+08	2026-05-28 17:21:49.395+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779950287883_h012fw	session_1779950278341_rpu1ot	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\961848dbd2824fef772740a772832277	51666	canceled	Asyel	A5	1	2026-05-28 14:38:07.883+08	2026-05-28 17:21:49.397+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779950203311_n2lt7w	session_1779950192772_r4qk1w	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\3da80ac081407aa0fca74584aa4a9c6d	859868	canceled	Asyel	A5	1	2026-05-28 14:36:43.311+08	2026-05-28 17:21:49.401+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779942694730_x6kji4	session_1779942523226_5dnhre	dsada.pdf	d:\\code\\PrintForm-server\\storage\\files\\e0cd389c4faa5523f26579b83caed5af	3105780	done	Asyel	A4	1	2026-05-28 12:31:34.73+08	2026-05-28 17:21:49.403+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:31:39.847+08	bw	portrait	\N	100	\N	1000	not-available
+job_1779951748333_wstzn8	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951748333_wstzn8	51666	canceled	Asyel	F4	1	2026-05-28 15:02:28.335+08	2026-05-28 17:21:49.385+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951746249_avt5h4	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951746249_avt5h4	51666	canceled	Asyel	F4	1	2026-05-28 15:02:26.253+08	2026-05-28 17:21:49.386+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779942545130_3lbx9h	session_1779942523226_5dnhre	2.1.1.pdf	d:\\code\\PrintForm-server\\storage\\files\\91a7a0cd8b7a03a535540490f9c4b5c6	671676	done	Asyel	A4	1	2026-05-28 12:29:05.13+08	2026-05-28 17:21:49.406+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:29:35.081+08	color	portrait	\N	100	\N	36000	not-available
+job_1779941714668_jc9jpp	session_1779941538446_p473pn	admin,+Anisa+Tri+Wahyuni,PERANCANGAN+vol1+no1+1-12-dikompresi.pdf	d:\\code\\PrintForm-server\\storage\\files\\c34aa9f8a6ee57849e31d6865a9a4dd9	367280	done	Asyel	A4	1	2026-05-28 12:15:14.668+08	2026-05-28 17:21:49.417+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:15:21.304+08	color	portrait	1	100	\N	2000	not-available
+job_1779951835489_s8tn2n	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951835489_s8tn2n	859868	canceled	Asyel	A5	1	2026-05-28 15:03:55.503+08	2026-05-28 17:21:49.362+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951834087_px3muf	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951834087_px3muf	859868	canceled	Asyel	A5	1	2026-05-28 15:03:54.091+08	2026-05-28 17:21:49.363+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951832487_pcz8f6	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951832487_pcz8f6	859868	canceled	Asyel	A5	1	2026-05-28 15:03:52.493+08	2026-05-28 17:21:49.364+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951830852_jiake3	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951830852_jiake3	859868	canceled	Asyel	A5	1	2026-05-28 15:03:50.859+08	2026-05-28 17:21:49.366+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951829377_a2bs2u	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951829377_a2bs2u	859868	canceled	Asyel	A5	1	2026-05-28 15:03:49.381+08	2026-05-28 17:21:49.368+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951827302_wvsmuk	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951827302_wvsmuk	859868	canceled	Asyel	A5	1	2026-05-28 15:03:47.308+08	2026-05-28 17:21:49.369+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951825412_wrj8y9	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951825412_wrj8y9	859868	canceled	Asyel	A5	1	2026-05-28 15:03:45.415+08	2026-05-28 17:21:49.371+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951824185_b286po	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951824185_b286po	859868	canceled	Asyel	A5	1	2026-05-28 15:03:44.19+08	2026-05-28 17:21:49.372+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951822332_b92knc	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951822332_b92knc	859868	canceled	Asyel	A5	1	2026-05-28 15:03:42.338+08	2026-05-28 17:21:49.375+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951818768_23b83e	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\f076839be5400783465bac2fddf102b9	859868	canceled	Asyel	A5	1	2026-05-28 15:03:38.768+08	2026-05-28 17:21:49.376+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951756872_x695r3	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951756872_x695r3	51666	rejected	Asyel	F4	1	2026-05-28 15:02:36.886+08	2026-05-28 17:21:49.377+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 15:02:43.564+08	color	portrait	\N	100	\N	2000	not-available
+job_1779951754889_ysb14f	session_1779951690708_6mhxgk	ds.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951754889_ysb14f	51666	rejected	Asyel	F4	1	2026-05-28 15:02:34.91+08	2026-05-28 17:21:49.379+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 15:02:44.365+08	color	portrait	\N	100	\N	2000	not-available
+job_1779942135196_h656lt	session_1779942117718_wgg2bl	2.1.1.pdf	d:\\code\\PrintForm-server\\storage\\files\\bed95c9ed3a0968a18ec4aeadd7be6c3	671676	rejected	Asyel	A4	1	2026-05-28 12:22:15.197+08	2026-05-28 17:21:49.412+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:29:26.83+08	color	portrait	1-2,5,7-10	100	\N	14000	not-available
+job_1779951848538_rd23ah	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951848538_rd23ah	859868	canceled	Asyel	A5	1	2026-05-28 15:04:08.543+08	2026-05-28 17:21:49.353+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951847109_jyokr2	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951847109_jyokr2	859868	canceled	Asyel	A5	1	2026-05-28 15:04:07.118+08	2026-05-28 17:21:49.354+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951845742_amht0v	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951845742_amht0v	859868	canceled	Asyel	A5	1	2026-05-28 15:04:05.753+08	2026-05-28 17:21:49.355+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951844288_xovfpe	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951844288_xovfpe	859868	canceled	Asyel	A5	1	2026-05-28 15:04:04.302+08	2026-05-28 17:21:49.356+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951840280_8thjwy	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951840280_8thjwy	859868	canceled	Asyel	A5	1	2026-05-28 15:04:00.3+08	2026-05-28 17:21:49.358+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951838709_rfbxzc	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951838709_rfbxzc	859868	canceled	Asyel	A5	1	2026-05-28 15:03:58.724+08	2026-05-28 17:21:49.359+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951837263_tf9avh	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951837263_tf9avh	859868	canceled	Asyel	A5	1	2026-05-28 15:03:57.275+08	2026-05-28 17:21:49.36+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779941825198_e4zfvd	session_1779941538446_p473pn	dsada.pdf	d:\\code\\PrintForm-server\\storage\\files\\0ce63533d68a6e954401736cdf496cf6	3105780	done	Asyel	A4	1	2026-05-28 12:17:05.198+08	2026-05-28 17:21:49.413+08	user_60da7484-9e0c-462c-bf78-357c340ae216	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	2026-05-28 12:17:33.185+08	bw	portrait	\N	100	\N	1000	not-available
+job_1779951852502_sip2vq	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951852502_sip2vq	859868	canceled	Asyel	A5	1	2026-05-28 15:04:12.516+08	2026-05-28 17:21:49.349+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951851054_275z1z	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951851054_275z1z	859868	canceled	Asyel	A5	1	2026-05-28 15:04:11.058+08	2026-05-28 17:21:49.35+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+job_1779951849825_dyfb8s	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951849825_dyfb8s	859868	canceled	Asyel	A5	1	2026-05-28 15:04:09.839+08	2026-05-28 17:21:49.352+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
 \.
 
 
@@ -7041,10 +7044,13 @@ rt_b664cc68-347a-4499-8bbf-5add190c284f	user_60da7484-9e0c-462c-bf78-357c340ae21
 rt_518e7d96-53f1-4f6d-9122-2b8cff677724	user_60da7484-9e0c-462c-bf78-357c340ae216	97f0ea49e09100c850278a0a85f766c2d8ef553bf1129d9f74a48b8be8c893c4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 15:24:18.967532+08	2026-06-27 15:24:18.966+08	2026-05-28 15:25:44.542241+08	\N
 rt_c917f491-b808-4d30-a054-4f256068607f	user_60da7484-9e0c-462c-bf78-357c340ae216	3dfe63fe584b737ec02e9007060560e28d412cfe65aad0233dd4ff0c8b571aaf	\N	::ffff:127.0.0.1	2026-05-28 15:23:58.094868+08	2026-06-27 15:23:58.093+08	2026-05-28 15:56:36.564784+08	rt_55484fa2-81ef-48e8-b3d0-bba1d367d2a8
 rt_9e14f75d-107a-4235-80a1-45bd7b5ece3f	user_60da7484-9e0c-462c-bf78-357c340ae216	5d0ad93d9e3accd0176c96a7f2b596ec281312b9bbf0167cd00cd2191105d6e1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 15:25:50.501905+08	2026-06-27 15:25:50.5+08	2026-05-28 16:00:45.054589+08	rt_167cfd1f-4531-4dd8-8180-39ed06ccc6bb
-rt_537f7827-871a-4f70-8cf4-9431b278fbeb	user_60da7484-9e0c-462c-bf78-357c340ae216	171a844fa543e6c7c3a11f1a8d8c65778f44d53fb8261550584406e0a8e4bda8	\N	::ffff:127.0.0.1	2026-05-28 16:15:43.518882+08	2026-06-27 16:15:43.516+08	\N	\N
 rt_55484fa2-81ef-48e8-b3d0-bba1d367d2a8	user_60da7484-9e0c-462c-bf78-357c340ae216	d36b93e00ba60db775961cca23412b587a0e31d614d506932a6262892158aba0	\N	::ffff:127.0.0.1	2026-05-28 15:56:36.545788+08	2026-06-27 15:56:36.544+08	2026-05-28 16:15:43.523716+08	rt_537f7827-871a-4f70-8cf4-9431b278fbeb
-rt_d9e5d89c-1d2e-41de-9711-d14e207749f3	user_60da7484-9e0c-462c-bf78-357c340ae216	112fba0cfe46070ee4fe72b447cc17ad153874b0b2772e557e54ff0fa8b7d8b4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 16:15:46.409328+08	2026-06-27 16:15:46.407+08	\N	\N
 rt_167cfd1f-4531-4dd8-8180-39ed06ccc6bb	user_60da7484-9e0c-462c-bf78-357c340ae216	1b2153a656dbe2a937361d04770c5f2c5db7e650a789628afeca4dd38c12f25a	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 16:00:45.045833+08	2026-06-27 16:00:45.043+08	2026-05-28 16:15:46.412488+08	rt_d9e5d89c-1d2e-41de-9711-d14e207749f3
+rt_537f7827-871a-4f70-8cf4-9431b278fbeb	user_60da7484-9e0c-462c-bf78-357c340ae216	171a844fa543e6c7c3a11f1a8d8c65778f44d53fb8261550584406e0a8e4bda8	\N	::ffff:127.0.0.1	2026-05-28 16:15:43.518882+08	2026-06-27 16:15:43.516+08	2026-05-28 17:21:04.510661+08	rt_c66f2c58-7f9f-4e11-a1c7-03d80113079f
+rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76	user_60da7484-9e0c-462c-bf78-357c340ae216	24ffd1f3957738f6644d424ac27a2370ea97d4ba1e1e554af25833bdc24a5e50	\N	::ffff:127.0.0.1	2026-05-28 17:21:04.637208+08	2026-06-27 17:21:04.635+08	\N	\N
+rt_c66f2c58-7f9f-4e11-a1c7-03d80113079f	user_60da7484-9e0c-462c-bf78-357c340ae216	9eb887a106da2f2ecb82abf1e22dad27d6d9eef87103fea125dbfc29bdd099f4	\N	::ffff:127.0.0.1	2026-05-28 17:21:04.504064+08	2026-06-27 17:21:04.502+08	2026-05-28 17:21:04.643467+08	rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76
+rt_058a00a7-e79d-412a-9ccd-589b95225708	user_60da7484-9e0c-462c-bf78-357c340ae216	a9b6e9a6bf272179616704bfae7a805457cfdbfeea2ce6b7371812aa6ef86250	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 17:21:11.680297+08	2026-06-27 17:21:11.677+08	\N	\N
+rt_d9e5d89c-1d2e-41de-9711-d14e207749f3	user_60da7484-9e0c-462c-bf78-357c340ae216	112fba0cfe46070ee4fe72b447cc17ad153874b0b2772e557e54ff0fa8b7d8b4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 16:15:46.409328+08	2026-06-27 16:15:46.407+08	2026-05-28 17:21:11.684612+08	rt_058a00a7-e79d-412a-9ccd-589b95225708
 \.
 
 
@@ -7053,6 +7059,7 @@ rt_167cfd1f-4531-4dd8-8180-39ed06ccc6bb	user_60da7484-9e0c-462c-bf78-357c340ae21
 --
 
 COPY public.sessions (id, alias, created_at, last_seen_at, status, owner_user_id) FROM stdin;
+session_1779960084394_2z4m2v	Asyel	2026-05-28 17:21:24.394+08	2026-05-28 17:21:46.157+08	closed	user_60da7484-9e0c-462c-bf78-357c340ae216
 session_1779951808075_wrkdea	Asyel	2026-05-28 15:03:28.075+08	2026-05-28 15:04:09.162+08	closed	user_60da7484-9e0c-462c-bf78-357c340ae216
 session_1779951690708_6mhxgk	Asyel	2026-05-28 15:01:30.708+08	2026-05-28 15:02:51.94+08	closed	user_60da7484-9e0c-462c-bf78-357c340ae216
 session_1779950278341_rpu1ot	Asyel	2026-05-28 14:37:58.341+08	2026-05-28 14:38:19.006+08	closed	user_60da7484-9e0c-462c-bf78-357c340ae216
@@ -7068,29 +7075,12 @@ session_1779940710228_x71pd7	Asyel	2026-05-28 11:58:30.228+08	2026-05-28 12:00:4
 
 
 --
--- Data for Name: storage_usage; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.storage_usage (id, total_bytes, file_count, computed_at) FROM stdin;
-t	0	0	2026-05-28 16:21:55.469805+08
-\.
-
-
---
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.users (id, email, password_hash, role, created_at, username, pin_hash, alamat, konfigurasi_toko, kode_toko) FROM stdin;
 user_f2c13e69-65e0-4d22-83ad-06e242968fde	\N	$2b$12$DERkrN7MzVT8tg38q04BwuCYkctTPgTFTdm0MwsZvt/1HCAag0Pka	user	2026-05-26 09:06:35.664922+08	masyefta	\N	\N	{}	\N
-user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m	Jl. Sam Ratulangi No. 10	{"kontak": "0823259932", "layanan": {"modeWarna": "both", "hargaDasar": 1000, "batasFileMb": 25, "jenisKertas": ["A5", "F4", "LETTER"], "hargaModeWarna": {"bw": 1000, "color": 2000}, "modeWarnaPilihan": ["bw", "color"]}, "namaToko": "Toko Asyel", "statusToko": "open", "jamOperasional": "7 hari aktif. Hari ini: Kamis 07:54 - 21:00", "waktuOperasional": [{"day": "sunday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "monday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "tuesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "wednesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "thursday", "open": "07:54", "close": "21:00", "enabled": true}, {"day": "friday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "saturday", "open": "08:00", "close": "21:00", "enabled": true}], "forceOpenOutsideOperationalHours": false}	TOKO1
-\.
-
-
---
--- Data for Name: websocket_subscriptions; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_at) FROM stdin;
+user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m	Jl. Sam Ratulangi No. 10	{"kontak": "0823259932", "layanan": {"modeWarna": "both", "hargaDasar": 1000, "batasFileMb": 25, "jenisKertas": ["A5", "F4", "LETTER"], "hargaModeWarna": {"bw": 1000, "color": 2000}, "modeWarnaPilihan": ["bw", "color"]}, "namaToko": "Toko Asyel", "statusToko": "open", "jamOperasional": "Setiap hari 08:00 - 21:00", "waktuOperasional": [{"day": "sunday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "monday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "tuesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "wednesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "thursday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "friday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "saturday", "open": "08:00", "close": "21:00", "enabled": true}], "forceOpenOutsideOperationalHours": false}	TOKO1
 \.
 
 
@@ -7098,7 +7088,7 @@ COPY public.websocket_subscriptions (id, client_id, user_id, channel, connected_
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 35630, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 35684, true);
 
 
 --
@@ -7106,22 +7096,6 @@ SELECT pg_catalog.setval('public.audit_logs_id_seq', 35630, true);
 --
 
 SELECT pg_catalog.setval('public.events_id_seq', 369, true);
-
-
---
--- Name: api_keys api_keys_key_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.api_keys
-    ADD CONSTRAINT api_keys_key_hash_key UNIQUE (key_hash);
-
-
---
--- Name: api_keys api_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.api_keys
-    ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -7189,14 +7163,6 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: storage_usage storage_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.storage_usage
-    ADD CONSTRAINT storage_usage_pkey PRIMARY KEY (id);
-
-
---
 -- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7210,14 +7176,6 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- Name: websocket_subscriptions websocket_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.websocket_subscriptions
-    ADD CONSTRAINT websocket_subscriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -7396,14 +7354,6 @@ CREATE UNIQUE INDEX idx_users_username_unique ON public.users USING btree (lower
 
 
 --
--- Name: api_keys api_keys_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.api_keys
-    ADD CONSTRAINT api_keys_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE CASCADE;
-
-
---
 -- Name: clients clients_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7508,24 +7458,8 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: websocket_subscriptions websocket_subscriptions_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.websocket_subscriptions
-    ADD CONSTRAINT websocket_subscriptions_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id) ON DELETE SET NULL;
-
-
---
--- Name: websocket_subscriptions websocket_subscriptions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.websocket_subscriptions
-    ADD CONSTRAINT websocket_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Y6UlUWS3wrEhSyIIdEZ8z8A7s4MWibRoFY1YcpZDd7JFfUwSyA7kmlWW2dDFyGD
+\unrestrict 3C6yyyMz1afQ4Ih3yhhinW2mdjJwBLaN4LiD4RAH9HrNJSwLIIhx2BI70DBLovq
 
