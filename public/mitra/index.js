@@ -17,7 +17,14 @@
   const statClientOnline = document.getElementById("statClientOnline");
   const statJobsToday = document.getElementById("statJobsToday");
   const statJobsDone = document.getElementById("statJobsDone");
-  const statJobsFailed = document.getElementById("statJobsFailed");
+  const statJobsRejectedCanceled = document.getElementById("statJobsRejectedCanceled");
+  const statEstimatedFunds = document.getElementById("statEstimatedFunds");
+  const openFundEstimateModalBtn = document.getElementById("openFundEstimateModalBtn");
+  const fundEstimateModalBackdrop = document.getElementById("fundEstimateModalBackdrop");
+  const fundEstimateValue = document.getElementById("fundEstimateValue");
+  const fundEstimateDayInput = document.getElementById("fundEstimateDayInput");
+  const fundEstimateStartInput = document.getElementById("fundEstimateStartInput");
+  const fundEstimateEndInput = document.getElementById("fundEstimateEndInput");
   const openAllJobsModalBtn = document.getElementById("openAllJobsModalBtn");
   const allJobsModalBackdrop = document.getElementById("allJobsModalBackdrop");
   const jobsFilterModalBackdrop = document.getElementById("jobsFilterModalBackdrop");
@@ -28,8 +35,9 @@
   const refreshAllJobsBtn = document.getElementById("refreshAllJobsBtn");
   const resetJobsFilterModalBtn = document.getElementById("resetJobsFilterModalBtn");
   const applyJobsFilterBtn = document.getElementById("applyJobsFilterBtn");
-  const jobsDateFilterEnabled = document.getElementById("jobsDateFilterEnabled");
-  const jobsDateFilterInput = document.getElementById("jobsDateFilterInput");
+  const jobsDateDayInput = document.getElementById("jobsDateDayInput");
+  const jobsDateStartInput = document.getElementById("jobsDateStartInput");
+  const jobsDateEndInput = document.getElementById("jobsDateEndInput");
   const jobsPageSizeSelect = document.getElementById("jobsPageSizeSelect");
   const jobsPageInfo = document.getElementById("jobsPageInfo");
   const jobsFirstPageBtn = document.getElementById("jobsFirstPageBtn");
@@ -117,13 +125,21 @@
   const jobTableState = {
     statusFilters: new Set(),
     fileFilters: new Set(),
-    dateEnabled: false,
+    dateMode: "day",
     date: "",
+    startDate: "",
+    endDate: "",
     search: "",
     sortKey: "createdAt",
     sortDirection: "desc",
     pageSize: 20,
     currentPage: 1
+  };
+  const fundEstimateState = {
+    dateMode: "day",
+    date: "",
+    startDate: "",
+    endDate: ""
   };
 
   function setStatus(el, text, kind = "") {
@@ -516,6 +532,73 @@
     return `${year}-${month}-${day}`;
   }
 
+  function todayDateInputValue() {
+    return toDateInputValue(new Date());
+  }
+
+  function getSelectedDateMode(name, fallback = "day") {
+    return document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
+  }
+
+  function setSelectedDateMode(name, value) {
+    const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (input) {
+      input.checked = true;
+    }
+  }
+
+  function setDateInputDisabled(input, disabled) {
+    if (input) {
+      input.disabled = disabled;
+    }
+  }
+
+  function syncDateModeInputs(mode, dayInput, startInput, endInput) {
+    const isDay = mode === "day";
+    const isRange = mode === "range";
+    setDateInputDisabled(dayInput, !isDay);
+    setDateInputDisabled(startInput, !isRange);
+    setDateInputDisabled(endInput, !isRange);
+    startInput?.parentElement?.classList.toggle("is-disabled", !isRange);
+  }
+
+  function isJobWithinDateScope(job, scope) {
+    const mode = scope?.dateMode || "day";
+    if (mode === "all") {
+      return true;
+    }
+
+    const jobDate = toDateInputValue(job?.createdAt || job?.updatedAt);
+    if (!jobDate) {
+      return false;
+    }
+
+    if (mode === "range") {
+      const startDate = scope.startDate || "";
+      const endDate = scope.endDate || "";
+      if (startDate && jobDate < startDate) {
+        return false;
+      }
+      if (endDate && jobDate > endDate) {
+        return false;
+      }
+      return true;
+    }
+
+    return jobDate === (scope.date || todayDateInputValue());
+  }
+
+  function isRevenueJob(job) {
+    return ["done", "sent"].includes(String(job?.status || "").toLowerCase());
+  }
+
+  function calculateEstimatedFunds(scope) {
+    return latestJobs
+      .filter(isRevenueJob)
+      .filter(job => isJobWithinDateScope(job, scope))
+      .reduce((total, job) => total + getJobPrice(job), 0);
+  }
+
   function getJobSortValue(job, key) {
     if (key === "createdAt") return new Date(job.createdAt || job.updatedAt || 0).getTime() || 0;
     if (key === "price") return getJobPrice(job);
@@ -552,13 +635,11 @@
     document.querySelectorAll('input[name="jobFileFilters"]').forEach(input => {
       input.checked = jobTableState.fileFilters.has(input.value);
     });
-    if (jobsDateFilterEnabled) {
-      jobsDateFilterEnabled.checked = jobTableState.dateEnabled;
-    }
-    if (jobsDateFilterInput) {
-      jobsDateFilterInput.value = jobTableState.date || "";
-      jobsDateFilterInput.disabled = !jobTableState.dateEnabled;
-    }
+    setSelectedDateMode("jobsDateMode", jobTableState.dateMode || "day");
+    if (jobsDateDayInput) jobsDateDayInput.value = jobTableState.date || todayDateInputValue();
+    if (jobsDateStartInput) jobsDateStartInput.value = jobTableState.startDate || "";
+    if (jobsDateEndInput) jobsDateEndInput.value = jobTableState.endDate || "";
+    syncDateModeInputs(jobTableState.dateMode || "day", jobsDateDayInput, jobsDateStartInput, jobsDateEndInput);
   }
 
   function readJobsFilterInputs() {
@@ -568,16 +649,20 @@
     jobTableState.fileFilters = new Set(
       Array.from(document.querySelectorAll('input[name="jobFileFilters"]:checked')).map(input => input.value)
     );
-    jobTableState.dateEnabled = Boolean(jobsDateFilterEnabled?.checked);
-    jobTableState.date = jobsDateFilterInput?.value || "";
+    jobTableState.dateMode = getSelectedDateMode("jobsDateMode", "day");
+    jobTableState.date = jobsDateDayInput?.value || todayDateInputValue();
+    jobTableState.startDate = jobsDateStartInput?.value || "";
+    jobTableState.endDate = jobsDateEndInput?.value || "";
     jobTableState.currentPage = 1;
   }
 
   function resetJobsFilters() {
     jobTableState.statusFilters = new Set();
     jobTableState.fileFilters = new Set();
-    jobTableState.dateEnabled = false;
-    jobTableState.date = "";
+    jobTableState.dateMode = "day";
+    jobTableState.date = todayDateInputValue();
+    jobTableState.startDate = "";
+    jobTableState.endDate = "";
     jobTableState.search = "";
     jobTableState.currentPage = 1;
     if (jobsSearchInput) {
@@ -585,6 +670,40 @@
     }
     syncJobsFilterInputs();
     renderAllJobsTable();
+  }
+
+  function initializeDateStates() {
+    const today = todayDateInputValue();
+    jobTableState.date = jobTableState.date || today;
+    fundEstimateState.date = fundEstimateState.date || today;
+    syncJobsFilterInputs();
+    syncFundEstimateInputs();
+  }
+
+  function syncFundEstimateInputs() {
+    setSelectedDateMode("fundEstimateMode", fundEstimateState.dateMode || "day");
+    if (fundEstimateDayInput) fundEstimateDayInput.value = fundEstimateState.date || todayDateInputValue();
+    if (fundEstimateStartInput) fundEstimateStartInput.value = fundEstimateState.startDate || "";
+    if (fundEstimateEndInput) fundEstimateEndInput.value = fundEstimateState.endDate || "";
+    syncDateModeInputs(
+      fundEstimateState.dateMode || "day",
+      fundEstimateDayInput,
+      fundEstimateStartInput,
+      fundEstimateEndInput
+    );
+  }
+
+  function readFundEstimateInputs() {
+    fundEstimateState.dateMode = getSelectedDateMode("fundEstimateMode", "day");
+    fundEstimateState.date = fundEstimateDayInput?.value || todayDateInputValue();
+    fundEstimateState.startDate = fundEstimateStartInput?.value || "";
+    fundEstimateState.endDate = fundEstimateEndInput?.value || "";
+  }
+
+  function renderFundEstimate() {
+    if (fundEstimateValue) {
+      fundEstimateValue.textContent = formatCurrency(calculateEstimatedFunds(fundEstimateState));
+    }
   }
 
   function isToday(value) {
@@ -871,12 +990,15 @@
     const onlineClients = clients.filter(client => String(client.status || "").toLowerCase() === "online");
     const jobsToday = jobs.filter(job => isToday(job.createdAt));
     const doneJobs = jobs.filter(job => ["done", "sent"].includes(String(job.status || "").toLowerCase()));
-    const failedJobs = jobs.filter(job => ["failed", "rejected"].includes(String(job.status || "").toLowerCase()));
+    const rejectedCanceledJobs = jobs.filter(job => ["rejected", "canceled"].includes(String(job.status || "").toLowerCase()));
+    const todayFunds = calculateEstimatedFunds({ dateMode: "day", date: todayDateInputValue() });
 
     statClientOnline.textContent = onlineClients.length;
     statJobsToday.textContent = jobsToday.length;
     statJobsDone.textContent = doneJobs.length;
-    statJobsFailed.textContent = failedJobs.length;
+    statJobsRejectedCanceled.textContent = rejectedCanceledJobs.length;
+    statEstimatedFunds.textContent = formatCurrency(todayFunds);
+    renderFundEstimate();
   }
 
   function getFilteredJobs() {
@@ -890,7 +1012,7 @@
         return jobTableState.fileFilters.size === 0 || jobTableState.fileFilters.has(normalizeJobFileStatus(job));
       })
       .filter(job => {
-        return !jobTableState.dateEnabled || !jobTableState.date || toDateInputValue(job.createdAt || job.updatedAt) === jobTableState.date;
+        return isJobWithinDateScope(job, jobTableState);
       })
       .filter(job => {
         if (!searchText) {
@@ -1597,7 +1719,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, jobsFilterModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -1645,6 +1767,11 @@
     });
 
     refreshLinkedClientsBtn.addEventListener("click", loadDashboardData);
+    openFundEstimateModalBtn.addEventListener("click", () => {
+      syncFundEstimateInputs();
+      renderFundEstimate();
+      openModal(fundEstimateModalBackdrop);
+    });
     openAllJobsModalBtn.addEventListener("click", () => {
       renderAllJobsTable();
       openModal(allJobsModalBackdrop);
@@ -1661,8 +1788,23 @@
       renderAllJobsTable();
       closeModal(jobsFilterModalBackdrop);
     });
-    jobsDateFilterEnabled.addEventListener("change", () => {
-      jobsDateFilterInput.disabled = !jobsDateFilterEnabled.checked;
+    document.querySelectorAll('input[name="jobsDateMode"]').forEach(input => {
+      input.addEventListener("change", () => {
+        syncDateModeInputs(getSelectedDateMode("jobsDateMode", "day"), jobsDateDayInput, jobsDateStartInput, jobsDateEndInput);
+      });
+    });
+    document.querySelectorAll('input[name="fundEstimateMode"]').forEach(input => {
+      input.addEventListener("change", () => {
+        readFundEstimateInputs();
+        syncFundEstimateInputs();
+        renderFundEstimate();
+      });
+    });
+    [fundEstimateDayInput, fundEstimateStartInput, fundEstimateEndInput].forEach(input => {
+      input.addEventListener("input", () => {
+        readFundEstimateInputs();
+        renderFundEstimate();
+      });
     });
     jobsSearchInput.addEventListener("input", () => {
       jobTableState.search = jobsSearchInput.value;
@@ -1728,6 +1870,7 @@
     logoutBtn.addEventListener("click", onLogout);
   }
 
+  initializeDateStates();
   bindModalHandlers();
   bindActionHandlers();
   renderAuthState();

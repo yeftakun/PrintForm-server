@@ -199,8 +199,13 @@
                   <strong id="statJobsDone">0</strong>
                 </article>
                 <article class="stat-card">
-                  <span>Gagal</span>
-                  <strong id="statJobsFailed">0</strong>
+                  <span>Ditolak/Batal</span>
+                  <strong id="statJobsRejectedCanceled">0</strong>
+                </article>
+                <article class="stat-card stat-card-highlight">
+                  <span>Estimasi Dana Diterima</span>
+                  <strong id="statEstimatedFunds">Rp0</strong>
+                  <button class="stat-card-link" id="openFundEstimateModalBtn" type="button">Lanjut</button>
                 </article>
               </div>
             </section>
@@ -477,6 +482,33 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="fundEstimateModalBackdrop" aria-hidden="true">
+      <div class="modal fund-estimate-modal" role="dialog" aria-modal="true" aria-labelledby="fundEstimateModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="fundEstimateModalTitle">Estimasi Dana Diterima</h2>
+            <p>Perhitungan dari job selesai yang memiliki estimasi harga.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="fundEstimateModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="fund-estimate-summary">
+          <span>Jumlah estimasi dana</span>
+          <strong id="fundEstimateValue">Rp0</strong>
+        </div>
+        <fieldset class="jobs-filter-group">
+          <legend>Periode</legend>
+          <label><input type="radio" name="fundEstimateMode" value="day" checked> Hari</label>
+          <input type="date" id="fundEstimateDayInput">
+          <label><input type="radio" name="fundEstimateMode" value="range"> Rentang</label>
+          <div class="date-range-grid">
+            <input type="date" id="fundEstimateStartInput" aria-label="Tanggal mulai">
+            <input type="date" id="fundEstimateEndInput" aria-label="Tanggal akhir">
+          </div>
+          <label><input type="radio" name="fundEstimateMode" value="all"> Semua</label>
+        </fieldset>
+      </div>
+    </div>
+
     <div class="modal-backdrop" id="jobsFilterModalBackdrop" aria-hidden="true">
       <div class="modal jobs-filter-modal" role="dialog" aria-modal="true" aria-labelledby="jobsFilterModalTitle">
         <div class="modal-header jobs-modal-header">
@@ -497,8 +529,14 @@
           </fieldset>
           <fieldset class="jobs-filter-group">
             <legend>Waktu</legend>
-            <label><input type="checkbox" id="jobsDateFilterEnabled"> Aktifkan tanggal</label>
-            <input type="date" id="jobsDateFilterInput">
+            <label><input type="radio" name="jobsDateMode" value="day" checked> Hari</label>
+            <input type="date" id="jobsDateDayInput">
+            <label><input type="radio" name="jobsDateMode" value="range"> Rentang</label>
+            <div class="date-range-grid">
+              <input type="date" id="jobsDateStartInput" aria-label="Tanggal mulai">
+              <input type="date" id="jobsDateEndInput" aria-label="Tanggal akhir">
+            </div>
+            <label><input type="radio" name="jobsDateMode" value="all"> Semua</label>
           </fieldset>
           <fieldset class="jobs-filter-group">
             <legend>File</legend>

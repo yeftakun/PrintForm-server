@@ -697,6 +697,10 @@ textarea {
   width: min(560px, calc(100vw - 32px));
 }
 
+.fund-estimate-modal {
+  width: min(520px, calc(100vw - 32px));
+}
+
 .modal-header {
   display: block;
   margin-bottom: 0;
@@ -1507,7 +1511,7 @@ body.mitra-dashboard-active .page {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1630,6 +1634,17 @@ body.mitra-dashboard-active .page {
   padding: 0 10px;
 }
 
+.date-range-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.date-range-grid.is-disabled,
+.jobs-filter-group input[type="date"]:disabled {
+  opacity: 0.48;
+}
+
 .jobs-filter-footer {
   margin-top: 16px;
 }
@@ -1655,6 +1670,54 @@ body.mitra-dashboard-active .page {
 .stat-card strong {
   color: #121418;
   font-size: 1.55rem;
+  line-height: 1;
+}
+
+.stat-card-highlight {
+  background: linear-gradient(145deg, #fff8f4, #ffffff);
+}
+
+.stat-card-link {
+  justify-self: start;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.stat-card-link:hover {
+  color: var(--accent-dark);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.fund-estimate-summary {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 14px;
+  padding: 16px;
+  border: 1px solid #f0d8ca;
+  border-radius: 12px;
+  background: #fff8f4;
+}
+
+.fund-estimate-summary span {
+  color: #667085;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.fund-estimate-summary strong {
+  color: #121418;
+  font-size: 2rem;
   line-height: 1;
 }
 
@@ -2126,6 +2189,10 @@ body.mitra-dashboard-active .page {
   .jobs-modal-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .date-range-grid {
+    grid-template-columns: 1fr;
   }
 
   .activity-item {
