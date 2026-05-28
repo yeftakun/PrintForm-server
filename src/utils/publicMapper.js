@@ -7,6 +7,7 @@ function toPublicJob(job) {
     size: job.size,
     createdAt: job.createdAt,
     status: job.status,
+    fileStatus: job.fileStatus || "not-available",
     fileDeleted: Boolean(job.fileDeleted || job.fileRemoved || job.removedFileAt),
     fileRemoved: Boolean(job.fileDeleted || job.fileRemoved || job.removedFileAt),
     removedFileAt: job.removedFileAt || null,

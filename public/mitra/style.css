@@ -630,6 +630,17 @@ textarea {
   font-size: 0.82rem;
 }
 
+.clients-table td strong,
+.clients-table td small {
+  display: block;
+}
+
+.clients-table td small {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 0.76rem;
+}
+
 .muted-cell {
   color: var(--muted);
 }
@@ -674,10 +685,22 @@ textarea {
   width: min(620px, calc(100vw - 32px));
 }
 
+.modal-jobs-wide {
+  width: min(1120px, calc(100vw - 32px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 16px;
+  overflow: hidden;
+}
+
 .modal-header {
   display: block;
   margin-bottom: 0;
   text-align: center;
+}
+
+.jobs-modal-header {
+  text-align: left;
 }
 
 .modal-copy {
@@ -1480,8 +1503,28 @@ body.mitra-dashboard-active .page {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.jobs-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) minmax(240px, 1fr);
+  gap: 12px;
+}
+
+.jobs-filter-bar .field {
+  gap: 7px;
+}
+
+.jobs-table-wrap {
+  min-height: 0;
+  margin-top: 0;
+  overflow: auto;
+}
+
+.jobs-table {
+  min-width: 1120px;
 }
 
 .stat-card {
@@ -1966,6 +2009,10 @@ body.mitra-dashboard-active .page {
 
   .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .jobs-filter-bar {
+    grid-template-columns: 1fr;
   }
 
   .activity-item {

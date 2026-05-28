@@ -438,6 +438,7 @@ router.post("/close", asyncHandler(async (req, res) => {
       job.fileDeleted = true;
       job.fileRemoved = true;
       job.removedFileAt = job.removedFileAt || removedAt;
+      job.fileStatus = "not-available";
     }
   }
 

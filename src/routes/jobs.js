@@ -186,6 +186,26 @@ async function removeFileSafe(filePath) {
   await secureDelete(filePath);
 }
 
+async function getPhysicalJobFileStatus(job) {
+  if (!job?.storedPath || job.fileDeleted || job.fileRemoved || job.removedFileAt) {
+    return "not-available";
+  }
+
+  try {
+    await fsp.access(job.storedPath, fs.constants.F_OK);
+    return "available";
+  } catch {
+    return "not-available";
+  }
+}
+
+async function withPhysicalJobFileStatus(job) {
+  return {
+    ...job,
+    fileStatus: await getPhysicalJobFileStatus(job)
+  };
+}
+
 async function removeUploadedDocument(req) {
   if (req?.file?.path) {
     await removeFileSafe(req.file.path);
@@ -560,7 +580,8 @@ router.get("/", asyncHandler(async (req, res) => {
   if (req.query.status) {
     jobs = jobs.filter(job => job.status === req.query.status);
   }
-  res.json(jobs.map(toPublicJob));
+  const jobsWithFileStatus = await Promise.all(jobs.map(withPhysicalJobFileStatus));
+  res.json(jobsWithFileStatus.map(toPublicJob));
 }));
 
 router.post("/preview", uploadDocument, asyncHandler(handlePreviewUpload));
@@ -587,7 +608,7 @@ router.get("/:id", asyncHandler(async (req, res) => {
     return;
   }
 
-  res.json(toPublicJob(job));
+  res.json(toPublicJob(await withPhysicalJobFileStatus(job)));
 }));
 
 router.get("/:id/download", asyncHandler(async (req, res) => {
@@ -708,6 +729,7 @@ router.post("/:id/clone", asyncHandler(async (req, res) => {
     size: sourceSize,
     createdAt: new Date().toISOString(),
     status: "ready",
+    fileStatus: "available",
     alias: sourceJob.alias || null,
     sessionId: session.id,
     ownerUserId: session.ownerUserId || sourceJob.ownerUserId || null,
@@ -1063,6 +1085,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
       job.fileDeleted = true;
       job.fileRemoved = true;
       job.removedFileAt = job.removedFileAt || removedAt;
+      job.fileStatus = "not-available";
       publishRealtimeEvent({
         type: "job.file.removed",
         channel: "jobs",
@@ -1078,6 +1101,9 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     if (normalizedStatus === "ready") {
       job.claimedByClientId = null;
       job.claimedAt = null;
+    }
+    if (!shouldDeleteDocument) {
+      job.fileStatus = await getPhysicalJobFileStatus(job);
     }
 
     await saveJobs(jobs);
@@ -1241,6 +1267,7 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     size: fileSize,
     createdAt: new Date().toISOString(),
     status: "ready",
+    fileStatus: "available",
     alias: session.alias || null,
     sessionId: session.id,
     ownerUserId: session.ownerUserId || null,

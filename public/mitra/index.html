@@ -181,6 +181,9 @@
                   <p class="dashboard-kicker">Section 1</p>
                   <h2 id="dashboardStatsTitle">Kartu Statistik</h2>
                 </div>
+                <div class="section-actions">
+                  <button class="btn btn-outline btn-compact" id="openAllJobsModalBtn" type="button">Lihat Semua Job</button>
+                </div>
               </div>
               <div class="stat-grid">
                 <article class="stat-card">
@@ -198,10 +201,6 @@
                 <article class="stat-card">
                   <span>Gagal</span>
                   <strong id="statJobsFailed">0</strong>
-                </article>
-                <article class="stat-card">
-                  <span>File Terhapus</span>
-                  <strong id="statFilesDeleted">0</strong>
                 </article>
               </div>
             </section>
@@ -415,6 +414,57 @@
         </div>
       </section>
     </main>
+
+    <div class="modal-backdrop" id="allJobsModalBackdrop" aria-hidden="true">
+      <div class="modal modal-jobs-wide" role="dialog" aria-modal="true" aria-labelledby="allJobsModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="allJobsModalTitle">Semua Job</h2>
+            <p>Daftar job dari seluruh sesi cetak toko ini.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="allJobsModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="jobs-filter-bar" aria-label="Filter job">
+          <label class="field">
+            <span>Status</span>
+            <select id="jobsStatusFilter">
+              <option value="all">Semua status</option>
+              <option value="today">Hari ini</option>
+              <option value="ready">Menunggu</option>
+              <option value="printing">Diproses</option>
+              <option value="done">Selesai</option>
+              <option value="failed">Gagal / ditolak</option>
+              <option value="canceled">Batal</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Cari</span>
+            <input type="search" id="jobsSearchInput" placeholder="Nama dokumen, alias, atau ID">
+          </label>
+        </div>
+        <div class="table-wrap jobs-table-wrap">
+          <table class="clients-table jobs-table">
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>Session ID</th>
+                <th>Dokumen</th>
+                <th>Alias</th>
+                <th>Konfigurasi</th>
+                <th>Harga</th>
+                <th>Status</th>
+                <th>File</th>
+              </tr>
+            </thead>
+            <tbody id="allJobsTableBody">
+              <tr>
+                <td colspan="8" class="muted-cell">Belum ada job.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <div class="modal-backdrop" id="registerModalBackdrop" aria-hidden="true">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="registerModalTitle">

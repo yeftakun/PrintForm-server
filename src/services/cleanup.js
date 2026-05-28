@@ -24,6 +24,7 @@ function markJobFileRemoved(job, removedAt) {
   job.fileDeleted = true;
   job.fileRemoved = true;
   job.removedFileAt = job.removedFileAt || removedAt;
+  job.fileStatus = "not-available";
 }
 
 async function removeJobFiles(jobs, shouldRemove, source) {

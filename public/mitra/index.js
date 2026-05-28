@@ -18,7 +18,11 @@
   const statJobsToday = document.getElementById("statJobsToday");
   const statJobsDone = document.getElementById("statJobsDone");
   const statJobsFailed = document.getElementById("statJobsFailed");
-  const statFilesDeleted = document.getElementById("statFilesDeleted");
+  const openAllJobsModalBtn = document.getElementById("openAllJobsModalBtn");
+  const allJobsModalBackdrop = document.getElementById("allJobsModalBackdrop");
+  const allJobsTableBody = document.getElementById("allJobsTableBody");
+  const jobsStatusFilter = document.getElementById("jobsStatusFilter");
+  const jobsSearchInput = document.getElementById("jobsSearchInput");
 
   const storeSettingsForm = document.getElementById("storeSettingsForm");
   const serviceSettingsForm = document.getElementById("serviceSettingsForm");
@@ -418,6 +422,54 @@
     return normalized || "-";
   }
 
+  function getJobStatusClass(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "done" || normalized === "sent") return "online";
+    if (normalized === "failed" || normalized === "rejected" || normalized === "canceled") return "offline";
+    return "";
+  }
+
+  function formatCurrency(value) {
+    if (!Number.isFinite(Number(value))) {
+      return "-";
+    }
+
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0
+    }).format(Number(value));
+  }
+
+  function getJobPrice(job) {
+    const price = Number(job?.printConfig?.estimatedPrice);
+    return Number.isFinite(price) && price > 0 ? price : 0;
+  }
+
+  function normalizeJobFileStatus(job) {
+    const status = String(job?.fileStatus || "").trim().toLowerCase().replace(/\s+/g, "-");
+    if (status === "available") {
+      return "available";
+    }
+    if (status === "not-available") {
+      return "not-available";
+    }
+    return job?.fileDeleted || job?.fileRemoved || job?.removedFileAt ? "not-available" : "available";
+  }
+
+  function getJobConfigText(job) {
+    const config = job?.printConfig || {};
+    const contentScale = Number(config.contentScale || 100);
+    return [
+      config.paperSize,
+      config.colorMode === "bw" ? "BW" : "Warna",
+      config.orientation === "landscape" ? "Landscape" : "Portrait",
+      config.copies ? `${config.copies} salinan` : "",
+      config.pageRange ? `Hal. ${config.pageRange}` : "",
+      contentScale !== 100 ? `${contentScale}%` : ""
+    ].filter(Boolean).join(" - ");
+  }
+
   function isToday(value) {
     const timestamp = new Date(value);
     if (!Number.isFinite(timestamp.getTime())) {
@@ -703,13 +755,89 @@
     const jobsToday = jobs.filter(job => isToday(job.createdAt));
     const doneJobs = jobs.filter(job => ["done", "sent"].includes(String(job.status || "").toLowerCase()));
     const failedJobs = jobs.filter(job => ["failed", "rejected"].includes(String(job.status || "").toLowerCase()));
-    const deletedFiles = jobs.filter(job => Boolean(job.fileDeleted || job.fileRemoved || job.removedFileAt));
 
     statClientOnline.textContent = onlineClients.length;
     statJobsToday.textContent = jobsToday.length;
     statJobsDone.textContent = doneJobs.length;
     statJobsFailed.textContent = failedJobs.length;
-    statFilesDeleted.textContent = deletedFiles.length;
+  }
+
+  function getFilteredJobs() {
+    const statusFilter = String(jobsStatusFilter?.value || "all").toLowerCase();
+    const searchText = String(jobsSearchInput?.value || "").trim().toLowerCase();
+
+    return latestJobs
+      .filter(job => {
+        const status = String(job.status || "").toLowerCase();
+        if (statusFilter === "today") {
+          return isToday(job.createdAt);
+        }
+        if (statusFilter === "done") {
+          return status === "done" || status === "sent";
+        }
+        if (statusFilter === "failed") {
+          return status === "failed" || status === "rejected";
+        }
+        if (statusFilter === "printing") {
+          return status === "printing" || status === "claimed";
+        }
+        if (statusFilter === "ready") {
+          return status === "ready" || status === "pending";
+        }
+        if (statusFilter === "canceled") {
+          return status === "canceled";
+        }
+        return true;
+      })
+      .filter(job => {
+        if (!searchText) {
+          return true;
+        }
+        const haystack = [
+          job.id,
+          job.originalName,
+          job.alias,
+          job.sessionId,
+          getJobConfigText(job),
+          formatStatusLabel(job.status)
+        ].join(" ").toLowerCase();
+        return haystack.includes(searchText);
+      })
+      .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0).getTime() - new Date(a.createdAt || a.updatedAt || 0).getTime());
+  }
+
+  function renderAllJobsTable() {
+    if (!allJobsTableBody) {
+      return;
+    }
+
+    const jobs = getFilteredJobs();
+    if (jobs.length === 0) {
+      allJobsTableBody.innerHTML = '<tr><td colspan="8" class="muted-cell">Tidak ada job yang sesuai filter.</td></tr>';
+      return;
+    }
+
+    allJobsTableBody.innerHTML = jobs.map(job => {
+      const statusClass = getJobStatusClass(job.status);
+      const fileStatus = normalizeJobFileStatus(job);
+      const fileStatusClass = fileStatus === "available" ? "online" : "offline";
+      const price = getJobPrice(job);
+      return `
+        <tr>
+          <td>${escapeHtml(formatDateTime(job.createdAt || job.updatedAt))}</td>
+          <td><code>${escapeHtml(job.sessionId || "-")}</code></td>
+          <td>
+            <strong>${escapeHtml(job.originalName || "-")}</strong>
+            <small>${escapeHtml(job.id || "-")}</small>
+          </td>
+          <td>${escapeHtml(job.alias || "-")}</td>
+          <td>${escapeHtml(getJobConfigText(job) || "-")}</td>
+          <td>${escapeHtml(price > 0 ? formatCurrency(price) : "-")}</td>
+          <td><span class="status-pill ${statusClass}">${escapeHtml(formatStatusLabel(job.status))}</span></td>
+          <td><span class="status-pill ${fileStatusClass}">${escapeHtml(fileStatus)}</span></td>
+        </tr>
+      `;
+    }).join("");
   }
 
   function renderActivity(clients, jobs) {
@@ -758,6 +886,7 @@
     renderLinkedClients(latestClients);
     renderStats(latestClients, latestJobs);
     renderActivity(latestClients, latestJobs);
+    renderAllJobsTable();
     dashboardLastSync.textContent = `Sinkron: ${new Date().toLocaleTimeString("id-ID", {
       hour: "2-digit",
       minute: "2-digit"
@@ -1330,7 +1459,7 @@
       });
     });
 
-    [registerModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -1378,6 +1507,12 @@
     });
 
     refreshLinkedClientsBtn.addEventListener("click", loadDashboardData);
+    openAllJobsModalBtn.addEventListener("click", () => {
+      renderAllJobsTable();
+      openModal(allJobsModalBackdrop);
+    });
+    jobsStatusFilter.addEventListener("change", renderAllJobsTable);
+    jobsSearchInput.addEventListener("input", renderAllJobsTable);
     connectClientBtn.addEventListener("click", showConnectClientInfo);
     downloadClientBtn.addEventListener("click", showDownloadInfo);
 
