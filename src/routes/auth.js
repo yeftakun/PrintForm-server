@@ -1,7 +1,12 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 const {
   AUTH_ALLOW_PUBLIC_REGISTER,
-  AUTH_ACCESS_TOKEN_TTL
+  AUTH_ACCESS_TOKEN_TTL,
+  PROFILE_PHOTO_MAX_BYTES,
+  profilePhotosDir
 } = require("../config");
 const {
   countUsers,
@@ -44,6 +49,57 @@ const {
 } = require("../utils/storeOperational");
 
 const router = express.Router();
+
+fs.mkdirSync(profilePhotosDir, { recursive: true });
+
+const ALLOWED_PROFILE_PHOTO_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+]);
+
+const ALLOWED_PROFILE_PHOTO_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp"
+]);
+
+const uploadProfilePhoto = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, profilePhotosDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const safeExt = ALLOWED_PROFILE_PHOTO_EXTENSIONS.has(ext) ? ext : ".jpg";
+      cb(null, `profile-${req.user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
+    }
+  }),
+  limits: {
+    fileSize: PROFILE_PHOTO_MAX_BYTES
+  },
+  fileFilter: (req, file, cb) => {
+    const mime = String(file.mimetype || "").toLowerCase();
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    if (ALLOWED_PROFILE_PHOTO_MIME_TYPES.has(mime) && ALLOWED_PROFILE_PHOTO_EXTENSIONS.has(ext)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error("Foto profil harus berupa JPG, PNG, atau WebP."));
+  }
+}).single("photo");
+
+function uploadProfilePhotoMiddleware(req, res, next) {
+  uploadProfilePhoto(req, res, err => {
+    if (!err) {
+      next();
+      return;
+    }
+    const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    res.status(status).json({ error: err.message || "Upload foto profil gagal." });
+  });
+}
 
 function normalizeUsername(value) {
   const username = String(value || "").trim().toLowerCase();
@@ -606,6 +662,53 @@ router.patch("/me/store", requireAuth, asyncHandler(async (req, res) => {
   });
 
   res.json({ user: toPublicUser(updatedUser) });
+}));
+
+router.post("/me/store/profile-photo", requireAuth, uploadProfilePhotoMiddleware, asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "Foto profil wajib diupload." });
+    return;
+  }
+
+  const currentConfig = req.user.konfigurasiToko && typeof req.user.konfigurasiToko === "object"
+    ? req.user.konfigurasiToko
+    : {};
+  const photoUrl = `/uploads/profile-photos/${req.file.filename}`;
+  const konfigurasiToko = {
+    ...currentConfig,
+    fotoProfil: {
+      url: photoUrl,
+      originalName: req.file.originalname || null,
+      mimeType: req.file.mimetype || null,
+      sizeBytes: req.file.size || 0,
+      updatedAt: new Date().toISOString()
+    }
+  };
+
+  const updatedUser = await updateUserStoreSettings(req.user.id, {
+    alamat: req.user.alamat || null,
+    kodeToko: req.user.kodeToko || null,
+    konfigurasiToko
+  });
+
+  if (!updatedUser) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "user.store_profile_photo.updated",
+    targetType: "user",
+    targetId: req.user.id,
+    detail: {
+      sizeBytes: req.file.size || 0,
+      mimeType: req.file.mimetype || null
+    }
+  });
+
+  res.json({ user: toPublicUser(updatedUser), photoUrl });
 }));
 
 router.patch("/me/password", requireAuth, asyncHandler(async (req, res) => {

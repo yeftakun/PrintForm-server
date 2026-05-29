@@ -37,6 +37,7 @@ const storageDir = process.env.STORAGE_DIR || path.join(rootDir, "storage");
 const filesDir = path.join(storageDir, "files");
 const uploadsDir = process.env.UPLOADS_DIR || path.join(rootDir, "uploads");
 const paymentProofsDir = process.env.PAYMENT_PROOFS_DIR || path.join(uploadsDir, "payment-proofs");
+const profilePhotosDir = process.env.PROFILE_PHOTOS_DIR || path.join(uploadsDir, "profile-photos");
 const jobsFile = path.join(storageDir, "jobs.json");
 const clientsFile = path.join(storageDir, "clients.json");
 const pingsFile = path.join(storageDir, "pings.json");
@@ -53,6 +54,7 @@ const FILE_CLEANUP_INTERVAL_MS = Number(process.env.FILE_CLEANUP_INTERVAL_MS) ||
 const FILE_QUOTA_BYTES = Number(process.env.FILE_QUOTA_BYTES) || 1_073_741_824; // default 1GB
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES) || 25 * 1024 * 1024; // default 25MB
 const PAYMENT_PROOF_MAX_BYTES = Number(process.env.PAYMENT_PROOF_MAX_BYTES) || MAX_UPLOAD_BYTES;
+const PROFILE_PHOTO_MAX_BYTES = Number(process.env.PROFILE_PHOTO_MAX_BYTES) || 5 * 1024 * 1024;
 const PAYMENT_MANUAL_INSTRUCTIONS = process.env.PAYMENT_MANUAL_INSTRUCTIONS
   || "Transfer manual ke rekening PrintForm, lalu upload bukti pembayaran dari halaman order.";
 const PAYMENT_ORDER_TTL_HOURS = Number(process.env.PAYMENT_ORDER_TTL_HOURS) || 24;
@@ -117,6 +119,7 @@ module.exports = {
   filesDir,
   uploadsDir,
   paymentProofsDir,
+  profilePhotosDir,
   jobsFile,
   clientsFile,
   pingsFile,
@@ -133,6 +136,7 @@ module.exports = {
   FILE_QUOTA_BYTES,
   MAX_UPLOAD_BYTES,
   PAYMENT_PROOF_MAX_BYTES,
+  PROFILE_PHOTO_MAX_BYTES,
   PAYMENT_MANUAL_INSTRUCTIONS,
   PAYMENT_ORDER_TTL_HOURS,
   ALLOWED_UPLOAD_MIME_TYPES,

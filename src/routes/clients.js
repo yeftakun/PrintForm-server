@@ -155,6 +155,16 @@ function getStoreHours(user) {
   return config.jamOperasional || config.jam_operasional || summarizeOperationalSchedule(schedule);
 }
 
+function getStoreProfilePhotoUrl(user) {
+  const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
+    ? user.konfigurasiToko
+    : {};
+  if (config.fotoProfil && typeof config.fotoProfil === "object" && config.fotoProfil.url) {
+    return String(config.fotoProfil.url);
+  }
+  return String(config.fotoProfilUrl || config.profilePhotoUrl || "").trim() || null;
+}
+
 function summarizeStoreClients(storeClients) {
   const effectiveClients = (storeClients || [])
     .map(toEffectivePublicClient)
@@ -199,6 +209,7 @@ function toPublicStore(user, storeClients = []) {
     ownerUserId: user.id,
     kodeToko: user.kodeToko || null,
     displayName: getStoreDisplayName(user, user.id),
+    profilePhotoUrl: getStoreProfilePhotoUrl(user),
     alamat: user.alamat || "Alamat belum diatur",
     jamOperasional: getStoreHours(user),
     status: isClosed ? "closed" : summary.status,

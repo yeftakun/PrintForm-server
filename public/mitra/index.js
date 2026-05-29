@@ -77,6 +77,22 @@
   const serviceSettingsForm = document.getElementById("serviceSettingsForm");
   const storeSettingsStatus = document.getElementById("storeSettingsStatus");
   const serviceSettingsStatus = document.getElementById("serviceSettingsStatus");
+  const dashboardUserMenuBtn = document.getElementById("dashboardUserMenuBtn");
+  const dashboardUserMenu = document.getElementById("dashboardUserMenu");
+  const dashboardProfilePhoto = document.getElementById("dashboardProfilePhoto");
+  const dashboardUserStoreCode = document.getElementById("dashboardUserStoreCode");
+  const storeProfilePhotoPreview = document.getElementById("storeProfilePhotoPreview");
+  const storeProfilePhotoInitial = document.getElementById("storeProfilePhotoInitial");
+  const storeProfilePhotoName = document.getElementById("storeProfilePhotoName");
+  const storeProfilePhotoInput = document.getElementById("storeProfilePhotoInput");
+  const pickStoreProfilePhotoBtn = document.getElementById("pickStoreProfilePhotoBtn");
+  const storeProfilePhotoStatus = document.getElementById("storeProfilePhotoStatus");
+  const profilePhotoCropModalBackdrop = document.getElementById("profilePhotoCropModalBackdrop");
+  const profileCropStage = document.getElementById("profileCropStage");
+  const profileCropImage = document.getElementById("profileCropImage");
+  const profileCropZoom = document.getElementById("profileCropZoom");
+  const saveProfilePhotoBtn = document.getElementById("saveProfilePhotoBtn");
+  const profilePhotoCropStatus = document.getElementById("profilePhotoCropStatus");
   const storeOperationalSummary = document.getElementById("storeOperationalSummary");
   const openOperationalHoursBtn = document.getElementById("openOperationalHoursBtn");
   const storeQrCanvas = document.getElementById("storeQrCanvas");
@@ -166,6 +182,22 @@
   let manualStoreStatus = "open";
   let forceOpenOutsideOperationalHours = false;
   let activeDashboardPanel = "";
+  let activeProfilePhotoFile = null;
+  let activeProfilePhotoObjectUrl = "";
+  const profileCropState = {
+    dragging: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    x: 0,
+    y: 0,
+    dragStartX: 0,
+    dragStartY: 0,
+    baseScale: 1,
+    zoom: 1,
+    naturalWidth: 0,
+    naturalHeight: 0
+  };
   const jobTableState = {
     statusFilters: new Set(),
     fileFilters: new Set(),
@@ -255,6 +287,23 @@
     dashboardSidebarToggle?.setAttribute("aria-expanded", "false");
   }
 
+  function closeDashboardUserMenu() {
+    dashboardUserMenu?.classList.remove("open");
+    dashboardUserMenu?.setAttribute("aria-hidden", "true");
+    dashboardUserMenuBtn?.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleDashboardUserMenu() {
+    const isOpen = dashboardUserMenu?.classList.contains("open");
+    if (isOpen) {
+      closeDashboardUserMenu();
+      return;
+    }
+    dashboardUserMenu?.classList.add("open");
+    dashboardUserMenu?.setAttribute("aria-hidden", "false");
+    dashboardUserMenuBtn?.setAttribute("aria-expanded", "true");
+  }
+
   function activateDashboardPanel(targetId, options = {}) {
     const nextTarget = getDashboardTargetIds().includes(targetId) ? targetId : "dashboardStats";
     activeDashboardPanel = nextTarget;
@@ -309,6 +358,97 @@
       return "";
     }
     return `${window.location.origin}/p/${encodeURIComponent(code)}`;
+  }
+
+  function updateProfileCropTransform() {
+    if (!profileCropImage) {
+      return;
+    }
+    const scale = profileCropState.baseScale * profileCropState.zoom;
+    const stageRect = profileCropStage.getBoundingClientRect();
+    const displayWidth = profileCropState.naturalWidth * scale;
+    const displayHeight = profileCropState.naturalHeight * scale;
+    const maxX = Math.max(0, (displayWidth - stageRect.width) / 2);
+    const maxY = Math.max(0, (displayHeight - stageRect.height) / 2);
+    profileCropState.x = Math.max(-maxX, Math.min(maxX, profileCropState.x));
+    profileCropState.y = Math.max(-maxY, Math.min(maxY, profileCropState.y));
+    profileCropImage.style.transform = `translate(-50%, -50%) translate(${profileCropState.x}px, ${profileCropState.y}px) scale(${scale})`;
+  }
+
+  function resetProfileCrop() {
+    const stageRect = profileCropStage.getBoundingClientRect();
+    const frameSize = Math.min(stageRect.width, stageRect.height);
+    const naturalWidth = profileCropImage.naturalWidth || 1;
+    const naturalHeight = profileCropImage.naturalHeight || 1;
+    profileCropState.naturalWidth = naturalWidth;
+    profileCropState.naturalHeight = naturalHeight;
+    profileCropState.baseScale = frameSize / Math.min(naturalWidth, naturalHeight);
+    profileCropState.zoom = 1;
+    profileCropState.x = 0;
+    profileCropState.y = 0;
+    profileCropZoom.value = "1";
+    updateProfileCropTransform();
+  }
+
+  function openProfilePhotoCrop(file) {
+    if (!file || !file.type.startsWith("image/")) {
+      setStatus(storeProfilePhotoStatus, "Pilih file gambar JPG, PNG, atau WebP.", "error");
+      return;
+    }
+
+    activeProfilePhotoFile = file;
+    if (activeProfilePhotoObjectUrl) {
+      URL.revokeObjectURL(activeProfilePhotoObjectUrl);
+    }
+    activeProfilePhotoObjectUrl = URL.createObjectURL(file);
+    profileCropImage.onload = resetProfileCrop;
+    setStatus(profilePhotoCropStatus, "");
+    openModal(profilePhotoCropModalBackdrop);
+    profileCropImage.src = activeProfilePhotoObjectUrl;
+  }
+
+  function getProfileCropSourceRect() {
+    const stageRect = profileCropStage.getBoundingClientRect();
+    const frameSize = Math.min(stageRect.width, stageRect.height);
+    const displayWidth = profileCropState.naturalWidth * profileCropState.baseScale * profileCropState.zoom;
+    const displayHeight = profileCropState.naturalHeight * profileCropState.baseScale * profileCropState.zoom;
+    const imageLeft = stageRect.left + stageRect.width / 2 + profileCropState.x - displayWidth / 2;
+    const imageTop = stageRect.top + stageRect.height / 2 + profileCropState.y - displayHeight / 2;
+    const frameLeft = stageRect.left + (stageRect.width - frameSize) / 2;
+    const frameTop = stageRect.top + (stageRect.height - frameSize) / 2;
+    const scale = profileCropState.naturalWidth / displayWidth;
+
+    return {
+      sx: Math.max(0, (frameLeft - imageLeft) * scale),
+      sy: Math.max(0, (frameTop - imageTop) * scale),
+      sw: Math.min(profileCropState.naturalWidth, frameSize * scale),
+      sh: Math.min(profileCropState.naturalHeight, frameSize * scale)
+    };
+  }
+
+  function createProfilePhotoBlob() {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement("canvas");
+      const size = 512;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Browser tidak mendukung pemrosesan foto profil."));
+        return;
+      }
+      const source = getProfileCropSourceRect();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(profileCropImage, source.sx, source.sy, source.sw, source.sh, 0, 0, size, size);
+      canvas.toBlob(blob => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error("Gagal membuat foto profil."));
+      }, "image/jpeg", 0.92);
+    });
   }
 
   function getQrMatrix() {
@@ -1184,6 +1324,20 @@
       : {};
   }
 
+  function getProfilePhotoUrl(user) {
+    const config = getStoreConfig(user);
+    if (config.fotoProfil && typeof config.fotoProfil === "object" && config.fotoProfil.url) {
+      return String(config.fotoProfil.url);
+    }
+    return String(config.fotoProfilUrl || config.profilePhotoUrl || "");
+  }
+
+  function getStoreInitial(user) {
+    const config = getStoreConfig(user);
+    const source = String(config.namaToko || user?.username || "P").trim();
+    return (source[0] || "P").toUpperCase();
+  }
+
   function normalizeOperationalTime(value, fallback) {
     const text = String(value || "").trim();
     return /^([01]\d|2[0-3]):([0-5]\d)$/.test(text) ? text : fallback;
@@ -1954,6 +2108,17 @@
       : String(legacyBasePrice || "");
     dashboardUserChip.textContent = user?.username ? `@${user.username}` : "Akun Mitra";
     dashboardStoreCode.textContent = `Kode toko: ${user?.kodeToko || "-"}`;
+    dashboardUserStoreCode.textContent = `Kode toko: ${user?.kodeToko || "-"}`;
+    const profilePhotoUrl = getProfilePhotoUrl(user);
+    const profileInitial = getStoreInitial(user);
+    [dashboardProfilePhoto, storeProfilePhotoPreview].forEach(image => {
+      image.src = profilePhotoUrl || "";
+      image.classList.toggle("has-photo", Boolean(profilePhotoUrl));
+    });
+    dashboardUserMenuBtn.classList.toggle("has-photo", Boolean(profilePhotoUrl));
+    storeProfilePhotoInitial.textContent = profileInitial;
+    storeProfilePhotoInitial.classList.toggle("hidden", Boolean(profilePhotoUrl));
+    storeProfilePhotoName.textContent = profilePhotoUrl ? "Foto profil aktif" : "Belum ada foto";
     accountUsername.textContent = user?.username ? `@${user.username}` : "-";
     accountEmail.textContent = user?.email || "-";
     accountPinStatus.textContent = user?.hasPin ? "Aktif" : "Belum diatur";
@@ -2025,6 +2190,42 @@
       });
     } catch (err) {
       setStatus(statusEl, err.message || "Gagal menyimpan pengaturan.", "error");
+    }
+  }
+
+  async function uploadProfilePhoto() {
+    if (!activeProfilePhotoFile) {
+      return;
+    }
+    setStatus(profilePhotoCropStatus, "Menyimpan foto profil...");
+
+    try {
+      const blob = await createProfilePhotoBlob();
+      const formData = new FormData();
+      formData.append("photo", blob, "profile-photo.jpg");
+      const res = await window.MitraAuth.apiFetch("/api/auth/me/store/profile-photo", {
+        method: "POST",
+        body: formData
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.error || `Upload gagal (${res.status})`);
+      }
+
+      const state = window.MitraAuth.getState() || {};
+      const nextState = { ...state, user: body.user };
+      window.MitraAuth.saveState(nextState);
+      currentUser = body.user;
+      fillDashboardForms(body.user);
+      setStatus(storeProfilePhotoStatus, "Foto profil berhasil diperbarui.", "success");
+      closeModal(profilePhotoCropModalBackdrop);
+      notify({
+        title: "Foto profil tersimpan",
+        message: "Foto profil toko berhasil diperbarui.",
+        variant: "success"
+      });
+    } catch (err) {
+      setStatus(profilePhotoCropStatus, err.message || "Gagal menyimpan foto profil.", "error");
     }
   }
 
@@ -2367,7 +2568,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -2395,6 +2596,16 @@
     window.addEventListener("keydown", event => {
       if (event.key === "Escape") {
         closeDashboardSidebar();
+        closeDashboardUserMenu();
+      }
+    });
+    dashboardUserMenuBtn?.addEventListener("click", event => {
+      event.stopPropagation();
+      toggleDashboardUserMenu();
+    });
+    document.addEventListener("click", event => {
+      if (!dashboardUserMenu?.contains(event.target) && !dashboardUserMenuBtn?.contains(event.target)) {
+        closeDashboardUserMenu();
       }
     });
 
@@ -2405,6 +2616,45 @@
     accountPinForm.addEventListener("submit", submitAccountPin);
     storeSettingsForm.elements.storeStatus.addEventListener("change", onStoreStatusChange);
     saveOperationalHoursBtn.addEventListener("click", onSaveOperationalHours);
+    pickStoreProfilePhotoBtn.addEventListener("click", () => storeProfilePhotoInput.click());
+    storeProfilePhotoInput.addEventListener("change", () => {
+      const file = storeProfilePhotoInput.files?.[0];
+      if (file) {
+        openProfilePhotoCrop(file);
+      }
+      storeProfilePhotoInput.value = "";
+    });
+    profileCropZoom.addEventListener("input", () => {
+      profileCropState.zoom = Number(profileCropZoom.value || 1);
+      updateProfileCropTransform();
+    });
+    profileCropStage.addEventListener("pointerdown", event => {
+      profileCropState.dragging = true;
+      profileCropState.pointerId = event.pointerId;
+      profileCropState.startX = event.clientX;
+      profileCropState.startY = event.clientY;
+      profileCropState.dragStartX = profileCropState.x;
+      profileCropState.dragStartY = profileCropState.y;
+      profileCropStage.setPointerCapture(event.pointerId);
+    });
+    profileCropStage.addEventListener("pointermove", event => {
+      if (!profileCropState.dragging || profileCropState.pointerId !== event.pointerId) {
+        return;
+      }
+      profileCropState.x = profileCropState.dragStartX + event.clientX - profileCropState.startX;
+      profileCropState.y = profileCropState.dragStartY + event.clientY - profileCropState.startY;
+      updateProfileCropTransform();
+    });
+    profileCropStage.addEventListener("pointerup", event => {
+      profileCropState.dragging = false;
+      if (profileCropStage.hasPointerCapture(event.pointerId)) {
+        profileCropStage.releasePointerCapture(event.pointerId);
+      }
+    });
+    profileCropStage.addEventListener("pointercancel", () => {
+      profileCropState.dragging = false;
+    });
+    saveProfilePhotoBtn.addEventListener("click", uploadProfilePhoto);
     storeSettingsForm.elements.storeName.addEventListener("input", renderStoreQr);
     storeSettingsForm.elements.kodeToko.addEventListener("input", renderStoreQr);
     downloadStoreQrBtn.addEventListener("click", downloadStoreQrPoster);

@@ -153,9 +153,26 @@
           <span class="store-override-badge hidden" id="storeOverrideBadge">Toko buka di luar waktu operasional</span>
 
           <div class="dashboard-actions">
-            <button class="btn btn-outline btn-compact" id="downloadClientBtn" type="button">Download Klien</button>
-            <span class="auth-chip" id="dashboardUserChip">@user</span>
-            <button class="btn btn-ghost btn-compact" id="logoutBtn" type="button">Logout</button>
+            <button class="btn btn-ghost btn-compact dashboard-download-client" id="downloadClientBtn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v11"></path>
+                <path d="m7 9 5 5 5-5"></path>
+                <path d="M5 21h14"></path>
+              </svg>
+              <span>Klien Desktop</span>
+            </button>
+            <div class="dashboard-user-menu-wrap">
+              <button class="dashboard-user-button" id="dashboardUserMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false">
+                <img id="dashboardProfilePhoto" alt="" src="">
+                <span class="dashboard-user-copy">
+                  <strong id="dashboardUserChip">@user</strong>
+                  <small id="dashboardUserStoreCode">Kode toko: -</small>
+                </span>
+              </button>
+              <div class="dashboard-user-menu" id="dashboardUserMenu" role="menu" aria-hidden="true">
+                <button id="logoutBtn" type="button" role="menuitem">Logout</button>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -270,6 +287,22 @@
                   <p class="dashboard-kicker">Toko</p>
                   <h2 id="storeSettingsTitle">Pengaturan Toko</h2>
                 </div>
+              </div>
+              <div class="store-profile-panel">
+                <div class="store-profile-photo-preview">
+                  <img id="storeProfilePhotoPreview" alt="" src="">
+                  <span id="storeProfilePhotoInitial">P</span>
+                </div>
+                <div class="store-profile-copy">
+                  <span>Foto Profil Toko</span>
+                  <strong id="storeProfilePhotoName">Belum ada foto</strong>
+                  <small>Foto akan dipotong ke rasio 1:1 untuk header dan profil toko.</small>
+                </div>
+                <div class="section-actions">
+                  <input class="sr-only" id="storeProfilePhotoInput" type="file" accept="image/png,image/jpeg,image/webp">
+                  <button class="btn btn-outline btn-compact" id="pickStoreProfilePhotoBtn" type="button">Pilih Foto</button>
+                </div>
+                <div class="status" id="storeProfilePhotoStatus" role="status"></div>
               </div>
               <form class="dashboard-form" id="storeSettingsForm">
                 <label class="field">
@@ -818,6 +851,31 @@
           <button class="btn btn-ghost" type="button" data-close="operationalHoursModalBackdrop">Batal</button>
         </div>
         <div class="status" id="operationalHoursStatus" role="status"></div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="profilePhotoCropModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide profile-photo-crop-modal" role="dialog" aria-modal="true" aria-labelledby="profilePhotoCropModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="profilePhotoCropModalTitle">Atur Foto Profil</h2>
+            <p>Geser foto dan atur ukurannya agar area penting masuk ke kotak 1:1.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="profilePhotoCropModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="profile-crop-stage" id="profileCropStage">
+          <img id="profileCropImage" alt="">
+          <div class="profile-crop-frame" aria-hidden="true"></div>
+        </div>
+        <label class="field profile-crop-zoom">
+          <span>Ukuran Foto</span>
+          <input id="profileCropZoom" type="range" min="1" max="3" step="0.01" value="1">
+        </label>
+        <div class="form-footer account-modal-footer profile-crop-footer">
+          <button class="btn btn-primary" id="saveProfilePhotoBtn" type="button">Simpan Foto</button>
+          <button class="btn btn-ghost" type="button" data-close="profilePhotoCropModalBackdrop">Batal</button>
+        </div>
+        <div class="status" id="profilePhotoCropStatus" role="status"></div>
       </div>
     </div>
 

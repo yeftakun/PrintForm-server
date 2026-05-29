@@ -189,6 +189,7 @@ th {
 
 .store-brand-icon,
 .store-icon-box,
+.store-profile-avatar,
 .store-detail-icon,
 .store-step-icon,
 .store-summary-status-icon,
@@ -297,6 +298,41 @@ th {
   border-radius: 14px;
   font-size: 2rem;
   box-shadow: 0 10px 24px rgba(198, 91, 54, 0.12);
+}
+
+.store-profile-avatar {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border: 1px solid rgba(224, 214, 200, 0.9);
+  border-radius: 14px;
+  font-size: 2rem;
+  box-shadow: 0 10px 24px rgba(198, 91, 54, 0.12);
+}
+
+.store-profile-avatar img {
+  position: absolute;
+  inset: 0;
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.store-profile-avatar img.has-photo {
+  display: block;
+}
+
+.store-profile-avatar img.has-photo + .store-profile-avatar-fallback {
+  display: none;
+}
+
+.store-profile-avatar-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
 }
 
 .store-title-row h2 {
@@ -748,6 +784,7 @@ th {
 
 .store-brand svg,
 .store-icon-box svg,
+.store-profile-avatar svg,
 .store-detail-icon svg,
 .store-step-icon svg,
 .store-summary-status-icon svg,
@@ -838,7 +875,8 @@ th {
     gap: 13px;
   }
 
-  .store-icon-box {
+  .store-icon-box,
+  .store-profile-avatar {
     width: 42px;
     height: 42px;
     border-radius: 13px;
@@ -1112,7 +1150,8 @@ th {
     padding-bottom: 20px;
   }
 
-  .store-icon-box {
+  .store-icon-box,
+  .store-profile-avatar {
     width: 72px;
     height: 72px;
     border-radius: 16px;
@@ -1397,7 +1436,8 @@ th {
     padding-bottom: 12px;
   }
 
-  .store-icon-box {
+  .store-icon-box,
+  .store-profile-avatar {
     width: 50px;
     height: 50px;
     border-radius: 14px;
@@ -1609,7 +1649,8 @@ th {
     gap: 10px;
   }
 
-  .store-icon-box {
+  .store-icon-box,
+  .store-profile-avatar {
     width: 48px;
     height: 48px;
   }

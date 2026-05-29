@@ -1,6 +1,6 @@
 const express = require("express");
 const path = require("path");
-const { rootDir } = require("./config");
+const { rootDir, profilePhotosDir } = require("./config");
 const { requestLogger } = require("./middleware/requestLogger");
 const { errorHandler } = require("./middleware/errorHandler");
 const { optionalAuth } = require("./middleware/auth");
@@ -20,6 +20,7 @@ function createApp() {
     next();
   });
   app.use(express.static(path.join(rootDir, "public")));
+  app.use("/uploads/profile-photos", express.static(profilePhotosDir));
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);

@@ -10,6 +10,7 @@ const storeStatus = document.getElementById("storeStatus");
 const storeStatusBadge = document.getElementById("storeStatusBadge");
 const storeSummaryStatusIcon = document.getElementById("storeSummaryStatusIcon");
 const storeServiceChips = document.getElementById("storeServiceChips");
+const storeProfilePhoto = document.getElementById("storeProfilePhoto");
 const confirmStoreBtn = document.getElementById("confirmStoreBtn");
 const storePageStatus = document.getElementById("storePageStatus");
 const storeLayout = document.querySelector(".store-layout");
@@ -67,6 +68,20 @@ function renderServiceChips(layanan) {
     .join("");
 }
 
+function renderStoreProfilePhoto(photoUrl, displayName) {
+  if (!storeProfilePhoto) {
+    return;
+  }
+  const normalizedUrl = String(photoUrl || "").trim();
+  storeProfilePhoto.alt = normalizedUrl ? `Foto profil ${displayName || "toko"}` : "";
+  storeProfilePhoto.onerror = () => {
+    storeProfilePhoto.classList.remove("has-photo");
+    storeProfilePhoto.alt = "";
+  };
+  storeProfilePhoto.src = normalizedUrl || "";
+  storeProfilePhoto.classList.toggle("has-photo", Boolean(normalizedUrl));
+}
+
 function renderStore(store) {
   currentStore = store;
   storeLayout?.classList.remove("hidden");
@@ -83,6 +98,7 @@ function renderStore(store) {
 
   storeName.textContent = displayName;
   storeNameSummary.textContent = displayName;
+  renderStoreProfilePhoto(store.profilePhotoUrl, displayName);
   storeCodeText.textContent = store.kodeToko || "-";
   storeCodeValue.textContent = store.kodeToko || "-";
   storeAddress.textContent = store.alamat || "Alamat belum diatur";
