@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3C6yyyMz1afQ4Ih3yhhinW2mdjJwBLaN4LiD4RAH9HrNJSwLIIhx2BI70DBLovq
+\restrict 1RoEsU98LMfa2oYQOQ121yi5znkkljDnpjo9CPzhffLlfnoqKuYYW95KdpV2khB
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -109,6 +109,137 @@ CREATE TABLE public.clients (
 ALTER TABLE public.clients OWNER TO postgres;
 
 --
+-- Name: coupon_usages; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.coupon_usages (
+    id bigint NOT NULL,
+    coupon_id text NOT NULL,
+    order_id text NOT NULL,
+    user_id text NOT NULL,
+    plan_id text,
+    discount_idr integer DEFAULT 0 NOT NULL,
+    used_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT coupon_usages_discount_check CHECK ((discount_idr >= 0))
+);
+
+
+ALTER TABLE public.coupon_usages OWNER TO postgres;
+
+--
+-- Name: coupon_usages_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.coupon_usages_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.coupon_usages_id_seq OWNER TO postgres;
+
+--
+-- Name: coupon_usages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.coupon_usages_id_seq OWNED BY public.coupon_usages.id;
+
+
+--
+-- Name: coupons; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.coupons (
+    id text NOT NULL,
+    code character varying(64) NOT NULL,
+    name character varying(120),
+    discount_type character varying(20) NOT NULL,
+    discount_value integer DEFAULT 0 NOT NULL,
+    max_discount_idr integer,
+    min_order_amount_idr integer DEFAULT 0 NOT NULL,
+    applies_to_plan_id text,
+    usage_limit integer,
+    usage_limit_per_user integer,
+    starts_at timestamp with time zone,
+    expires_at timestamp with time zone,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT coupons_discount_type_check CHECK (((discount_type)::text = ANY ((ARRAY['fixed_amount'::character varying, 'percent'::character varying, 'free'::character varying])::text[]))),
+    CONSTRAINT coupons_discount_value_check CHECK ((discount_value >= 0)),
+    CONSTRAINT coupons_min_order_check CHECK ((min_order_amount_idr >= 0))
+);
+
+
+ALTER TABLE public.coupons OWNER TO postgres;
+
+--
+-- Name: credit_usages; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.credit_usages (
+    id bigint NOT NULL,
+    user_id text NOT NULL,
+    credit_id text,
+    job_id text,
+    amount integer DEFAULT 1 NOT NULL,
+    usage_type character varying(32) DEFAULT 'job_print'::character varying NOT NULL,
+    job_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT credit_usages_amount_check CHECK ((amount > 0))
+);
+
+
+ALTER TABLE public.credit_usages OWNER TO postgres;
+
+--
+-- Name: credit_usages_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.credit_usages_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.credit_usages_id_seq OWNER TO postgres;
+
+--
+-- Name: credit_usages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.credit_usages_id_seq OWNED BY public.credit_usages.id;
+
+
+--
+-- Name: credits; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.credits (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    plan_id text,
+    order_id text,
+    source_type character varying(20) NOT NULL,
+    total_credits integer NOT NULL,
+    used_credits integer DEFAULT 0 NOT NULL,
+    starts_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    status character varying(20) DEFAULT 'active'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT credits_credit_check CHECK (((total_credits >= 0) AND (used_credits >= 0) AND (used_credits <= total_credits))),
+    CONSTRAINT credits_source_type_check CHECK (((source_type)::text = ANY ((ARRAY['free'::character varying, 'subscription'::character varying, 'topup'::character varying, 'bonus'::character varying, 'refund'::character varying])::text[]))),
+    CONSTRAINT credits_status_check CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'expired'::character varying, 'cancelled'::character varying])::text[])))
+);
+
+
+ALTER TABLE public.credits OWNER TO postgres;
+
+--
 -- Name: events; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -178,6 +309,85 @@ CREATE TABLE public.jobs (
 ALTER TABLE public.jobs OWNER TO postgres;
 
 --
+-- Name: orders; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.orders (
+    id text NOT NULL,
+    user_id text NOT NULL,
+    plan_id text NOT NULL,
+    quantity integer DEFAULT 1 NOT NULL,
+    subtotal_idr integer DEFAULT 0 NOT NULL,
+    discount_idr integer DEFAULT 0 NOT NULL,
+    total_idr integer DEFAULT 0 NOT NULL,
+    coupon_id text,
+    coupon_code character varying(64),
+    status character varying(32) DEFAULT 'pending_payment'::character varying NOT NULL,
+    payment_instruction text,
+    payment_expires_at timestamp with time zone,
+    activated_at timestamp with time zone,
+    rejected_at timestamp with time zone,
+    rejected_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT orders_amount_check CHECK (((subtotal_idr >= 0) AND (discount_idr >= 0) AND (total_idr >= 0))),
+    CONSTRAINT orders_quantity_check CHECK ((quantity > 0)),
+    CONSTRAINT orders_status_check CHECK (((status)::text = ANY ((ARRAY['pending_payment'::character varying, 'waiting_verification'::character varying, 'paid'::character varying, 'rejected'::character varying, 'cancelled'::character varying, 'expired'::character varying])::text[])))
+);
+
+
+ALTER TABLE public.orders OWNER TO postgres;
+
+--
+-- Name: payment_proofs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.payment_proofs (
+    id text NOT NULL,
+    order_id text NOT NULL,
+    user_id text NOT NULL,
+    original_name character varying(255) NOT NULL,
+    stored_path text NOT NULL,
+    mime_type character varying(128) NOT NULL,
+    size_bytes bigint NOT NULL,
+    status character varying(32) DEFAULT 'submitted'::character varying NOT NULL,
+    user_note text,
+    admin_note text,
+    submitted_at timestamp with time zone DEFAULT now() NOT NULL,
+    reviewed_at timestamp with time zone,
+    CONSTRAINT payment_proofs_status_check CHECK (((status)::text = ANY ((ARRAY['submitted'::character varying, 'approved'::character varying, 'rejected'::character varying])::text[])))
+);
+
+
+ALTER TABLE public.payment_proofs OWNER TO postgres;
+
+--
+-- Name: plans; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.plans (
+    id text NOT NULL,
+    code character varying(50) NOT NULL,
+    name character varying(100) NOT NULL,
+    plan_type character varying(20) NOT NULL,
+    price_idr integer DEFAULT 0 NOT NULL,
+    credits_per_unit integer DEFAULT 0 NOT NULL,
+    duration_months integer DEFAULT 1 NOT NULL,
+    description text,
+    is_active boolean DEFAULT true NOT NULL,
+    sort_order integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT plans_credits_check CHECK ((credits_per_unit >= 0)),
+    CONSTRAINT plans_duration_check CHECK ((duration_months >= 0)),
+    CONSTRAINT plans_plan_type_check CHECK (((plan_type)::text = ANY ((ARRAY['free'::character varying, 'subscription'::character varying, 'credit_pack'::character varying])::text[]))),
+    CONSTRAINT plans_price_check CHECK ((price_idr >= 0))
+);
+
+
+ALTER TABLE public.plans OWNER TO postgres;
+
+--
 -- Name: preview_files; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -237,6 +447,23 @@ CREATE TABLE public.sessions (
 ALTER TABLE public.sessions OWNER TO postgres;
 
 --
+-- Name: user_credit_balances; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.user_credit_balances AS
+ SELECT user_id,
+    COALESCE(sum(total_credits), (0)::bigint) AS total_credits,
+    COALESCE(sum(used_credits), (0)::bigint) AS used_credits,
+    COALESCE(sum((total_credits - used_credits)), (0)::bigint) AS remaining_credits,
+    min(expires_at) FILTER (WHERE ((used_credits < total_credits) AND ((status)::text = 'active'::text) AND (starts_at <= now()) AND (expires_at > now()))) AS nearest_expiry_at
+   FROM public.credits
+  WHERE (((status)::text = 'active'::text) AND (starts_at <= now()) AND (expires_at > now()))
+  GROUP BY user_id;
+
+
+ALTER VIEW public.user_credit_balances OWNER TO postgres;
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -261,6 +488,20 @@ ALTER TABLE public.users OWNER TO postgres;
 --
 
 ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.audit_logs_id_seq'::regclass);
+
+
+--
+-- Name: coupon_usages id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupon_usages ALTER COLUMN id SET DEFAULT nextval('public.coupon_usages_id_seq'::regclass);
+
+
+--
+-- Name: credit_usages id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credit_usages ALTER COLUMN id SET DEFAULT nextval('public.credit_usages_id_seq'::regclass);
 
 
 --
@@ -3340,6 +3581,31 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 32151	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:27:46.812949+08
 32152	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:27:51.746026+08
 32153	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:27:51.804805+08
+35732	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:33.280175+08
+35813	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:49.3097+08
+35814	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:54.301122+08
+35815	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:59.294933+08
+35816	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:04.305651+08
+35817	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:09.335011+08
+35820	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:19.410397+08
+35891	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:14.302177+08
+35892	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:19.298273+08
+35893	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:24.357802+08
+35894	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:29.294837+08
+35973	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:14.340705+08
+35974	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:19.318544+08
+35975	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:24.322484+08
+35976	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:29.351239+08
+35979	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:44.334451+08
+35980	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:49.339245+08
+36060	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:44.415179+08
+36061	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:49.417921+08
+36062	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:54.425864+08
+36063	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:59.283349+08
+36064	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:59.418976+08
+36065	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:04.418866+08
+36066	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:09.422085+08
+36168	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:09.421097+08
 32147	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:27:26.80082+08
 32154	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:27:56.8023+08
 32155	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:28:01.802398+08
@@ -3721,6 +3987,33 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 32533	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:55:01.796646+08
 32535	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:55:11.798484+08
 32536	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:55:16.799516+08
+35733	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:38.04835+08
+35734	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:42.989348+08
+35735	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:47.994105+08
+35818	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:14.324827+08
+35819	user	user_60da7484-9e0c-462c-bf78-357c340ae216	billing.order.created	order	ord_c168681d-1a2d-4b11-9002-246ce211981e	{"planId": "plan_free", "status": "paid", "creditId": "cr_28d57779-076d-4526-bb6e-0ce105f7278c", "quantity": 1, "totalIdr": 0, "couponCode": null}	2026-05-28 20:13:15.257012+08
+35895	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:34.300423+08
+35896	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:39.297138+08
+35897	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:44.300688+08
+35898	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:49.301329+08
+35899	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:54.309176+08
+35900	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:59.301234+08
+35901	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:04.33117+08
+35902	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:09.303743+08
+35903	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:14.308867+08
+35904	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:19.296606+08
+35907	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:34.307293+08
+35911	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:54.301578+08
+35984	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:44:04.358895+08
+35985	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:44:09.350116+08
+36067	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:14.435257+08
+36068	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:19.417284+08
+36069	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:24.42602+08
+36070	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:29.281195+08
+36071	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:29.415465+08
+36169	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:14.426796+08
+36170	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:19.429184+08
+36171	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:24.42393+08
 32528	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:54:41.801187+08
 32529	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:54:46.799464+08
 32534	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:55:06.799845+08
@@ -3772,6 +4065,23 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 32589	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:58:56.802048+08
 32590	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:59:01.804959+08
 32591	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:59:06.809397+08
+35736	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_fe6c86d6-5c70-4c75-8e61-f6a59301ffcb", "previousRefreshTokenId": "rt_10f255bd-5563-46ff-a24d-8bc92a99c2c2"}	2026-05-28 20:06:38.553253+08
+35737	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:06:39.307811+08
+35738	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:06:44.300863+08
+35741	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:06:59.288281+08
+35743	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:09.306578+08
+35744	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:14.296522+08
+35821	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:24.30079+08
+35822	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:29.298466+08
+35826	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:49.310495+08
+35827	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:54.319452+08
+35828	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:59.276926+08
+35905	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:24.303566+08
+35906	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:29.285291+08
+35908	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:39.30974+08
+35909	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:44.299365+08
+35910	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:49.320231+08
+35912	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:59.278922+08
 32569	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:57:31.801817+08
 32570	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:57:36.80175+08
 32572	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 00:57:46.803786+08
@@ -4050,6 +4360,34 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 32863	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 01:18:41.799907+08
 32864	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 01:18:46.802002+08
 32867	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 01:18:56.801185+08
+35739	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:06:49.311917+08
+35740	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:06:54.301167+08
+35742	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:04.299424+08
+35823	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:34.30073+08
+35913	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:20:59.314025+08
+35914	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:04.301837+08
+35915	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:09.295777+08
+35916	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:14.312065+08
+35917	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:19.306702+08
+35918	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:24.300197+08
+35919	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:29.309258+08
+35986	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:48:29.33264+08
+35987	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:48:29.413038+08
+36072	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:34.434014+08
+36073	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:39.42133+08
+36074	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:44.428427+08
+36075	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:49.4282+08
+36076	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_ded2d49c-2d53-4c2f-a3cf-1e043b72c2ac", "previousRefreshTokenId": "rt_82f1aaf9-f4f3-443d-ad9c-7e12091cf49e"}	2026-05-28 20:57:54.449553+08
+36077	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:54.464943+08
+36078	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:59.289388+08
+36079	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:57:59.431425+08
+36080	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:04.415333+08
+36081	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:09.423602+08
+36172	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:29.283448+08
+36173	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:29.418141+08
+36174	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:34.420039+08
+36175	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:39.422003+08
+36176	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:44.429689+08
 32858	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 01:18:21.750714+08
 32859	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 01:18:21.798893+08
 32860	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 01:18:26.802116+08
@@ -4764,6 +5102,39 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 33574	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:30:27.582773+08
 33575	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:30:32.449232+08
 33576	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:30:37.354111+08
+35745	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:19.30884+08
+35746	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:24.316873+08
+35748	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:34.311949+08
+35749	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:40.27277+08
+35750	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:44.311721+08
+35751	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:49.315072+08
+35824	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:39.299072+08
+35825	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:13:44.300467+08
+35829	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:04.297484+08
+35830	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:09.301893+08
+35831	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:14.304513+08
+35920	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:34.30831+08
+35921	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_feb33d3a-fd51-4523-8c78-69dfa0cedff2", "previousRefreshTokenId": "rt_fe6c86d6-5c70-4c75-8e61-f6a59301ffcb"}	2026-05-28 20:21:39.333124+08
+35922	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:39.350859+08
+35923	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:44.298211+08
+35924	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:49.31614+08
+35925	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:54.308156+08
+35926	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:21:59.297323+08
+35988	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:48:34.394778+08
+35990	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:48:44.469582+08
+36082	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:14.437185+08
+36083	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:19.423351+08
+36084	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:24.423811+08
+36085	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:29.292646+08
+36086	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:29.429411+08
+36089	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_6341b008-1dba-4878-9265-adb4ac358912", "previousRefreshTokenId": "rt_5dd684af-a355-44f1-88e6-9787aecc2272"}	2026-05-28 20:58:36.796113+08
+36177	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:49.424283+08
+36178	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:54.415968+08
+36255	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:28.030632+08
+36256	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:29.310069+08
+36278	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:59.501407+08
+36285	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:29.466627+08
+36286	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:34.456558+08
 33577	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:30:42.32489+08
 33578	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:30:47.340699+08
 33579	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:30:52.365902+08
@@ -4935,6 +5306,39 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 33745	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:50:02.412853+08
 33746	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:50:07.338075+08
 33747	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:50:07.411983+08
+35747	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:29.397072+08
+35832	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:19.309579+08
+35833	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:24.294078+08
+35834	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:29.284569+08
+35927	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:04.296143+08
+35928	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:09.30028+08
+35929	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:14.306623+08
+35930	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:19.308504+08
+35931	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:24.348375+08
+35932	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:29.279051+08
+35989	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:48:39.392931+08
+36087	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:34.439592+08
+36088	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_4cb9d3cf-2d43-4bc7-a086-f6aa6c39b0ff", "previousRefreshTokenId": "rt_5dd684af-a355-44f1-88e6-9787aecc2272"}	2026-05-28 20:58:36.68961+08
+36090	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:39.425277+08
+36091	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:44.430388+08
+36092	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:49.416594+08
+36093	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:54.425807+08
+36098	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:09.422364+08
+36099	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:14.422469+08
+36100	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:19.424706+08
+36101	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:24.429083+08
+36102	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:29.280567+08
+36103	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:29.416002+08
+36179	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:59.388122+08
+36180	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:59.429976+08
+36181	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:04.431804+08
+36182	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:09.440487+08
+36183	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:14.438517+08
+36184	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:19.438586+08
+36185	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:24.437884+08
+36186	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:29.279363+08
+36187	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:29.433178+08
+36188	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:34.442142+08
 33748	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:50:12.417668+08
 33749	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:50:17.409756+08
 33750	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 09:50:22.407294+08
@@ -5338,6 +5742,39 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34148	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 11:21:27.415938+08
 34149	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 11:21:32.41821+08
 34150	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 11:21:37.411923+08
+35752	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:54.313318+08
+35753	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:07:59.287653+08
+35754	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:04.307552+08
+35755	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:09.304315+08
+35756	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:14.30425+08
+35757	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:19.29904+08
+35758	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:24.300707+08
+35759	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:29.295276+08
+35763	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_a22da8e5-a5c3-4527-a699-4251a0d6ea81", "previousRefreshTokenId": "rt_d0d16db2-cc4a-4eb9-a3a5-339cb9beccf6"}	2026-05-28 20:08:44.510078+08
+35835	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:34.3069+08
+35836	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:39.301745+08
+35933	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:34.300798+08
+35934	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:39.499968+08
+35935	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:44.314232+08
+35991	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:51:51.843907+08
+36094	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.login	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"identifier": "yefta"}	2026-05-28 20:58:58.738843+08
+36189	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:39.435415+08
+36190	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:44.445489+08
+36191	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:49.43883+08
+36192	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:54.438744+08
+36193	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:59.281889+08
+36257	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:29.807248+08
+36279	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:04.46084+08
+36280	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:09.461934+08
+36281	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:14.522118+08
+36282	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:19.479036+08
+36283	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:24.461589+08
+36287	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:39.454475+08
+36288	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:44.454823+08
+36289	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:49.449757+08
+36290	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_836ac221-9a5e-43dc-a4ea-5cea867b834d", "previousRefreshTokenId": "rt_ded2d49c-2d53-4c2f-a3cf-1e043b72c2ac"}	2026-05-28 21:12:54.649602+08
+36291	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:55.021454+08
+36292	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:59.301661+08
 34151	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 11:21:42.433708+08
 34152	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 11:21:47.52177+08
 34153	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-26 11:21:52.382746+08
@@ -5402,6 +5839,8 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34212	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_4c774e9a-77d4-4bb3-91dd-fbbd552c64cd", "previousRefreshTokenId": "rt_60848b93-43eb-485c-a0f6-740a6c685d23"}	2026-05-27 20:50:52.83711+08
 34213	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-27 20:51:25.110886+08
 34214	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-27 20:51:45.550759+08
+35760	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:34.31327+08
+35761	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:39.296623+08
 34216	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-27 20:52:35.003534+08
 34217	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.logout	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"revokedCount": 1}	2026-05-27 20:53:11.061629+08
 34219	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-27 20:58:19.834722+08
@@ -5435,6 +5874,7 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34247	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-28 08:47:11.613638+08
 34248	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_7334df89-7e2e-49da-b6c7-26cbc3696883", "previousRefreshTokenId": "rt_611f6e23-3531-4d46-a076-567ae40a09ab"}	2026-05-28 08:49:19.252467+08
 34249	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:49:19.488333+08
+36998	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.login	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"identifier": "yefta"}	2026-05-29 07:06:54.926775+08
 34250	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:49:25.536017+08
 34251	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:49:29.538375+08
 34252	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-28 08:49:31.654485+08
@@ -5463,6 +5903,12 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34275	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:51:09.577054+08
 34276	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:51:14.572614+08
 34277	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:51:19.882586+08
+35762	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:44.46417+08
+35837	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:44.309232+08
+35838	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:49.302444+08
+35839	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:54.313503+08
+35840	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:14:59.283395+08
+35936	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:49.319114+08
 34279	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:51:26.619138+08
 34280	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:51:29.5851+08
 34281	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:51:34.587627+08
@@ -5499,6 +5945,38 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34312	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:54:24.756697+08
 34313	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-28 08:54:27.120182+08
 34314	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:54:30.325449+08
+35764	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:49.310596+08
+35765	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:54.302498+08
+35766	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:08:59.293859+08
+35841	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:04.296448+08
+35842	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:09.298619+08
+35843	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:14.305454+08
+35844	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:19.319776+08
+35845	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:24.298623+08
+35846	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:29.292205+08
+35848	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:39.312204+08
+35849	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:44.306143+08
+35850	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:49.435036+08
+35851	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:54.3058+08
+35937	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:54.304469+08
+35938	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:22:59.299304+08
+35992	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:51:54.720211+08
+36095	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:59.322926+08
+36096	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:58:59.427466+08
+36097	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:04.449274+08
+36194	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:05:59.531464+08
+36195	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:04.44012+08
+36196	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:09.444112+08
+36197	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:14.441986+08
+36198	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:19.437753+08
+36199	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:24.43609+08
+36200	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:29.293148+08
+36201	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:29.441411+08
+36202	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:34.446023+08
+36203	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:39.443232+08
+36204	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:44.436447+08
+36205	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:49.434698+08
+36206	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:54.433987+08
 34315	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:54:34.585543+08
 34316	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:54:39.617347+08
 34317	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 08:54:44.578401+08
@@ -5736,6 +6214,36 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34551	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:06:39.193019+08
 34552	client	\N	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:06:44.193631+08
 34553	client	\N	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:06:45.728225+08
+35767	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:04.29614+08
+35768	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:09.316203+08
+35769	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:14.409932+08
+35847	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:34.307566+08
+35939	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:04.328594+08
+35940	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:09.294976+08
+35941	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:14.303875+08
+35993	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:51:59.326628+08
+35994	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:51:59.450196+08
+35995	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:04.419838+08
+35996	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:09.48791+08
+36104	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:34.422648+08
+36105	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:39.469199+08
+36106	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:44.427955+08
+36207	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:59.274801+08
+36208	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:06:59.445589+08
+36209	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:04.441655+08
+36210	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:09.435234+08
+36211	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:14.438028+08
+36212	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:19.443901+08
+36213	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:24.443666+08
+36214	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:29.282161+08
+36215	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:29.432305+08
+36216	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:34.445076+08
+36217	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:39.444872+08
+36258	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:34.444139+08
+36266	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:09.458447+08
+36267	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:14.461059+08
+36270	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:29.300113+08
+36271	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:29.467821+08
 34549	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:06:34.346031+08
 34550	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.unbound	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"handoverGuard": {"jobsReowned": 0, "jobsDetached": 0, "claimsReleased": 0, "sessionsReowned": 0, "sessionsDetached": 0}, "previousOwnerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216"}	2026-05-28 12:06:35.840178+08
 34554	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.paired	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"identifier": "yefta", "handoverGuard": {"jobsReowned": 0, "jobsDetached": 0, "claimsReleased": 0, "sessionsReowned": 0, "sessionsDetached": 0}, "nextOwnerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "previousOwnerUserId": null}	2026-05-28 12:06:46.376469+08
@@ -5866,6 +6374,39 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34679	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:21:16.589997+08
 34680	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:21:16.639627+08
 34681	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:21:21.637864+08
+35770	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:19.307445+08
+35771	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:24.299149+08
+35852	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:15:59.301031+08
+35853	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:04.311602+08
+35854	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:09.315523+08
+35855	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:14.311398+08
+35860	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:39.331338+08
+35861	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:44.302062+08
+35942	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:19.307924+08
+35943	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:24.300602+08
+35944	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:29.279658+08
+35997	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:14.419889+08
+35998	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:19.412713+08
+35999	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:24.407464+08
+36000	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:29.317043+08
+36001	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:29.407702+08
+36002	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:34.91643+08
+36003	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:39.402119+08
+36004	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:44.414421+08
+36005	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:49.407258+08
+36006	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:54.414507+08
+36007	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:59.281396+08
+36008	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:52:59.397391+08
+36009	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:04.417344+08
+36107	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:49.703324+08
+36108	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:54.416016+08
+36109	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:59.283765+08
+36110	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:59:59.422841+08
+36218	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:44.446124+08
+36219	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:49.436258+08
+36220	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:54.441945+08
+36221	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:59.285052+08
+36222	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:07:59.437895+08
 34682	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:21:26.637923+08
 34683	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:21:31.630332+08
 34684	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 12:21:36.636565+08
@@ -6066,6 +6607,38 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34880	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 13:03:22.960365+08
 34881	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 13:03:27.96545+08
 34882	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 13:03:33.003295+08
+35772	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:29.282015+08
+35856	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:19.330065+08
+35857	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:24.35673+08
+35858	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:29.825534+08
+35859	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:34.313125+08
+35945	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:34.305293+08
+35946	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:39.29972+08
+35947	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:44.294733+08
+35948	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:49.30408+08
+35952	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:09.294391+08
+35953	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:14.299232+08
+36010	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:09.415495+08
+36011	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:14.413437+08
+36012	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:19.401891+08
+36013	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:24.416192+08
+36014	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:29.286324+08
+36015	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:29.398581+08
+36016	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:34.400378+08
+36017	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:39.412791+08
+36111	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:04.445194+08
+36112	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:09.42235+08
+36113	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:14.423069+08
+36114	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:19.415654+08
+36115	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:24.437115+08
+36116	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:29.297512+08
+36117	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:29.424731+08
+36223	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:04.435376+08
+36224	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:09.431098+08
+36259	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:39.463983+08
+36260	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:44.446561+08
+36261	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:49.4458+08
+36262	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:54.431559+08
 34883	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 13:03:37.958215+08
 34884	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 13:03:42.964913+08
 34885	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 13:03:47.959049+08
@@ -6134,6 +6707,39 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 34948	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 14:37:07.956119+08
 34949	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 14:37:12.960258+08
 34950	system	\N	session.closed	session	session_1779950192772_r4qk1w	{"ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "removedJobs": 0, "removedFiles": 1}	2026-05-28 14:37:17.516786+08
+35773	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:34.304392+08
+35774	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:39.300199+08
+35775	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:44.411362+08
+35776	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:49.731808+08
+35777	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:54.300559+08
+35778	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:09:59.28013+08
+35862	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:49.347319+08
+35865	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:04.312325+08
+35868	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:19.296118+08
+35870	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:29.279966+08
+35949	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:54.306525+08
+35950	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:23:59.286855+08
+35951	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:04.302781+08
+36018	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:44.440888+08
+36019	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:49.483624+08
+36020	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:54.428596+08
+36118	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:34.43604+08
+36119	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:39.423323+08
+36120	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:44.417265+08
+36121	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:49.420462+08
+36122	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:54.428708+08
+36123	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:59.286246+08
+36124	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:00:59.421517+08
+36125	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:04.418036+08
+36225	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:14.447158+08
+36226	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:19.440986+08
+36227	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:24.436521+08
+36228	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:29.282342+08
+36229	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:29.432078+08
+36230	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:34.437115+08
+36231	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:39.434498+08
+36232	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:44.457426+08
+36233	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:49.431844+08
 34951	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 14:37:18.564961+08
 34952	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 14:37:22.969384+08
 34953	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 14:37:28.000201+08
@@ -6206,6 +6812,34 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35029	system	\N	job.cloned	job	job_1779951750535_hhiud0	{"sessionId": "session_1779951690708_6mhxgk", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "sourceJobId": "job_1779951736922_tiw81y"}	2026-05-28 15:02:30.765073+08
 35030	system	\N	job.cloned	job	job_1779951752790_hpxmgx	{"sessionId": "session_1779951690708_6mhxgk", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "sourceJobId": "job_1779951748333_wstzn8"}	2026-05-28 15:02:32.894574+08
 35031	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:02:33.006024+08
+35779	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:04.310044+08
+35780	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:09.304656+08
+35781	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:14.309667+08
+35782	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:19.301235+08
+35783	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:24.311734+08
+35784	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:29.284193+08
+35863	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:54.31737+08
+35864	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:16:59.284196+08
+35954	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:24.37519+08
+35955	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_33eeee9b-dd2a-472e-9761-1501619e3676", "previousRefreshTokenId": "rt_a22da8e5-a5c3-4527-a699-4251a0d6ea81"}	2026-05-28 20:24:26.545603+08
+36021	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:59.311556+08
+36022	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:53:59.427208+08
+36126	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:09.426199+08
+36127	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:14.421548+08
+36128	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:19.417819+08
+36129	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:24.434968+08
+36130	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:29.293571+08
+36131	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:29.425001+08
+36132	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:34.427289+08
+36133	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:39.418515+08
+36234	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:54.472806+08
+36235	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:59.281547+08
+36236	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:08:59.433366+08
+36237	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:04.435258+08
+36263	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:59.312588+08
+36264	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:59.478618+08
+36265	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:04.464583+08
+36268	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:19.453589+08
 35020	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:02:12.966599+08
 35021	system	\N	job.cloned	job	job_1779951734362_4q2huc	{"sessionId": "session_1779951690708_6mhxgk", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "sourceJobId": "job_1779951732325_0gd5k8"}	2026-05-28 15:02:14.544095+08
 35022	system	\N	job.cloned	job	job_1779951736922_tiw81y	{"sessionId": "session_1779951690708_6mhxgk", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "sourceJobId": "job_1779951732325_0gd5k8"}	2026-05-28 15:02:16.971944+08
@@ -6276,6 +6910,34 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35094	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:05:02.974714+08
 35098	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:05:22.997268+08
 35099	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:05:28.014784+08
+35785	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:34.377772+08
+35786	user	user_60da7484-9e0c-462c-bf78-357c340ae216	billing.order.created	order	ord_b857cfbc-1d32-43a2-a995-2a83cea71c3b	{"planId": "plan_free", "status": "paid", "creditId": "cr_b8c528cd-b9a0-4909-a39c-fb120e842597", "quantity": 1, "totalIdr": 0, "couponCode": null}	2026-05-28 20:10:37.248637+08
+35787	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:39.337219+08
+35788	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:44.577989+08
+35866	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:09.310764+08
+35867	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:14.302402+08
+35869	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:24.298198+08
+35956	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:29.406751+08
+36023	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:04.428619+08
+36024	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:09.429727+08
+36025	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:14.416754+08
+36026	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:19.441042+08
+36027	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:24.424441+08
+36028	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:29.289659+08
+36029	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:29.424465+08
+36030	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:34.425959+08
+36031	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:39.418726+08
+36134	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:44.443978+08
+36135	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:49.428143+08
+36136	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:54.426383+08
+36137	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:59.29247+08
+36138	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:01:59.422944+08
+36139	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:04.418267+08
+36140	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:09.425004+08
+36141	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:14.426562+08
+36142	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:19.423829+08
+36143	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:24.419387+08
+36144	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:29.276079+08
 35089	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:04:42.95258+08
 35090	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:04:47.957092+08
 35091	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:04:52.956889+08
@@ -6311,6 +6973,39 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35125	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:07:17.962701+08
 35126	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:07:23.003178+08
 35127	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:07:27.952562+08
+35789	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:49.369064+08
+35790	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:54.3261+08
+35791	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:10:59.286028+08
+35871	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:34.32347+08
+35872	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:39.336713+08
+35873	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:44.29591+08
+35874	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:49.311209+08
+35875	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:54.393069+08
+35957	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:34.304889+08
+35958	user	user_60da7484-9e0c-462c-bf78-357c340ae216	billing.order.cancelled	order	ord_65d2022c-86b6-4029-905c-7a53845aba8b	{"planId": "plan_starter_monthly", "totalIdr": 13000}	2026-05-28 20:24:37.446022+08
+36032	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:44.436759+08
+36033	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:49.426922+08
+36145	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:29.416459+08
+36146	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:34.422287+08
+36147	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:39.418633+08
+36148	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:44.424879+08
+36149	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:49.422579+08
+36238	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:09.441536+08
+36239	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:14.441939+08
+36240	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:19.436012+08
+36241	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:24.433619+08
+36242	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:29.287805+08
+36243	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:29.435601+08
+36244	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:34.431854+08
+36245	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:39.430006+08
+36246	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:44.44038+08
+36247	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:49.438982+08
+36269	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:24.462395+08
+36273	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:39.472114+08
+36274	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:44.541857+08
+36275	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:49.462084+08
+36276	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:54.45656+08
+36277	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:59.309622+08
 35128	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:07:32.897917+08
 35129	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:07:32.959152+08
 35130	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_c917f491-b808-4d30-a054-4f256068607f", "previousRefreshTokenId": "rt_bd3a20c5-e6ee-42b6-87a0-c3ba7ee71a8a"}	2026-05-28 15:23:58.107257+08
@@ -6496,6 +7191,25 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35318	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:37:07.955933+08
 35321	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:37:22.955868+08
 35322	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:37:27.954659+08
+35792	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:04.297326+08
+35793	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:09.31998+08
+35794	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:14.296271+08
+35798	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:34.299999+08
+35799	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:39.309386+08
+35800	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:44.310951+08
+35801	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:49.305384+08
+35802	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:54.29978+08
+35803	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:59.27715+08
+35876	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:17:59.284837+08
+35959	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:39.302383+08
+35960	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:44.306233+08
+35961	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:49.310178+08
+35964	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:25:04.302445+08
+35965	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:25:09.30345+08
+36034	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:54.426729+08
+36150	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:54.430794+08
+36151	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:59.283209+08
+36152	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:02:59.415386+08
 35299	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:35:47.960044+08
 35302	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:36:02.919613+08
 35303	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 15:36:02.957302+08
@@ -6752,6 +7466,22 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35572	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:19:03.05975+08
 35573	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:19:07.980754+08
 35576	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:19:22.960859+08
+35795	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:19.309947+08
+35796	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:24.295324+08
+35797	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:11:29.292339+08
+35877	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:04.364408+08
+35878	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:09.303206+08
+35962	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:54.301215+08
+35963	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:24:59.287321+08
+36035	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:59.299231+08
+36036	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:54:59.418217+08
+36037	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:04.432872+08
+36038	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:09.42288+08
+36039	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:14.422578+08
+36040	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:19.42249+08
+36041	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:24.42042+08
+36042	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:29.284265+08
+36043	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:29.424839+08
 35555	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:17:52.954269+08
 35559	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:18:08.000524+08
 35560	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:18:12.95762+08
@@ -6788,6 +7518,38 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35602	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:21:12.950896+08
 35603	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:21:17.982936+08
 35604	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:21:22.958851+08
+35804	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:04.301731+08
+35805	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:09.311576+08
+35806	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:14.296373+08
+35879	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:14.301347+08
+35880	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:19.300623+08
+35881	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:24.301277+08
+35882	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:29.285016+08
+35966	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_82f1aaf9-f4f3-443d-ad9c-7e12091cf49e", "previousRefreshTokenId": "rt_feb33d3a-fd51-4523-8c78-69dfa0cedff2"}	2026-05-28 20:42:50.54356+08
+35967	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:42:50.608824+08
+35968	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:42:54.32184+08
+35969	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:42:59.304709+08
+36044	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:34.430059+08
+36045	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:39.426598+08
+36046	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:44.43936+08
+36047	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:49.429213+08
+36048	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:54.421091+08
+36049	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:59.284532+08
+36050	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:55:59.413543+08
+36051	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:04.430336+08
+36052	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:09.420711+08
+36053	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:14.418836+08
+36054	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:19.425951+08
+36153	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:04.419678+08
+36248	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:54.437942+08
+36249	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:59.281726+08
+36250	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:09:59.430835+08
+36251	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:04.439852+08
+36252	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:09.433952+08
+36253	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:14.429993+08
+36254	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:10:19.433493+08
+36272	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:11:34.46036+08
+36284	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:29.364988+08
 35605	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:21:27.961848+08
 35606	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:21:32.925642+08
 35607	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 16:21:32.95613+08
@@ -6828,6 +7590,33 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35643	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:38.561848+08
 35644	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:42.962623+08
 35645	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:47.960456+08
+35807	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:19.332731+08
+35808	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:24.298392+08
+35809	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:29.294753+08
+35883	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:34.6006+08
+35884	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:39.303026+08
+35885	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:44.30258+08
+35886	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:49.453351+08
+35889	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:04.299996+08
+35890	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:19:09.306632+08
+35970	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_5dd684af-a355-44f1-88e6-9787aecc2272", "previousRefreshTokenId": "rt_33eeee9b-dd2a-472e-9761-1501619e3676"}	2026-05-28 20:42:59.9871+08
+36055	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:24.427333+08
+36056	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:29.282987+08
+36057	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:29.418225+08
+36154	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:09.431131+08
+36155	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:14.428289+08
+36156	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:19.42166+08
+36157	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:24.41701+08
+36158	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:29.28429+08
+36159	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:29.416813+08
+36160	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:34.42288+08
+36161	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:39.423069+08
+36162	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:44.421405+08
+36163	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:49.430598+08
+36164	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:54.421025+08
+36165	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:59.28067+08
+36166	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:03:59.414188+08
+36167	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:04:04.414743+08
 35639	system	\N	session.created	session	session_1779960084394_2z4m2v	{"alias": "Asyel", "ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "targetSource": "store-code", "selectedClientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "availabilitySource": "realtime-connected"}	2026-05-28 17:21:24.475157+08
 35646	system	\N	session.closed	session	session_1779960084394_2z4m2v	{"ownerUserId": "user_60da7484-9e0c-462c-bf78-357c340ae216", "removedJobs": 0, "removedFiles": 1}	2026-05-28 17:21:49.486084+08
 35647	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:21:52.964527+08
@@ -6868,6 +7657,1664 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 35682	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:37.955767+08
 35683	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:42.958472+08
 35684	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 17:24:47.966976+08
+35685	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_10f255bd-5563-46ff-a24d-8bc92a99c2c2", "previousRefreshTokenId": "rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76"}	2026-05-28 18:28:24.96819+08
+35686	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:28:25.123545+08
+35687	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:34:58.053327+08
+35688	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:03.002176+08
+35689	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:07.979974+08
+35690	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:12.992171+08
+35691	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:17.991071+08
+35692	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:22.987831+08
+35693	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:28.007391+08
+35694	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:32.969395+08
+35695	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:37.997434+08
+35696	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_d0d16db2-cc4a-4eb9-a3a5-339cb9beccf6", "previousRefreshTokenId": "rt_058a00a7-e79d-412a-9ccd-589b95225708"}	2026-05-28 18:35:42.066387+08
+35697	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:43.326137+08
+35698	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:47.97751+08
+35699	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:53.006396+08
+35700	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:35:57.968166+08
+35701	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:02.997412+08
+35702	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:07.979877+08
+35703	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:12.983304+08
+35704	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:17.991295+08
+35705	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:22.98124+08
+35706	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:27.997847+08
+35707	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:33.000067+08
+35708	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:37.982359+08
+35709	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:42.995168+08
+35710	user	user_60da7484-9e0c-462c-bf78-357c340ae216	billing.order.created	order	ord_65d2022c-86b6-4029-905c-7a53845aba8b	{"planId": "plan_starter_monthly", "status": "pending_payment", "creditId": null, "quantity": 1, "totalIdr": 13000, "couponCode": null}	2026-05-28 18:36:43.847829+08
+35711	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:47.994866+08
+35712	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:52.983678+08
+35713	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:36:57.987281+08
+35714	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:02.997164+08
+35715	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:07.994401+08
+35716	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:13.006638+08
+35717	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:17.985324+08
+35718	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:23.052409+08
+35719	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:27.967612+08
+35720	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:32.979641+08
+35721	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:37.984527+08
+35722	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:42.989595+08
+35723	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:47.982064+08
+35724	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:52.986238+08
+35725	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:37:58.004013+08
+35726	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:02.987517+08
+35727	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:07.992957+08
+35728	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:13.000482+08
+35729	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:18.050326+08
+35730	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:22.994686+08
+35731	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 18:38:28.008673+08
+35810	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:34.313219+08
+35811	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:39.483899+08
+35812	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:12:44.30239+08
+35887	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:54.302827+08
+35888	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:18:59.28656+08
+35971	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:04.323499+08
+35972	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:09.316371+08
+35977	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:34.311774+08
+35978	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:39.314342+08
+35981	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:54.325638+08
+35982	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:59.292782+08
+35983	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:43:59.335555+08
+36058	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:34.430748+08
+36059	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 20:56:39.4195+08
+36293	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:12:59.456857+08
+36294	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:04.462352+08
+36295	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:09.461349+08
+36296	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:14.459066+08
+36297	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:19.446089+08
+36298	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:24.570355+08
+36299	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:29.292337+08
+36300	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:29.455553+08
+36301	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:34.452857+08
+36302	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:39.457525+08
+36303	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:44.484224+08
+36304	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:49.461654+08
+36305	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:54.459014+08
+36306	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:59.313451+08
+36307	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:13:59.454251+08
+36308	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:04.459993+08
+36309	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:09.4458+08
+36310	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:14.460266+08
+36311	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:19.452912+08
+36312	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:24.462862+08
+36313	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:29.352472+08
+36314	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:29.572259+08
+36315	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:34.461782+08
+36316	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_79d149d4-44a8-4238-94b2-60eed4f972ac", "previousRefreshTokenId": "rt_3fa3e29e-111b-4926-bdbf-37a0c3a590c2"}	2026-05-28 21:14:35.731144+08
+36317	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:39.452504+08
+36318	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:44.448633+08
+36319	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:49.455456+08
+36320	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:54.555868+08
+36321	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:59.288235+08
+36322	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:14:59.459415+08
+36323	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:04.452376+08
+36324	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:09.803529+08
+36325	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:14.458639+08
+36326	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:19.522254+08
+36327	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:24.591534+08
+36328	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:29.288852+08
+36329	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:29.449082+08
+36330	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:34.445987+08
+36331	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:39.471966+08
+36332	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:44.459066+08
+36333	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:49.45153+08
+36334	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:54.465213+08
+36335	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:59.28837+08
+36336	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:15:59.453341+08
+36337	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:04.456189+08
+36338	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:09.591175+08
+36339	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:14.450569+08
+36340	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:19.456916+08
+36341	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:24.461438+08
+36342	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:29.294092+08
+36343	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:29.442591+08
+36344	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:34.452664+08
+36345	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:39.457626+08
+36346	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:44.458852+08
+36347	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:49.458319+08
+36348	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:54.455301+08
+36349	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:59.293587+08
+36350	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:16:59.4545+08
+36351	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:04.451411+08
+36352	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:09.484533+08
+36353	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:14.463158+08
+36354	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:19.455409+08
+36355	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:24.449841+08
+36356	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:29.313697+08
+36357	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:29.459675+08
+36358	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:34.46693+08
+36359	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:39.455855+08
+36360	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:44.448635+08
+36361	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:49.455525+08
+36362	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:54.458659+08
+36363	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:59.292446+08
+36364	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:17:59.4587+08
+36365	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:04.446832+08
+36366	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:09.466923+08
+36367	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:14.827225+08
+36368	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:19.470033+08
+36369	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:24.463968+08
+36370	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:29.280916+08
+36371	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:29.44925+08
+36372	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:34.449726+08
+36373	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:39.452037+08
+36374	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:44.460233+08
+36375	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:49.456656+08
+36376	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:54.460282+08
+36377	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:59.27707+08
+36378	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:18:59.442269+08
+36379	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:04.449569+08
+36380	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:09.456814+08
+36381	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:14.447549+08
+36382	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:19.456118+08
+36383	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:24.458225+08
+36384	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:29.280983+08
+36385	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:29.449516+08
+36386	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:34.445728+08
+36387	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:39.446024+08
+36388	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:44.450398+08
+36389	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:49.454816+08
+36390	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:54.447819+08
+36391	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:59.28488+08
+36392	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:19:59.449345+08
+36393	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:04.45323+08
+36394	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:09.451474+08
+36395	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:14.458008+08
+36396	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:19.448887+08
+36397	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:24.456642+08
+36398	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:29.28722+08
+36399	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:29.446447+08
+36400	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:34.455498+08
+36401	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:39.467618+08
+36402	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:44.456046+08
+36403	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:49.45944+08
+36404	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:54.447047+08
+36405	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:59.277824+08
+36406	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:20:59.446036+08
+36407	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:04.445827+08
+36408	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:09.458377+08
+36409	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:14.454097+08
+36410	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:19.565686+08
+36411	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:24.45195+08
+36412	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:29.27994+08
+36413	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:29.473408+08
+36414	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:34.456808+08
+36415	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:39.449079+08
+36416	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:44.462605+08
+36417	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:49.447865+08
+36418	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:54.453583+08
+36419	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:59.281354+08
+36420	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:21:59.448143+08
+36421	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:04.453431+08
+36422	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:09.451503+08
+36423	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:14.461838+08
+36424	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:19.452525+08
+36425	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:24.457122+08
+36426	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:29.282514+08
+36427	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:29.448411+08
+36428	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:34.450138+08
+36429	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:39.460075+08
+36430	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:44.446396+08
+36431	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:49.447234+08
+36432	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:54.453127+08
+36433	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:59.278328+08
+36434	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:22:59.443745+08
+36435	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:04.452095+08
+36436	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:09.450911+08
+36437	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:14.452948+08
+36438	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:19.453881+08
+36439	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:24.447826+08
+36440	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:29.290719+08
+36441	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:29.4435+08
+36442	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:34.459255+08
+36443	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:39.449899+08
+36444	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:44.450212+08
+36445	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:49.446853+08
+36446	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:54.459809+08
+36447	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:59.28618+08
+36448	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:23:59.450568+08
+36449	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:04.448381+08
+36450	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:09.449608+08
+36451	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:14.457965+08
+36452	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:19.465626+08
+36453	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:24.459598+08
+36454	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:29.279426+08
+36455	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:29.44386+08
+36456	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:34.449875+08
+36457	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:39.46055+08
+36458	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:44.452452+08
+36459	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:49.448667+08
+36460	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:54.461298+08
+36461	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:59.285741+08
+36462	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:24:59.455613+08
+36463	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:04.447117+08
+36464	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:09.448933+08
+36465	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:14.446715+08
+36466	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:19.451953+08
+36467	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:24.457353+08
+36468	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:29.284649+08
+36469	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:29.447453+08
+36470	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:34.448787+08
+36471	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:39.460791+08
+36472	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:44.459015+08
+36473	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:49.450625+08
+36474	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:54.460237+08
+36475	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:59.282074+08
+36476	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:25:59.443649+08
+36477	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:04.485829+08
+36478	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:09.449399+08
+36479	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:14.456343+08
+36480	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:19.456878+08
+36481	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:24.459398+08
+36482	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:29.290678+08
+36483	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:29.455173+08
+36484	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:34.449573+08
+36485	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:39.449092+08
+36486	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:44.457364+08
+36487	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:49.451781+08
+36488	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:54.448771+08
+36489	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:59.278678+08
+36490	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:26:59.444839+08
+36491	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:04.448539+08
+36492	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:09.457543+08
+36493	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:14.457132+08
+36494	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:19.460513+08
+36495	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:24.454398+08
+36496	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:29.293633+08
+36497	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:29.45496+08
+36498	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:34.454497+08
+36499	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:39.454785+08
+36500	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:44.45281+08
+36501	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:49.446141+08
+36502	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_99b8e144-e78c-44d7-a0f5-f9602ccea9e8", "previousRefreshTokenId": "rt_836ac221-9a5e-43dc-a4ea-5cea867b834d"}	2026-05-28 21:27:54.47288+08
+36503	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:54.496347+08
+36504	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:59.282712+08
+36505	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:27:59.683338+08
+36506	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:04.450571+08
+36507	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:09.446037+08
+36508	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:14.449657+08
+36509	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:19.454266+08
+36510	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:24.448316+08
+36511	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:29.28412+08
+36512	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:29.448472+08
+36513	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:34.464445+08
+36514	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:39.449168+08
+36515	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:44.448928+08
+36516	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:49.456822+08
+36517	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:54.459334+08
+36518	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:59.285336+08
+36519	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:28:59.450678+08
+36520	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:04.457899+08
+36521	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:09.449341+08
+36522	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:14.457425+08
+36523	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:19.45774+08
+36524	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:24.450735+08
+36525	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:29.287265+08
+36526	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:29.452845+08
+36527	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:34.463688+08
+36528	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:39.459234+08
+36529	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:44.453676+08
+36530	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:49.452358+08
+36531	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:54.460626+08
+36532	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:59.288421+08
+36533	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:29:59.454822+08
+36534	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:04.453455+08
+36535	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:09.446701+08
+36536	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:14.463774+08
+36537	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:19.457673+08
+36538	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:24.45019+08
+36539	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:29.293921+08
+36540	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:29.453422+08
+36541	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:34.45026+08
+36542	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:39.453241+08
+36543	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:44.462064+08
+36544	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:49.456669+08
+36545	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:54.444487+08
+36546	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:59.279894+08
+36547	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:30:59.446347+08
+36548	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:04.460577+08
+36549	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:09.460033+08
+36550	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:14.475377+08
+36551	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:19.469021+08
+36552	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:24.470712+08
+36553	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:29.282007+08
+36554	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:29.459227+08
+36555	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:34.469434+08
+36556	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:39.476013+08
+36557	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:44.467141+08
+36558	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:31:49.525828+08
+36559	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_16995305-0837-41f6-8e88-8d9bdc1a6206", "previousRefreshTokenId": "rt_99b8e144-e78c-44d7-a0f5-f9602ccea9e8"}	2026-05-28 21:43:56.297499+08
+36560	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:43:56.345623+08
+36561	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_8bbd1311-4d26-4847-b44a-44f82057e814", "previousRefreshTokenId": "rt_79d149d4-44a8-4238-94b2-60eed4f972ac"}	2026-05-28 21:43:57.998391+08
+36562	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:43:59.314314+08
+36563	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:43:59.495269+08
+36564	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:04.516228+08
+36565	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:09.497787+08
+36566	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:14.526775+08
+36567	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:19.514341+08
+36568	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:24.560986+08
+36569	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:29.294041+08
+36570	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:29.525455+08
+36571	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:34.510831+08
+36572	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:39.521975+08
+36573	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:44.51969+08
+36574	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:49.518202+08
+36575	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:54.525211+08
+36576	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:59.296717+08
+36577	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:44:59.510392+08
+36578	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:45:04.526287+08
+36579	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:45:09.516453+08
+36580	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 21:45:14.680379+08
+36581	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_db78c5b1-f8b7-41fa-8f4c-df47da3f5539", "previousRefreshTokenId": "rt_16995305-0837-41f6-8e88-8d9bdc1a6206"}	2026-05-28 22:00:29.469644+08
+36582	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_cd09c787-83ab-402b-8e79-6f38acce88e0", "previousRefreshTokenId": "rt_db78c5b1-f8b7-41fa-8f4c-df47da3f5539"}	2026-05-28 22:00:29.509797+08
+36583	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:29.585715+08
+36584	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:34.573839+08
+36585	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_7e1aaf7f-9ba6-41d3-9d45-8e274c5ad3bb", "previousRefreshTokenId": "rt_8bbd1311-4d26-4847-b44a-44f82057e814"}	2026-05-28 22:00:36.448906+08
+36586	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:39.528295+08
+36587	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:44.528311+08
+36588	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:49.534987+08
+36589	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:54.537298+08
+36590	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:59.317799+08
+36591	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:00:59.538555+08
+36592	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:04.53915+08
+36593	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:09.530634+08
+36594	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:14.541699+08
+36595	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:19.541258+08
+36596	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:24.532008+08
+36597	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:29.372802+08
+36598	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:29.597654+08
+36599	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:34.538197+08
+36600	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:39.629844+08
+36601	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:44.547281+08
+36604	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:59.30342+08
+36605	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:59.524655+08
+36606	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:04.588317+08
+36602	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:49.540878+08
+36603	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:01:54.528586+08
+36607	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:10.060139+08
+36608	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:14.545747+08
+36609	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:19.606815+08
+36610	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:24.559015+08
+36611	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:29.345507+08
+36612	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:29.55987+08
+36613	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:34.544681+08
+36614	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:39.549358+08
+36615	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:44.550669+08
+36616	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:49.5519+08
+36617	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:54.555475+08
+36618	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:59.303177+08
+36619	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:02:59.549655+08
+36620	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:04.552363+08
+36621	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:09.569051+08
+36622	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:14.556433+08
+36623	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:19.551096+08
+36624	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:24.555477+08
+36625	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:29.302855+08
+36626	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:29.554255+08
+36627	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:34.546303+08
+36628	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:39.554555+08
+36629	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:44.552152+08
+36630	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:49.55145+08
+36631	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:54.544513+08
+36632	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:59.300433+08
+36633	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:03:59.545801+08
+36634	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:04.551778+08
+36635	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:09.551048+08
+36636	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:14.545458+08
+36637	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:19.558495+08
+36638	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:24.553124+08
+36639	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:29.348277+08
+36640	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:29.609854+08
+36641	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:34.546512+08
+36642	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:39.740871+08
+36643	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:44.572664+08
+36644	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:49.674607+08
+36645	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:54.569787+08
+36646	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:59.30249+08
+36647	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:04:59.548972+08
+36648	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:04.574735+08
+36649	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:09.737778+08
+36650	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:14.588347+08
+36651	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:19.549724+08
+36652	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:24.547491+08
+36653	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:29.299985+08
+36654	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:29.549925+08
+36655	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:34.549776+08
+36656	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:39.54387+08
+36657	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:44.539736+08
+36658	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:49.545335+08
+36659	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:54.551024+08
+36660	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:59.304273+08
+36661	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:05:59.551011+08
+36662	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:04.542541+08
+36663	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:09.554525+08
+36664	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:14.635867+08
+36665	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:19.581233+08
+36666	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:24.583513+08
+36667	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:29.30738+08
+36668	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:29.552258+08
+36669	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:34.558855+08
+36670	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:39.625485+08
+36671	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:44.585784+08
+36672	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:49.668092+08
+36673	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:06:54.629774+08
+36674	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_c4d79014-e366-4a4f-9258-d033ca4b9bf2", "previousRefreshTokenId": "rt_cd09c787-83ab-402b-8e79-6f38acce88e0"}	2026-05-28 22:16:18.548871+08
+36675	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:19.557376+08
+36676	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:24.58246+08
+36677	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:29.688869+08
+36678	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_4b074404-161f-41c6-a806-b184bdb1f7d8", "previousRefreshTokenId": "rt_7e1aaf7f-9ba6-41d3-9d45-8e274c5ad3bb"}	2026-05-28 22:16:35.128862+08
+36679	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:37.093477+08
+36680	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:39.655118+08
+36681	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:44.574954+08
+36682	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:49.573705+08
+36683	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:54.584387+08
+36684	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:59.338689+08
+36685	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:16:59.832244+08
+36686	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:04.672455+08
+36687	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:09.551128+08
+36688	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:14.581882+08
+36689	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:19.578387+08
+36690	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:24.649447+08
+36691	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:29.347053+08
+36692	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:29.573032+08
+36693	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:34.573723+08
+36694	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:39.621057+08
+36695	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:44.558937+08
+36696	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:49.552493+08
+36697	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:54.590042+08
+36698	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:59.386128+08
+36699	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:17:59.641244+08
+36700	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:04.554323+08
+36701	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:09.57425+08
+36702	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:14.571531+08
+36703	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:19.662762+08
+36704	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:24.58063+08
+36705	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:29.50161+08
+36706	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:29.662541+08
+36707	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:34.578877+08
+36708	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:39.555459+08
+36709	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:44.569601+08
+36710	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:49.5563+08
+36711	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:54.583262+08
+36712	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:59.318533+08
+36713	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:18:59.560471+08
+36714	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:04.562359+08
+36715	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:09.562921+08
+36716	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:14.568711+08
+36717	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:19.555005+08
+36718	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:24.585053+08
+36719	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:29.33311+08
+36720	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:29.572023+08
+36721	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:34.575837+08
+36722	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:39.574361+08
+36723	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:44.586279+08
+36724	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:49.556744+08
+36725	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:54.582171+08
+36726	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:59.349005+08
+36727	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:19:59.577617+08
+36728	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:04.614281+08
+36729	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:18.941017+08
+36730	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:20.625226+08
+36731	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:24.610076+08
+36732	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:29.353169+08
+36733	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:29.588546+08
+36734	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:34.594912+08
+36735	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:39.610722+08
+36736	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_settings.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"hasKodeToko": true, "updatedStoreSettings": true}	2026-05-28 22:20:41.586851+08
+36737	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:44.625719+08
+36738	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:49.609252+08
+36739	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:54.65615+08
+36740	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:59.347304+08
+36741	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:20:59.585467+08
+36742	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:04.586945+08
+36743	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:09.605731+08
+36744	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:14.613354+08
+36745	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:19.608383+08
+36746	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:24.687966+08
+36747	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:29.320758+08
+36748	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:29.590855+08
+36749	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:21:34.785495+08
+36750	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_65769ebf-cf44-418f-a0c9-6a0abd4df83f", "previousRefreshTokenId": "rt_c4d79014-e366-4a4f-9258-d033ca4b9bf2"}	2026-05-28 22:34:47.38796+08
+36751	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:38:19.812615+08
+36752	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-28 22:39:39.751602+08
+36753	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_9aae956b-c083-4884-86f3-a641e38030e9", "previousRefreshTokenId": "rt_65769ebf-cf44-418f-a0c9-6a0abd4df83f"}	2026-05-29 04:04:22.156071+08
+36754	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:22.26713+08
+36755	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:25.570433+08
+36756	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:30.581297+08
+36757	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:35.578342+08
+36758	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:40.54192+08
+36759	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:45.564191+08
+36760	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:50.556189+08
+36761	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:04:55.553243+08
+36762	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:00.55512+08
+36763	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:05.564866+08
+36764	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:10.53129+08
+36765	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:15.55735+08
+36766	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_8173cb9c-727a-4d39-affc-d07662aad8d9", "previousRefreshTokenId": "rt_4b074404-161f-41c6-a806-b184bdb1f7d8"}	2026-05-29 04:05:16.713867+08
+36767	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:20.554735+08
+36768	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:25.551465+08
+36769	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:30.552605+08
+36770	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:35.556848+08
+36771	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:40.532342+08
+36772	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:40.563896+08
+36773	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:45.562104+08
+36774	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:50.57364+08
+36775	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:05:55.568661+08
+36778	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:10.541409+08
+36779	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:10.572757+08
+36780	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:15.564603+08
+36781	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:20.564102+08
+36776	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:00.567714+08
+36777	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:05.561974+08
+36782	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 04:06:25.566329+08
+36783	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_782311c0-8991-47d7-9c3d-2457bf3ac5ef", "previousRefreshTokenId": "rt_9aae956b-c083-4884-86f3-a641e38030e9"}	2026-05-29 05:41:29.910321+08
+36784	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:43:51.432953+08
+36785	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_fb0d66f5-d752-4673-a3af-fa219ff64f8e", "previousRefreshTokenId": "rt_8173cb9c-727a-4d39-affc-d07662aad8d9"}	2026-05-29 05:43:55.319933+08
+36786	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:43:55.608232+08
+36787	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:00.635205+08
+36788	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:05.611357+08
+36789	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:10.553862+08
+36790	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:10.611589+08
+36791	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:15.6073+08
+36792	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:20.627856+08
+36793	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:25.60512+08
+36794	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:30.641978+08
+36795	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:35.610507+08
+36796	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:40.560388+08
+36797	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:40.636553+08
+36798	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:45.611192+08
+36799	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:50.615351+08
+36800	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:44:55.607891+08
+36801	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:00.608187+08
+36802	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:05.613866+08
+36803	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:10.560511+08
+36804	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:10.606972+08
+36805	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:15.61828+08
+36806	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:20.608456+08
+36807	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:25.60693+08
+36808	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:30.617905+08
+36809	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:35.614719+08
+36810	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:40.560428+08
+36811	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:40.609531+08
+36812	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:45.613365+08
+36813	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:50.615293+08
+36814	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:45:55.615484+08
+36815	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:00.616378+08
+36816	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:05.618732+08
+36817	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:11.191071+08
+36818	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:15.628451+08
+36819	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:20.631628+08
+36820	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:25.716439+08
+36821	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:30.627903+08
+36822	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:35.629439+08
+36823	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:40.58278+08
+36824	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:40.768039+08
+36825	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:45.629814+08
+36826	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:50.633319+08
+36827	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:46:55.679659+08
+36828	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:00.624866+08
+36829	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:05.701503+08
+36830	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:10.818768+08
+36831	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:15.649522+08
+36832	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:20.656282+08
+36833	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:25.622128+08
+36834	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:30.635192+08
+36835	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:35.632049+08
+36836	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:40.625443+08
+36837	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:45.632222+08
+36838	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:50.628262+08
+36839	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:47:55.62363+08
+36840	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:00.718112+08
+36841	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:05.630996+08
+36842	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:10.606981+08
+36843	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:15.645299+08
+36844	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:20.629903+08
+36845	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:25.629455+08
+36846	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:30.634907+08
+36847	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:35.633743+08
+36848	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:40.546017+08
+36850	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:45.632047+08
+36851	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:50.622578+08
+36852	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:55.627888+08
+36849	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:48:40.622757+08
+36853	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:00.632266+08
+36854	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:05.626215+08
+36855	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:10.557555+08
+36856	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:10.63318+08
+36857	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:15.631501+08
+36858	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:20.705791+08
+36859	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:25.618693+08
+36860	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:30.620989+08
+36861	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:35.637678+08
+36862	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:40.540569+08
+36863	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 05:49:40.632313+08
+36864	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_bb72f25f-d770-4f48-ab40-33ff30ac73c5", "previousRefreshTokenId": "rt_782311c0-8991-47d7-9c3d-2457bf3ac5ef"}	2026-05-29 06:08:21.674308+08
+36865	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:08:21.728081+08
+36866	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_1fda4b77-0df3-4278-bb9c-3326f242d011", "previousRefreshTokenId": "rt_bb72f25f-d770-4f48-ab40-33ff30ac73c5"}	2026-05-29 06:48:35.834926+08
+36867	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:48:35.860042+08
+36868	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:48:40.610811+08
+36869	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:48:40.707297+08
+36870	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:48:45.993213+08
+36871	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_368adbc7-3f48-48da-b850-46799c3c142e", "previousRefreshTokenId": "rt_fb0d66f5-d752-4673-a3af-fa219ff64f8e"}	2026-05-29 06:48:47.290898+08
+36872	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:48:50.703649+08
+36873	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:48:55.711592+08
+36874	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:00.708254+08
+36875	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:05.69594+08
+36876	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:10.616111+08
+36877	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:10.707178+08
+36878	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:15.711764+08
+36879	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:20.703581+08
+36880	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:25.707435+08
+36881	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:30.701659+08
+36882	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:35.698934+08
+36883	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:40.612395+08
+36884	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:40.694477+08
+36885	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:45.708895+08
+36886	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:50.697307+08
+36887	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:49:55.69705+08
+36888	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:00.697403+08
+36889	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:05.707793+08
+36890	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:10.60896+08
+36891	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:10.699014+08
+36892	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:15.712191+08
+36893	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:20.706485+08
+36894	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:25.738439+08
+36895	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:30.739777+08
+36896	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:50:35.940851+08
+36897	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:27.16039+08
+36898	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:30.718718+08
+36899	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:35.741245+08
+36900	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:40.648233+08
+36901	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:40.766835+08
+36902	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:45.734867+08
+36903	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:50.732636+08
+36904	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:54:55.758174+08
+36905	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:00.72541+08
+36906	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:05.743312+08
+36907	user	user_60da7484-9e0c-462c-bf78-357c340ae216	user.store_profile_photo.updated	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"mimeType": "image/jpeg", "sizeBytes": 65411}	2026-05-29 06:55:10.442646+08
+36908	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:10.736466+08
+36909	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:15.718717+08
+36910	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:20.741342+08
+36911	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:25.737143+08
+36912	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:30.814474+08
+36913	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:35.88897+08
+36914	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:40.623782+08
+36915	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:40.948417+08
+36916	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:45.735262+08
+36917	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:50.728487+08
+36918	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:55:55.755032+08
+36919	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:00.714811+08
+36920	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:05.743937+08
+36921	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:10.635502+08
+36922	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:10.735335+08
+36923	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:16.436867+08
+36924	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:21.069127+08
+36925	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:26.193118+08
+36926	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:30.73291+08
+36927	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:35.722374+08
+36928	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:40.684359+08
+36929	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:45.723376+08
+36930	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:50.740468+08
+36931	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:56:55.761696+08
+36932	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:00.732083+08
+36933	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:05.73416+08
+36934	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:10.648264+08
+36935	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:10.920231+08
+36936	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:15.729589+08
+36937	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:20.737879+08
+36938	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:25.737683+08
+36939	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:30.72361+08
+36940	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:35.828405+08
+36941	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:40.640074+08
+36942	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:40.726382+08
+36943	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:45.725383+08
+36944	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:50.765639+08
+36945	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:57:55.745496+08
+36946	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:00.726363+08
+36947	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:05.737506+08
+36948	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:10.751973+08
+36949	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:15.737275+08
+36950	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:20.739816+08
+36951	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:25.767557+08
+36952	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:30.864113+08
+36953	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:35.744479+08
+36954	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:40.62633+08
+36955	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:40.729935+08
+36956	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:45.72546+08
+36957	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:50.734923+08
+36958	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:58:55.743772+08
+36959	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:00.725052+08
+36960	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:05.897276+08
+36961	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:10.637237+08
+36962	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:10.748692+08
+36963	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:15.740885+08
+36964	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:20.806004+08
+36965	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:25.939311+08
+36966	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:30.848814+08
+36967	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:35.748452+08
+36968	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:40.644615+08
+36969	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:40.7661+08
+36970	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 06:59:45.817669+08
+36971	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_fefc9e1f-b494-4b36-a726-6d5275835700", "previousRefreshTokenId": "rt_1fda4b77-0df3-4278-bb9c-3326f242d011"}	2026-05-29 07:05:11.228133+08
+36972	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_cbdcecc2-e842-4104-8420-7e9bd9a91364", "previousRefreshTokenId": "rt_fefc9e1f-b494-4b36-a726-6d5275835700"}	2026-05-29 07:05:11.365634+08
+36973	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:11.506132+08
+36974	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_23e0e288-7f63-48ce-9bde-57a5761b04dc", "previousRefreshTokenId": "rt_cbdcecc2-e842-4104-8420-7e9bd9a91364"}	2026-05-29 07:05:11.622175+08
+36975	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:15.754123+08
+36976	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:20.777197+08
+36977	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:25.77828+08
+36978	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:30.807716+08
+36979	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:35.794108+08
+36980	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:40.640691+08
+36981	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:40.756753+08
+36982	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:45.768894+08
+36983	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:50.776112+08
+36984	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:05:55.786605+08
+36985	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:00.794452+08
+36986	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:05.795044+08
+36987	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:10.63523+08
+36988	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:10.770577+08
+36989	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:15.789704+08
+36990	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:20.804148+08
+36991	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:25.80551+08
+36992	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:30.788758+08
+36993	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:35.803029+08
+36994	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:40.658285+08
+36995	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:40.78031+08
+36996	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:45.775658+08
+36997	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:50.77811+08
+36999	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:06:55.787178+08
+37000	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:00.798417+08
+37001	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:05.799349+08
+37002	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:10.659371+08
+37003	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:10.783443+08
+37004	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:15.777966+08
+37005	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:20.796496+08
+37006	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:25.808811+08
+37007	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:30.791441+08
+37008	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:35.807552+08
+37009	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:40.642253+08
+37010	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:40.774218+08
+37011	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:45.771442+08
+37012	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:50.790593+08
+37013	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:07:55.784479+08
+37014	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:08:00.777673+08
+37015	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:08:05.803845+08
+37016	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:08:10.638637+08
+37017	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:08:10.781343+08
+37018	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:08:15.783192+08
+37019	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_2a346139-2b00-4ad3-bd15-308bbfcb777d", "previousRefreshTokenId": "rt_23e0e288-7f63-48ce-9bde-57a5761b04dc"}	2026-05-29 07:36:49.793999+08
+37020	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_514b21ae-a135-4f2c-a2ba-7a52c42534fd", "previousRefreshTokenId": "rt_2a346139-2b00-4ad3-bd15-308bbfcb777d"}	2026-05-29 07:36:50.45273+08
+37021	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:36:50.715483+08
+37022	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:36:55.54554+08
+37023	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:00.566871+08
+37024	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:05.582903+08
+37025	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:10.546412+08
+37026	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:15.543793+08
+37027	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:20.51646+08
+37028	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:25.512529+08
+37029	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:30.521392+08
+37030	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:35.516176+08
+37031	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:40.532274+08
+37032	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:45.544713+08
+37033	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:50.522532+08
+37034	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:37:55.5328+08
+37035	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:00.537712+08
+37036	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:05.544841+08
+37037	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:10.529454+08
+37038	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:15.545268+08
+37039	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:20.560657+08
+37040	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:25.552081+08
+37041	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:30.560756+08
+37042	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:35.547654+08
+37043	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:40.552404+08
+37044	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:45.549761+08
+37045	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:50.535763+08
+37046	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:38:55.545524+08
+37047	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:00.532689+08
+37048	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:05.548223+08
+37049	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:10.553816+08
+37050	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:15.546906+08
+37051	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:20.550037+08
+37052	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:25.542933+08
+37053	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:30.536021+08
+37054	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:35.533185+08
+37055	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:40.542983+08
+37056	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:45.562541+08
+37057	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:50.545265+08
+37058	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:39:55.529083+08
+37059	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:00.548573+08
+37060	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:05.541112+08
+37061	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:10.678657+08
+37062	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:15.523579+08
+37063	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:20.536333+08
+37064	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:25.512312+08
+37065	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:30.559207+08
+37066	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:35.547038+08
+37067	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:40.548152+08
+37068	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:45.564141+08
+37069	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:50.549863+08
+37070	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:40:55.542416+08
+37071	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:00.546654+08
+37072	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:05.547324+08
+37073	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:10.552264+08
+37074	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:15.553402+08
+37075	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:20.547562+08
+37076	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:25.54468+08
+37077	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:30.542238+08
+37078	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:35.529832+08
+37079	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:40.523775+08
+37080	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:45.550505+08
+37081	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:50.546624+08
+37082	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:41:55.547184+08
+37083	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:00.544109+08
+37084	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:05.546876+08
+37085	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:10.548481+08
+37086	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:15.551695+08
+37087	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:20.535731+08
+37088	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:25.530237+08
+37089	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:30.550139+08
+37090	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:35.546642+08
+37091	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:40.545036+08
+37092	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:45.560816+08
+37093	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:50.54447+08
+37094	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:42:55.537875+08
+37095	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:00.549738+08
+37096	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:05.56611+08
+37097	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:10.557391+08
+37098	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:15.544241+08
+37099	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:20.565103+08
+37100	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:25.565229+08
+37101	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:30.566277+08
+37102	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:35.555438+08
+37103	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:40.563766+08
+37104	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:45.566648+08
+37105	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:50.566084+08
+37106	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:43:55.570589+08
+37107	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:00.552032+08
+37108	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:05.55307+08
+37109	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:10.571465+08
+37110	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:15.544623+08
+37111	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:20.557015+08
+37112	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:25.556984+08
+37113	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:30.554102+08
+37114	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:35.567035+08
+37115	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:40.557824+08
+37116	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:45.55121+08
+37117	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:50.558575+08
+37118	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:44:55.575223+08
+37119	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:00.555777+08
+37120	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:05.557917+08
+37121	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:10.563868+08
+37122	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:15.561279+08
+37123	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:20.555404+08
+37124	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:25.557697+08
+37125	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:30.559339+08
+37126	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:35.564871+08
+37127	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:40.56277+08
+37128	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:45.570087+08
+37129	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:50.597728+08
+37130	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:45:55.554693+08
+37131	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:00.560472+08
+37132	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:05.562701+08
+37133	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:10.564964+08
+37134	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:15.540559+08
+37135	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:20.570783+08
+37136	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:25.55503+08
+37137	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:30.552684+08
+37138	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:35.556389+08
+37139	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:40.556338+08
+37140	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:45.558906+08
+37141	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:50.56643+08
+37142	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:46:55.555076+08
+37143	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:00.563446+08
+37144	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:05.567879+08
+37145	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:10.565736+08
+37146	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:15.532926+08
+37147	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:20.558732+08
+37148	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:25.56762+08
+37149	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:30.564463+08
+37150	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:35.582197+08
+37151	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:40.55636+08
+37152	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:45.556945+08
+37153	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:50.560025+08
+37154	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:47:55.566848+08
+37155	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:00.566739+08
+37156	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:05.540179+08
+37157	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:10.565709+08
+37158	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:15.54679+08
+37159	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:20.567041+08
+37160	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:25.564628+08
+37161	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:30.548212+08
+37162	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:35.560458+08
+37163	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:40.553857+08
+37164	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:45.5511+08
+37165	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:50.556201+08
+37166	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:48:55.561823+08
+37167	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:00.549111+08
+37168	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:05.561618+08
+37169	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:10.559696+08
+37170	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:15.550228+08
+37171	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:20.566204+08
+37172	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:25.560506+08
+37173	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:30.568015+08
+37174	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:35.574654+08
+37175	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:40.556677+08
+37176	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:45.539789+08
+37177	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:50.556945+08
+37178	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:49:55.556286+08
+37179	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:00.564867+08
+37180	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:05.555015+08
+37181	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:10.555847+08
+37182	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:15.549629+08
+37183	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:20.555766+08
+37184	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:25.557763+08
+37185	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:30.578001+08
+37186	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:35.5542+08
+37187	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:40.582991+08
+37188	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:45.540007+08
+37189	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:50.569812+08
+37190	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:50:55.568804+08
+37191	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:00.553867+08
+37192	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:05.553145+08
+37193	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:10.562456+08
+37194	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:15.550606+08
+37195	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:20.540188+08
+37196	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:25.551468+08
+37197	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:30.568219+08
+37198	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:35.564279+08
+37199	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:40.567686+08
+37200	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:45.550924+08
+37201	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_d881310c-7a10-4189-ad7b-17c7123d8b99", "previousRefreshTokenId": "rt_514b21ae-a135-4f2c-a2ba-7a52c42534fd"}	2026-05-29 07:51:50.60742+08
+37202	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:50.627629+08
+37203	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:51:55.55695+08
+37204	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:00.556803+08
+37205	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:05.555966+08
+37206	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:10.572202+08
+37207	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:15.530901+08
+37208	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:20.537292+08
+37209	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:25.542039+08
+37210	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:30.573707+08
+37211	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:35.565367+08
+37212	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:40.568906+08
+37213	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:45.540119+08
+37214	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:50.559673+08
+37215	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:52:55.564395+08
+37216	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:00.558483+08
+37217	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:05.554319+08
+37218	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:10.568838+08
+37219	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:15.536155+08
+37220	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:20.567693+08
+37221	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:25.558577+08
+37222	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:30.569261+08
+37223	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:35.574442+08
+37224	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:40.579484+08
+37225	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:45.536236+08
+37226	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:50.556643+08
+37227	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:53:55.559753+08
+37228	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:00.661032+08
+37229	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:05.557315+08
+37230	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:10.566624+08
+37231	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:15.556678+08
+37232	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:20.576422+08
+37233	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:25.557655+08
+37234	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:30.563845+08
+37235	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:35.564601+08
+37236	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:40.560241+08
+37237	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:45.544284+08
+37238	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:50.556478+08
+37239	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:54:55.559265+08
+37240	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:00.563732+08
+37241	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:05.559118+08
+37242	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:10.562132+08
+37243	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:15.549413+08
+37244	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:20.556618+08
+37245	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:25.548136+08
+37246	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:30.562231+08
+37247	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:35.551998+08
+37248	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:40.555618+08
+37249	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:45.534011+08
+37250	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:50.568227+08
+37251	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:55:55.57291+08
+37252	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:00.55571+08
+37253	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:05.566212+08
+37254	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:10.559661+08
+37255	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:15.545584+08
+37256	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:20.578599+08
+37257	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:25.566305+08
+37258	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:30.551708+08
+37259	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:35.548994+08
+37260	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:40.56894+08
+37261	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:45.567784+08
+37262	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:50.563713+08
+37263	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:56:55.560823+08
+37264	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:00.565232+08
+37265	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:05.559278+08
+37266	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:10.562875+08
+37267	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:15.539543+08
+37268	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:20.572086+08
+37269	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:25.564935+08
+37270	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:30.562963+08
+37271	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:35.564733+08
+37272	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:40.54202+08
+37273	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:45.534861+08
+37274	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:50.564167+08
+37275	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:57:55.566013+08
+37276	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:00.55387+08
+37277	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:05.5543+08
+37278	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:10.565976+08
+37279	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:15.538879+08
+37280	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:20.555479+08
+37281	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:25.554471+08
+37282	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:30.56451+08
+37283	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:35.572962+08
+37284	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:40.56886+08
+37285	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:45.545996+08
+37286	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:50.537341+08
+37287	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:58:55.548407+08
+37288	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:00.536273+08
+37289	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:05.556679+08
+37290	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:10.585815+08
+37291	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:15.544839+08
+37292	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:20.555388+08
+37293	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:25.552262+08
+37294	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:30.563507+08
+37295	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:35.552688+08
+37296	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:40.565631+08
+37297	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:45.546241+08
+37298	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:50.568005+08
+37299	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 07:59:55.547926+08
+37300	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:00.567404+08
+37301	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:05.577353+08
+37302	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:10.558236+08
+37303	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:15.546593+08
+37304	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:20.555705+08
+37305	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:25.571142+08
+37306	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:30.554677+08
+37307	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:35.565233+08
+37308	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:40.574922+08
+37309	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:45.56301+08
+37310	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:50.564807+08
+37311	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:00:55.594657+08
+37312	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:00.567503+08
+37313	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:05.549076+08
+37314	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:10.562125+08
+37315	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:15.558607+08
+37316	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:20.574663+08
+37317	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:25.583565+08
+37318	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:30.586731+08
+37319	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:35.545944+08
+37320	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:40.572074+08
+37321	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:45.559101+08
+37322	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:50.568488+08
+37323	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:01:55.5705+08
+37324	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:00.558253+08
+37325	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:05.559889+08
+37326	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:10.555919+08
+37327	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:15.547421+08
+37328	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:20.564923+08
+37329	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:25.567355+08
+37330	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:30.55096+08
+37331	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:35.545438+08
+37332	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:40.557666+08
+37333	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:45.524487+08
+37334	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:50.561673+08
+37335	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:02:55.56815+08
+37336	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:00.561107+08
+37337	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:05.574302+08
+37338	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:10.56872+08
+37339	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:15.551162+08
+37340	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:20.55492+08
+37341	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:25.56795+08
+37342	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:30.561885+08
+37343	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:35.559435+08
+37344	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:40.536701+08
+37345	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:45.548985+08
+37346	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:50.555935+08
+37347	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:03:55.555212+08
+37348	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:00.54444+08
+37349	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:05.555616+08
+37350	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:10.554522+08
+37351	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:15.542547+08
+37352	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:20.563533+08
+37353	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:25.556466+08
+37354	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:30.557229+08
+37355	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:35.562106+08
+37356	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:40.546011+08
+37357	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:45.566463+08
+37358	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:50.562816+08
+37359	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:04:55.576302+08
+37360	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:00.567467+08
+37361	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:05.55733+08
+37362	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:10.56857+08
+37363	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:15.562242+08
+37364	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:20.584911+08
+37365	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:25.575574+08
+37366	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:30.587724+08
+37367	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:35.571699+08
+37368	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:40.591619+08
+37369	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:45.545148+08
+37370	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:50.574808+08
+37371	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:05:55.586918+08
+37372	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:00.573306+08
+37373	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:05.569946+08
+37374	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:10.588172+08
+37375	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:15.538902+08
+37376	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:20.578607+08
+37377	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:25.579331+08
+37378	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:30.575132+08
+37379	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:35.570947+08
+37380	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:40.571996+08
+37381	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:45.575023+08
+37382	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_316f4507-e9f3-482b-8b0a-8a4ba830123a", "previousRefreshTokenId": "rt_d881310c-7a10-4189-ad7b-17c7123d8b99"}	2026-05-29 08:06:50.611046+08
+37383	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:50.626614+08
+37384	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:06:55.564074+08
+37385	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:00.578751+08
+37386	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:05.579116+08
+37387	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:10.582526+08
+37388	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:15.536077+08
+37389	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:20.570855+08
+37390	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:25.564291+08
+37391	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:30.586135+08
+37392	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:35.592665+08
+37393	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:40.584725+08
+37394	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:45.539482+08
+37395	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:50.572673+08
+37396	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:07:55.591687+08
+37397	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:00.588966+08
+37398	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:05.60369+08
+37399	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:10.569795+08
+37400	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:15.540539+08
+37401	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:20.563964+08
+37402	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:25.555888+08
+37403	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:30.587461+08
+37404	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:35.586755+08
+37405	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:40.581085+08
+37406	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:45.545048+08
+37407	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:50.574912+08
+37408	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:08:55.552259+08
+37409	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:00.57515+08
+37410	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:05.577625+08
+37411	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:10.579321+08
+37412	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:15.56228+08
+37413	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:20.573133+08
+37414	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:25.554148+08
+37415	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:30.585146+08
+37416	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:35.574954+08
+37417	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:40.588527+08
+37418	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:45.54743+08
+37419	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:50.59118+08
+37420	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:09:55.582978+08
+37421	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:00.583589+08
+37422	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:05.583212+08
+37423	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:10.581628+08
+37424	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:15.551177+08
+37425	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:20.567915+08
+37426	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:25.568006+08
+37427	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:30.568905+08
+37428	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:35.578653+08
+37429	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:40.573482+08
+37430	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:45.56283+08
+37431	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:50.572762+08
+37432	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:10:55.55528+08
+37433	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:00.564994+08
+37434	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:05.596485+08
+37435	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:10.588917+08
+37436	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:15.574152+08
+37437	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:20.581607+08
+37438	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:25.558282+08
+37439	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:30.574916+08
+37440	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:35.568067+08
+37441	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:40.584405+08
+37442	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:45.540426+08
+37443	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:50.570905+08
+37444	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:11:55.563402+08
+37445	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:00.572212+08
+37446	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:05.563945+08
+37447	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:10.572487+08
+37448	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:15.546866+08
+37449	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:20.59317+08
+37450	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:25.578997+08
+37451	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:30.575626+08
+37452	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:35.587321+08
+37453	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:40.584338+08
+37454	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:45.565777+08
+37455	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:50.574252+08
+37456	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:12:55.563425+08
+37457	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:00.557825+08
+37458	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:05.570801+08
+37459	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:10.580262+08
+37460	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:15.550392+08
+37461	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:20.585798+08
+37462	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:25.572826+08
+37463	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:30.57303+08
+37464	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:35.563806+08
+37465	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:40.590483+08
+37466	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:45.553376+08
+37467	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:50.573664+08
+37468	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:13:55.58738+08
+37469	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:00.555059+08
+37470	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:05.570912+08
+37471	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:10.58664+08
+37472	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:15.578249+08
+37473	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:20.567305+08
+37474	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:25.59021+08
+37475	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:30.585553+08
+37476	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:35.572579+08
+37477	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:40.569495+08
+37478	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:45.558452+08
+37479	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:50.587482+08
+37480	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:14:55.589969+08
+37481	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:00.563609+08
+37482	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:05.572592+08
+37483	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:10.589648+08
+37484	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:15.557474+08
+37485	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:20.575984+08
+37486	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:25.589991+08
+37487	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:30.54664+08
+37488	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:35.577513+08
+37489	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:40.588745+08
+37490	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:45.701607+08
+37491	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:50.585651+08
+37492	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:15:55.570826+08
+37493	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:00.573986+08
+37494	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:05.598733+08
+37495	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:10.584725+08
+37496	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:15.563742+08
+37497	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:20.569894+08
+37498	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:25.576411+08
+37499	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:30.576164+08
+37500	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:35.57185+08
+37501	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:40.572741+08
+37502	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:45.564978+08
+37503	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:50.562282+08
+37504	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:16:55.577669+08
+37505	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:00.580036+08
+37506	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:05.575858+08
+37507	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:10.575199+08
+37508	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:15.565416+08
+37509	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:20.542225+08
+37510	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:25.586991+08
+37511	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:30.573098+08
+37512	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:35.584625+08
+37513	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:40.572163+08
+37514	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:45.578334+08
+37515	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:50.577419+08
+37516	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:17:55.568861+08
+37517	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:00.569367+08
+37518	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:05.583766+08
+37519	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:10.587729+08
+37520	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:15.557045+08
+37521	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:20.59047+08
+37522	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:25.595223+08
+37523	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:30.58598+08
+37524	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:35.576222+08
+37525	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:40.583261+08
+37526	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:45.557939+08
+37527	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:50.571642+08
+37528	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:18:55.568842+08
+37529	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:00.563654+08
+37530	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:05.575387+08
+37531	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:10.585702+08
+37532	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:15.553555+08
+37533	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:20.565284+08
+37534	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:25.574052+08
+37535	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:30.575639+08
+37536	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:35.583226+08
+37537	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:40.593994+08
+37538	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:45.564513+08
+37539	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:50.58475+08
+37540	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:19:55.602962+08
+37541	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:00.592684+08
+37542	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:05.565716+08
+37543	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:10.59413+08
+37544	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:15.562385+08
+37545	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:20.580315+08
+37546	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:25.585524+08
+37547	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:30.593026+08
+37548	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:35.597608+08
+37549	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:40.590151+08
+37550	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:45.566785+08
+37551	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:50.582732+08
+37552	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:20:55.602646+08
+37553	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:00.590105+08
+37554	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:05.600159+08
+37555	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:10.596932+08
+37556	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:15.557993+08
+37557	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:20.599925+08
+37558	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:25.593441+08
+37559	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:30.592492+08
+37560	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:35.583352+08
+37561	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:40.581564+08
+37562	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:45.569238+08
+37563	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_fea5f485-d239-40de-ba1e-84b5aa5c569d", "previousRefreshTokenId": "rt_316f4507-e9f3-482b-8b0a-8a4ba830123a"}	2026-05-29 08:21:50.654143+08
+37564	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:50.668252+08
+37565	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:21:55.592412+08
+37566	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:00.59822+08
+37567	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:05.588839+08
+37568	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:10.598881+08
+37569	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:15.569804+08
+37570	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:20.590522+08
+37571	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:25.581586+08
+37572	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:30.59127+08
+37573	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:35.590743+08
+37574	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:40.697769+08
+37575	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:45.573518+08
+37576	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:50.598747+08
+37577	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:22:55.588701+08
+37578	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:00.593364+08
+37579	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:05.601629+08
+37580	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:10.597575+08
+37581	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:15.550544+08
+37582	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:20.600726+08
+37583	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:25.586537+08
+37584	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:30.598555+08
+37585	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:35.594465+08
+37586	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:40.595565+08
+37587	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:45.577017+08
+37588	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:50.591686+08
+37589	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:23:55.587739+08
+37590	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:00.583093+08
+37591	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:05.596037+08
+37592	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:10.593349+08
+37593	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:15.572369+08
+37594	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:20.594169+08
+37595	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:25.601195+08
+37596	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:30.59571+08
+37597	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:35.590054+08
+37598	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:40.606427+08
+37599	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:45.569035+08
+37600	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:50.604729+08
+37601	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:24:55.61093+08
+37602	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:00.588468+08
+37603	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:05.600428+08
+37604	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:10.607129+08
+37605	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:15.569242+08
+37606	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:20.606381+08
+37607	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:25.609451+08
+37608	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:30.604411+08
+37609	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:35.599007+08
+37610	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:40.608315+08
+37611	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:45.573678+08
+37612	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:50.599182+08
+37613	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:25:55.594652+08
+37614	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:00.599778+08
+37615	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:05.601989+08
+37616	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:10.601449+08
+37617	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:15.556051+08
+37618	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:20.611008+08
+37619	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:25.605985+08
+37620	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:30.607519+08
+37621	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:35.614964+08
+37622	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:40.616928+08
+37623	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:45.557229+08
+37624	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:45.591587+08
+37625	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:50.616359+08
+37626	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:26:55.626961+08
+37627	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:00.63527+08
+37628	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:05.603514+08
+37629	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:10.605323+08
+37630	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:15.576176+08
+37631	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:20.622959+08
+37632	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:25.624992+08
+37633	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:30.623611+08
+37634	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:35.621812+08
+37635	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:40.620147+08
+37636	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:45.683284+08
+37637	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:50.595095+08
+37638	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:27:55.6148+08
+37639	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:00.613269+08
+37640	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:05.605245+08
+37641	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:10.748475+08
+37642	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:15.556195+08
+37643	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:15.603441+08
+37644	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:20.611475+08
+37646	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:30.607238+08
+37648	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:40.601874+08
+37649	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:45.564996+08
+37650	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:45.59464+08
+37651	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:50.614494+08
+37656	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:15.562515+08
+37657	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:15.590573+08
+37658	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:20.611345+08
+37667	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:00.613043+08
+37670	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:15.553435+08
+37671	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:15.588275+08
+37645	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:25.626183+08
+37647	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:35.620899+08
+37652	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:28:55.620844+08
+37653	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:00.61776+08
+37654	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:05.615809+08
+37655	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:10.622094+08
+37659	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:25.619142+08
+37660	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:30.61265+08
+37661	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:35.627454+08
+37662	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:40.623281+08
+37663	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:45.557008+08
+37664	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:45.594047+08
+37665	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:50.614298+08
+37666	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:29:55.606788+08
+37668	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:05.62329+08
+37669	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:10.609865+08
+37672	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:20.614232+08
+37673	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:25.593892+08
+37674	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:30.606363+08
+37675	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:35.615439+08
+37676	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:40.624202+08
+37677	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:45.560889+08
+37678	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:45.592856+08
+37679	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:50.603636+08
+37680	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:30:55.626217+08
+37681	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:00.619632+08
+37682	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:05.615402+08
+37683	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:10.626804+08
+37684	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:15.567854+08
+37685	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:15.597908+08
+37686	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:20.626205+08
+37687	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:25.606401+08
+37688	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:30.628307+08
+37689	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:35.628728+08
+37690	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:40.655823+08
+37691	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:45.55477+08
+37692	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:45.604883+08
+37693	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:50.646194+08
+37694	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:31:55.651141+08
+37695	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:00.645503+08
+37696	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:05.652848+08
+37697	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:10.675556+08
+37698	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:15.568642+08
+37699	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:15.647313+08
+37700	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:20.671838+08
+37701	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:25.652365+08
+37702	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:30.66912+08
+37703	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:35.664579+08
+37704	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:40.66722+08
+37705	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:45.564701+08
+37706	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:45.642623+08
+37707	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:50.661579+08
+37708	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:32:55.663695+08
+37709	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:00.643673+08
+37710	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:05.662441+08
+37711	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:10.660404+08
+37712	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:15.565259+08
+37713	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:15.643911+08
+37714	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:20.671944+08
+37715	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:25.676402+08
+37716	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:30.645592+08
+37717	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:35.655063+08
+37718	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:40.66238+08
+37719	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:45.548234+08
+37720	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:45.645336+08
+37721	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:50.671047+08
+37722	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:33:55.66758+08
+37723	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:00.667899+08
+37724	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:05.670792+08
+37725	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:10.653831+08
+37726	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:15.588439+08
+37727	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:15.631443+08
+37728	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:20.663689+08
+37729	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:25.670735+08
+37730	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:30.687582+08
+37731	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:35.657242+08
+37732	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:40.663134+08
+37733	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:45.575677+08
+37734	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:45.637279+08
+37735	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:50.670203+08
+37736	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:34:55.672725+08
+37737	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:00.663068+08
+37738	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:05.644417+08
+37739	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:10.669412+08
+37740	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:15.556668+08
+37741	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:15.639029+08
+37742	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:20.658151+08
+37743	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:25.673354+08
+37744	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:30.673982+08
+37745	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:35.662365+08
+37746	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:40.674103+08
+37747	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:45.566374+08
+37748	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:45.643743+08
+37749	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:50.664442+08
+37750	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:35:55.67573+08
+37751	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:00.661776+08
+37752	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:05.690433+08
+37753	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:10.665797+08
+37754	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:15.55957+08
+37755	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:15.642153+08
+37756	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:20.665735+08
+37757	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:25.638373+08
+37758	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:30.639978+08
+37759	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:35.650605+08
+37760	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:40.641271+08
+37761	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:45.551717+08
+37762	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:45.655919+08
+37763	user	user_60da7484-9e0c-462c-bf78-357c340ae216	auth.refresh	user	user_60da7484-9e0c-462c-bf78-357c340ae216	{"nextRefreshTokenId": "rt_3670194b-79bf-4e6e-84b7-d729690a6447", "previousRefreshTokenId": "rt_fea5f485-d239-40de-ba1e-84b5aa5c569d"}	2026-05-29 08:36:50.663011+08
+37764	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:50.679859+08
+37765	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:36:55.634078+08
+37766	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:00.797425+08
+37767	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:05.637641+08
+37768	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:10.643383+08
+37769	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:15.534677+08
+37770	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:15.639531+08
+37771	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:20.647498+08
+37772	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:25.641114+08
+37773	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:30.641864+08
+37774	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:35.648341+08
+37775	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:40.655274+08
+37776	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:45.541025+08
+37777	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:45.647922+08
+37778	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:50.661642+08
+37779	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:37:55.658194+08
+37780	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:00.661367+08
+37781	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:05.661821+08
+37782	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:10.674206+08
+37783	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:15.543299+08
+37784	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:15.65223+08
+37785	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:20.667251+08
+37786	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:25.671266+08
+37787	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:30.661462+08
+37788	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:35.687637+08
+37789	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:40.661176+08
+37790	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:45.553951+08
+37791	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:45.649497+08
+37792	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:50.688295+08
+37793	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:38:55.677216+08
+37794	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:00.683832+08
+37795	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:05.671122+08
+37796	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:10.675377+08
+37797	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:15.559168+08
+37798	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:15.654393+08
+37799	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:20.687608+08
+37800	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:25.675177+08
+37801	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:30.683152+08
+37802	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:35.691864+08
+37803	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:40.673386+08
+37804	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:45.563081+08
+37805	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:45.654596+08
+37806	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:50.678352+08
+37807	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:39:55.690839+08
+37808	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:00.684166+08
+37809	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:05.685898+08
+37810	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:10.690802+08
+37811	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:15.564107+08
+37812	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:15.660319+08
+37813	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:20.676484+08
+37814	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:25.678742+08
+37815	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:30.675601+08
+37816	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:35.673671+08
+37817	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:40.660161+08
+37818	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:45.557608+08
+37819	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:45.653558+08
+37820	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:50.680048+08
+37821	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:40:55.688725+08
+37822	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:00.669024+08
+37823	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:05.668748+08
+37824	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:10.673496+08
+37825	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:15.568753+08
+37826	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:15.657845+08
+37827	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:20.673027+08
+37828	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:25.679657+08
+37829	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:41:30.685024+08
+37830	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:29.648826+08
+37831	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:31.74779+08
+37832	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:36.842469+08
+37833	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:41.647689+08
+37834	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:46.860167+08
+37835	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:51.662352+08
+37836	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:44:56.648025+08
+37837	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:01.572124+08
+37838	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:06.587663+08
+37839	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:11.530962+08
+37840	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:16.538339+08
+37841	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:21.534994+08
+37842	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:26.526771+08
+37843	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:31.543983+08
+37844	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:36.532292+08
+37845	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:41.537299+08
+37846	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:46.552125+08
+37847	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:51.529341+08
+37848	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:45:56.51655+08
+37849	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:01.529041+08
+37850	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:06.528496+08
+37851	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:11.534243+08
+37852	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:16.53986+08
+37853	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:21.530339+08
+37854	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:26.525062+08
+37855	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:31.537548+08
+37856	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:36.537909+08
+37857	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:41.530649+08
+37858	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:46.535479+08
+37859	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:51.530856+08
+37860	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:56.514744+08
+37861	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:46:56.656196+08
+37862	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:01.525002+08
+37863	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:06.529437+08
+37864	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:11.534341+08
+37865	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:16.527126+08
+37866	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:21.537647+08
+37867	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:26.52114+08
+37868	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:31.527175+08
+37869	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:36.529584+08
+37870	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:41.532898+08
+37871	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:46.528741+08
+37872	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:51.534581+08
+37873	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:56.512953+08
+37874	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:47:56.699618+08
+37875	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:01.531406+08
+37876	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:06.525161+08
+37877	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:11.534957+08
+37878	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:16.542782+08
+37879	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:21.545799+08
+37880	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:26.518929+08
+37881	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:26.550819+08
+37882	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:31.561049+08
+37883	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:36.541823+08
+37884	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:41.55414+08
+37885	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:46.548672+08
+37886	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:51.538547+08
+37887	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:56.518224+08
+37888	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:48:56.555547+08
+37889	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:49:01.548172+08
+37890	user	user_60da7484-9e0c-462c-bf78-357c340ae216	client.updated	client	1e4e3e2f-046f-4395-8123-d73c2af8e9b7	{"clientId": "1e4e3e2f-046f-4395-8123-d73c2af8e9b7", "clientName": "YEFTA"}	2026-05-29 08:49:06.555502+08
 \.
 
 
@@ -6876,7 +9323,41 @@ COPY public.audit_logs (id, actor_type, actor_id, action, target_type, target_id
 --
 
 COPY public.clients (id, name, printers, selected_printer, created_at, last_seen_at, status, owner_user_id) FROM stdin;
-1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "OneNote (Desktop)", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Canon G1030 series	2026-05-05 06:17:48.704+08	2026-05-28 17:24:48.907+08	online	user_60da7484-9e0c-462c-bf78-357c340ae216
+1e4e3e2f-046f-4395-8123-d73c2af8e9b7	YEFTA	["OneNote (Desktop) - Terproteksi", "OneNote (Desktop) - Protected", "OneNote (Desktop)", "Microsoft Print to PDF", "Fax", "Canon G1030 series"]	Canon G1030 series	2026-05-05 06:17:48.704+08	2026-05-29 08:49:06.89+08	online	user_60da7484-9e0c-462c-bf78-357c340ae216
+\.
+
+
+--
+-- Data for Name: coupon_usages; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.coupon_usages (id, coupon_id, order_id, user_id, plan_id, discount_idr, used_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: coupons; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.coupons (id, code, name, discount_type, discount_value, max_discount_idr, min_order_amount_idr, applies_to_plan_id, usage_limit, usage_limit_per_user, starts_at, expires_at, is_active, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: credit_usages; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.credit_usages (id, user_id, credit_id, job_id, amount, usage_type, job_snapshot, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: credits; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.credits (id, user_id, plan_id, order_id, source_type, total_credits, used_credits, starts_at, expires_at, status, created_at) FROM stdin;
+cr_b8c528cd-b9a0-4909-a39c-fb120e842597	user_60da7484-9e0c-462c-bf78-357c340ae216	plan_free	ord_b857cfbc-1d32-43a2-a995-2a83cea71c3b	free	10	0	2026-05-28 20:10:37.221+08	2026-06-04 20:10:37.221+08	active	2026-05-28 20:10:37.209432+08
+cr_28d57779-076d-4526-bb6e-0ce105f7278c	user_60da7484-9e0c-462c-bf78-357c340ae216	plan_free	ord_c168681d-1a2d-4b11-9002-246ce211981e	free	10	0	2026-05-28 20:13:15.231+08	2026-06-04 20:13:15.231+08	active	2026-05-28 20:13:15.223783+08
 \.
 
 
@@ -6933,6 +9414,37 @@ job_1779941825198_e4zfvd	session_1779941538446_p473pn	dsada.pdf	d:\\code\\PrintF
 job_1779951852502_sip2vq	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951852502_sip2vq	859868	canceled	Asyel	A5	1	2026-05-28 15:04:12.516+08	2026-05-28 17:21:49.349+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
 job_1779951851054_275z1z	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951851054_275z1z	859868	canceled	Asyel	A5	1	2026-05-28 15:04:11.058+08	2026-05-28 17:21:49.35+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
 job_1779951849825_dyfb8s	session_1779951808075_wrkdea	g.pdf	d:\\code\\PrintForm-server\\storage\\files\\job_1779951849825_dyfb8s	859868	canceled	Asyel	A5	1	2026-05-28 15:04:09.839+08	2026-05-28 17:21:49.352+08	user_60da7484-9e0c-462c-bf78-357c340ae216	\N	\N	color	portrait	\N	100	\N	2000	not-available
+\.
+
+
+--
+-- Data for Name: orders; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.orders (id, user_id, plan_id, quantity, subtotal_idr, discount_idr, total_idr, coupon_id, coupon_code, status, payment_instruction, payment_expires_at, activated_at, rejected_at, rejected_reason, created_at, updated_at) FROM stdin;
+ord_b857cfbc-1d32-43a2-a995-2a83cea71c3b	user_60da7484-9e0c-462c-bf78-357c340ae216	plan_free	1	0	0	0	\N	\N	paid	\N	\N	2026-05-28 20:10:37.212+08	\N	\N	2026-05-28 20:10:37.209432+08	2026-05-28 20:10:37.209432+08
+ord_c168681d-1a2d-4b11-9002-246ce211981e	user_60da7484-9e0c-462c-bf78-357c340ae216	plan_free	1	0	0	0	\N	\N	paid	\N	\N	2026-05-28 20:13:15.224+08	\N	\N	2026-05-28 20:13:15.223783+08	2026-05-28 20:13:15.223783+08
+ord_65d2022c-86b6-4029-905c-7a53845aba8b	user_60da7484-9e0c-462c-bf78-357c340ae216	plan_starter_monthly	1	13000	0	13000	\N	\N	cancelled	Transfer manual ke rekening PrintForm, lalu upload bukti pembayaran dari halaman order.	2026-05-29 18:36:43.814+08	\N	\N	\N	2026-05-28 18:36:43.806776+08	2026-05-28 20:24:37.423757+08
+\.
+
+
+--
+-- Data for Name: payment_proofs; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.payment_proofs (id, order_id, user_id, original_name, stored_path, mime_type, size_bytes, status, user_note, admin_note, submitted_at, reviewed_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: plans; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.plans (id, code, name, plan_type, price_idr, credits_per_unit, duration_months, description, is_active, sort_order, created_at, updated_at) FROM stdin;
+plan_free	free	Free	free	0	10	0	10 tugas per minggu untuk mencoba layanan PrintForm.	t	1	2026-05-28 18:05:39.246002+08	2026-05-28 18:05:39.246002+08
+plan_starter_monthly	starter_monthly	Starter	subscription	13000	1000	1	1.000 tugas cetak per bulan.	t	2	2026-05-28 18:05:39.246002+08	2026-05-28 18:05:39.246002+08
+plan_pro_monthly	pro_monthly	Pro	subscription	20000	2500	1	2.500 tugas cetak per bulan.	t	3	2026-05-28 18:05:39.246002+08	2026-05-28 18:05:39.246002+08
+plan_credit_200	credit_200	Buy Credit	credit_pack	5000	200	4	200 kredit tugas, berlaku 4 bulan.	t	4	2026-05-28 18:05:39.246002+08	2026-05-28 18:05:39.246002+08
 \.
 
 
@@ -7047,10 +9559,50 @@ rt_9e14f75d-107a-4235-80a1-45bd7b5ece3f	user_60da7484-9e0c-462c-bf78-357c340ae21
 rt_55484fa2-81ef-48e8-b3d0-bba1d367d2a8	user_60da7484-9e0c-462c-bf78-357c340ae216	d36b93e00ba60db775961cca23412b587a0e31d614d506932a6262892158aba0	\N	::ffff:127.0.0.1	2026-05-28 15:56:36.545788+08	2026-06-27 15:56:36.544+08	2026-05-28 16:15:43.523716+08	rt_537f7827-871a-4f70-8cf4-9431b278fbeb
 rt_167cfd1f-4531-4dd8-8180-39ed06ccc6bb	user_60da7484-9e0c-462c-bf78-357c340ae216	1b2153a656dbe2a937361d04770c5f2c5db7e650a789628afeca4dd38c12f25a	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 16:00:45.045833+08	2026-06-27 16:00:45.043+08	2026-05-28 16:15:46.412488+08	rt_d9e5d89c-1d2e-41de-9711-d14e207749f3
 rt_537f7827-871a-4f70-8cf4-9431b278fbeb	user_60da7484-9e0c-462c-bf78-357c340ae216	171a844fa543e6c7c3a11f1a8d8c65778f44d53fb8261550584406e0a8e4bda8	\N	::ffff:127.0.0.1	2026-05-28 16:15:43.518882+08	2026-06-27 16:15:43.516+08	2026-05-28 17:21:04.510661+08	rt_c66f2c58-7f9f-4e11-a1c7-03d80113079f
-rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76	user_60da7484-9e0c-462c-bf78-357c340ae216	24ffd1f3957738f6644d424ac27a2370ea97d4ba1e1e554af25833bdc24a5e50	\N	::ffff:127.0.0.1	2026-05-28 17:21:04.637208+08	2026-06-27 17:21:04.635+08	\N	\N
 rt_c66f2c58-7f9f-4e11-a1c7-03d80113079f	user_60da7484-9e0c-462c-bf78-357c340ae216	9eb887a106da2f2ecb82abf1e22dad27d6d9eef87103fea125dbfc29bdd099f4	\N	::ffff:127.0.0.1	2026-05-28 17:21:04.504064+08	2026-06-27 17:21:04.502+08	2026-05-28 17:21:04.643467+08	rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76
-rt_058a00a7-e79d-412a-9ccd-589b95225708	user_60da7484-9e0c-462c-bf78-357c340ae216	a9b6e9a6bf272179616704bfae7a805457cfdbfeea2ce6b7371812aa6ef86250	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 17:21:11.680297+08	2026-06-27 17:21:11.677+08	\N	\N
 rt_d9e5d89c-1d2e-41de-9711-d14e207749f3	user_60da7484-9e0c-462c-bf78-357c340ae216	112fba0cfe46070ee4fe72b447cc17ad153874b0b2772e557e54ff0fa8b7d8b4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 16:15:46.409328+08	2026-06-27 16:15:46.407+08	2026-05-28 17:21:11.684612+08	rt_058a00a7-e79d-412a-9ccd-589b95225708
+rt_f9e8edec-a77a-43cf-9b8c-fdd33e787e76	user_60da7484-9e0c-462c-bf78-357c340ae216	24ffd1f3957738f6644d424ac27a2370ea97d4ba1e1e554af25833bdc24a5e50	\N	::ffff:127.0.0.1	2026-05-28 17:21:04.637208+08	2026-06-27 17:21:04.635+08	2026-05-28 18:28:24.960412+08	rt_10f255bd-5563-46ff-a24d-8bc92a99c2c2
+rt_058a00a7-e79d-412a-9ccd-589b95225708	user_60da7484-9e0c-462c-bf78-357c340ae216	a9b6e9a6bf272179616704bfae7a805457cfdbfeea2ce6b7371812aa6ef86250	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 17:21:11.680297+08	2026-06-27 17:21:11.677+08	2026-05-28 18:35:42.05994+08	rt_d0d16db2-cc4a-4eb9-a3a5-339cb9beccf6
+rt_10f255bd-5563-46ff-a24d-8bc92a99c2c2	user_60da7484-9e0c-462c-bf78-357c340ae216	d223b04334f96952c5bdf1705a0c4864f59ae61bf2132039bbad7177e01cf552	\N	::ffff:127.0.0.1	2026-05-28 18:28:24.945345+08	2026-06-27 18:28:24.942+08	2026-05-28 20:06:38.541809+08	rt_fe6c86d6-5c70-4c75-8e61-f6a59301ffcb
+rt_d0d16db2-cc4a-4eb9-a3a5-339cb9beccf6	user_60da7484-9e0c-462c-bf78-357c340ae216	0a0c2772980548f4f58c23afe7b4e092e2fd0aa6378678b3a0ac2131a2cb58f1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 18:35:42.034408+08	2026-06-27 18:35:42.019+08	2026-05-28 20:08:44.507741+08	rt_a22da8e5-a5c3-4527-a699-4251a0d6ea81
+rt_fe6c86d6-5c70-4c75-8e61-f6a59301ffcb	user_60da7484-9e0c-462c-bf78-357c340ae216	9f25fd2fcda311e24f0385e55cb0485fe044841dcee961ac4c375795b675a72f	\N	::ffff:127.0.0.1	2026-05-28 20:06:38.531673+08	2026-06-27 20:06:38.529+08	2026-05-28 20:21:39.330486+08	rt_feb33d3a-fd51-4523-8c78-69dfa0cedff2
+rt_a22da8e5-a5c3-4527-a699-4251a0d6ea81	user_60da7484-9e0c-462c-bf78-357c340ae216	529aed5ae1e72bacb9d51353621068397b19afb44dd2093ad389a4da89ed6277	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 20:08:44.496876+08	2026-06-27 20:08:44.495+08	2026-05-28 20:24:26.543109+08	rt_33eeee9b-dd2a-472e-9761-1501619e3676
+rt_feb33d3a-fd51-4523-8c78-69dfa0cedff2	user_60da7484-9e0c-462c-bf78-357c340ae216	f8675bc11bc9e7afe6f530bebb393d9ec8e21859ad681c46b341eb12cdba984d	\N	::ffff:127.0.0.1	2026-05-28 20:21:39.325659+08	2026-06-27 20:21:39.324+08	2026-05-28 20:42:50.535235+08	rt_82f1aaf9-f4f3-443d-ad9c-7e12091cf49e
+rt_33eeee9b-dd2a-472e-9761-1501619e3676	user_60da7484-9e0c-462c-bf78-357c340ae216	35637bbcd44790bcab2453c71f309dbe546734eeb2837c2a5557f61e78e3ea98	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 20:24:26.537306+08	2026-06-27 20:24:26.531+08	2026-05-28 20:42:59.981472+08	rt_5dd684af-a355-44f1-88e6-9787aecc2272
+rt_ded2d49c-2d53-4c2f-a3cf-1e043b72c2ac	user_60da7484-9e0c-462c-bf78-357c340ae216	345232cf3d664c304aa06307133e90d73203cdf45d3ef65b677e58bb2617ee0f	\N	::ffff:127.0.0.1	2026-05-28 20:57:54.443593+08	2026-06-27 20:57:54.442+08	2026-05-28 21:12:54.644227+08	rt_836ac221-9a5e-43dc-a4ea-5cea867b834d
+rt_82f1aaf9-f4f3-443d-ad9c-7e12091cf49e	user_60da7484-9e0c-462c-bf78-357c340ae216	6424ec2edd2cb5b668706c63cecdafd58b810e4860788e23dbf95b6ca693def3	\N	::ffff:127.0.0.1	2026-05-28 20:42:50.529726+08	2026-06-27 20:42:50.527+08	2026-05-28 20:57:54.446729+08	rt_ded2d49c-2d53-4c2f-a3cf-1e043b72c2ac
+rt_4cb9d3cf-2d43-4bc7-a086-f6aa6c39b0ff	user_60da7484-9e0c-462c-bf78-357c340ae216	c5d73a3f41e961e627faac17103e7be099882399e4a02eafb96bee2d9367b04b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 20:58:36.591645+08	2026-06-27 20:58:36.582+08	\N	\N
+rt_6341b008-1dba-4878-9265-adb4ac358912	user_60da7484-9e0c-462c-bf78-357c340ae216	882fbecc697ab51559c6f742905dc6b2439533d742003fcbaa63f4b0ce131d18	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 20:58:36.651819+08	2026-06-27 20:58:36.65+08	\N	\N
+rt_5dd684af-a355-44f1-88e6-9787aecc2272	user_60da7484-9e0c-462c-bf78-357c340ae216	226cd86fa6b081c42549a409bdd88615de463da21fa42f6f3fb559db7d8dfaf9	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 20:42:59.978625+08	2026-06-27 20:42:59.977+08	2026-05-28 20:58:36.663812+08	rt_6341b008-1dba-4878-9265-adb4ac358912
+rt_3fa3e29e-111b-4926-bdbf-37a0c3a590c2	user_60da7484-9e0c-462c-bf78-357c340ae216	d22b77a8cbd21e388a4fc8ac866ad3ad2fef0af568d593972fa33a318861d3fc	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 20:58:58.726567+08	2026-06-27 20:58:58.639+08	2026-05-28 21:14:35.723932+08	rt_79d149d4-44a8-4238-94b2-60eed4f972ac
+rt_836ac221-9a5e-43dc-a4ea-5cea867b834d	user_60da7484-9e0c-462c-bf78-357c340ae216	9fca186570ee39878c7713618e7523759df725a94c12b6b737f5c784414c708d	\N	::ffff:127.0.0.1	2026-05-28 21:12:54.558469+08	2026-06-27 21:12:54.555+08	2026-05-28 21:27:54.469375+08	rt_99b8e144-e78c-44d7-a0f5-f9602ccea9e8
+rt_99b8e144-e78c-44d7-a0f5-f9602ccea9e8	user_60da7484-9e0c-462c-bf78-357c340ae216	2604d2a160280213dda236ade219ebbba329b37354863288b7bc924306684ffd	\N	::ffff:127.0.0.1	2026-05-28 21:27:54.465616+08	2026-06-27 21:27:54.464+08	2026-05-28 21:43:56.286922+08	rt_16995305-0837-41f6-8e88-8d9bdc1a6206
+rt_79d149d4-44a8-4238-94b2-60eed4f972ac	user_60da7484-9e0c-462c-bf78-357c340ae216	4bab909efab886e13c5ea6ca8d0ff030c122ac6b6bd56033917c8604df744b13	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 21:14:35.677485+08	2026-06-27 21:14:35.676+08	2026-05-28 21:43:57.995217+08	rt_8bbd1311-4d26-4847-b44a-44f82057e814
+rt_16995305-0837-41f6-8e88-8d9bdc1a6206	user_60da7484-9e0c-462c-bf78-357c340ae216	05a2f2a6469c1ee9a0cc91358b2c05eb9fe6b691c9d668ed4241db166d842c33	\N	::ffff:127.0.0.1	2026-05-28 21:43:56.278218+08	2026-06-27 21:43:56.275+08	2026-05-28 22:00:29.459277+08	rt_db78c5b1-f8b7-41fa-8f4c-df47da3f5539
+rt_db78c5b1-f8b7-41fa-8f4c-df47da3f5539	user_60da7484-9e0c-462c-bf78-357c340ae216	d7db694dd4449d8c9ef5d56eda528d7df94c5c3fdcacf4f59ea861697ca968f9	\N	::ffff:127.0.0.1	2026-05-28 22:00:29.448557+08	2026-06-27 22:00:29.447+08	2026-05-28 22:00:29.506644+08	rt_cd09c787-83ab-402b-8e79-6f38acce88e0
+rt_8bbd1311-4d26-4847-b44a-44f82057e814	user_60da7484-9e0c-462c-bf78-357c340ae216	8a43fdf74e5c711d40b226e5d152c12878e0368506dc901e720f637d1fcc6d6b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 21:43:57.990698+08	2026-06-27 21:43:57.989+08	2026-05-28 22:00:36.446533+08	rt_7e1aaf7f-9ba6-41d3-9d45-8e274c5ad3bb
+rt_cd09c787-83ab-402b-8e79-6f38acce88e0	user_60da7484-9e0c-462c-bf78-357c340ae216	da8ca357b139aa40ebaf12bfebef8e756969e47dc685fa84c406ee79d9b16e92	\N	::ffff:127.0.0.1	2026-05-28 22:00:29.502668+08	2026-06-27 22:00:29.501+08	2026-05-28 22:16:18.543688+08	rt_c4d79014-e366-4a4f-9258-d033ca4b9bf2
+rt_7e1aaf7f-9ba6-41d3-9d45-8e274c5ad3bb	user_60da7484-9e0c-462c-bf78-357c340ae216	b247486e2b95228027d5344d1e71ccd0550416785b1cabc2bfc8455f8012e034	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 22:00:36.444285+08	2026-06-27 22:00:36.443+08	2026-05-28 22:16:35.115085+08	rt_4b074404-161f-41c6-a806-b184bdb1f7d8
+rt_c4d79014-e366-4a4f-9258-d033ca4b9bf2	user_60da7484-9e0c-462c-bf78-357c340ae216	9ac19b0656f13d243fd9bbc8686879fc601e3a8a2a8211a8d6fb3fff31d59713	\N	::ffff:127.0.0.1	2026-05-28 22:16:18.534261+08	2026-06-27 22:16:18.531+08	2026-05-28 22:34:47.377769+08	rt_65769ebf-cf44-418f-a0c9-6a0abd4df83f
+rt_65769ebf-cf44-418f-a0c9-6a0abd4df83f	user_60da7484-9e0c-462c-bf78-357c340ae216	f0e5f1d9ed6b65fab5aa3502dffbf4e894b8b74c3392134741e6e97cf3a27e0d	\N	::ffff:127.0.0.1	2026-05-28 22:34:47.366172+08	2026-06-27 22:34:47.362+08	2026-05-29 04:04:22.153096+08	rt_9aae956b-c083-4884-86f3-a641e38030e9
+rt_4b074404-161f-41c6-a806-b184bdb1f7d8	user_60da7484-9e0c-462c-bf78-357c340ae216	d3a613737fec8a451cb4f6e8676bd02ffa74426c7437d42e4232114f2857bd4f	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-28 22:16:35.107864+08	2026-06-27 22:16:34.762+08	2026-05-29 04:05:16.711348+08	rt_8173cb9c-727a-4d39-affc-d07662aad8d9
+rt_9aae956b-c083-4884-86f3-a641e38030e9	user_60da7484-9e0c-462c-bf78-357c340ae216	f71afdd0b208c891b831bca608cbdf548a628c088b160626b0f43c78395f7f19	\N	::ffff:127.0.0.1	2026-05-29 04:04:22.129006+08	2026-06-28 04:04:22.127+08	2026-05-29 05:41:29.903165+08	rt_782311c0-8991-47d7-9c3d-2457bf3ac5ef
+rt_8173cb9c-727a-4d39-affc-d07662aad8d9	user_60da7484-9e0c-462c-bf78-357c340ae216	ea87326b56e9e7f5740f30aff6f06e800a7f70cfd563dbacb488296e90eefcfb	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-29 04:05:16.708238+08	2026-06-28 04:05:16.707+08	2026-05-29 05:43:55.31702+08	rt_fb0d66f5-d752-4673-a3af-fa219ff64f8e
+rt_782311c0-8991-47d7-9c3d-2457bf3ac5ef	user_60da7484-9e0c-462c-bf78-357c340ae216	681ef0ac7d21b7e9d044ea9938a9de94cb36a731b1d28690687f71148bad2dc4	\N	::ffff:127.0.0.1	2026-05-29 05:41:29.893374+08	2026-06-28 05:41:29.891+08	2026-05-29 06:08:21.665051+08	rt_bb72f25f-d770-4f48-ab40-33ff30ac73c5
+rt_bb72f25f-d770-4f48-ab40-33ff30ac73c5	user_60da7484-9e0c-462c-bf78-357c340ae216	ca9daa6529edec62e98ff547f09e5ac01e3a42a20af1b7f20eb6a4948c5701f9	\N	::ffff:127.0.0.1	2026-05-29 06:08:21.658439+08	2026-06-28 06:08:21.656+08	2026-05-29 06:48:35.825763+08	rt_1fda4b77-0df3-4278-bb9c-3326f242d011
+rt_368adbc7-3f48-48da-b850-46799c3c142e	user_60da7484-9e0c-462c-bf78-357c340ae216	388dd8d7d7ff8cbcb9d7185425102be53c99821ee6321bf3f5db0370bef8516b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-29 06:48:47.25681+08	2026-06-28 06:48:47.254+08	\N	\N
+rt_fb0d66f5-d752-4673-a3af-fa219ff64f8e	user_60da7484-9e0c-462c-bf78-357c340ae216	161484442c1f16078123313f06679fe2cbd480a24d3d859cd910c93cf59e4358	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	::1	2026-05-29 05:43:55.311279+08	2026-06-28 05:43:55.307+08	2026-05-29 06:48:47.270513+08	rt_368adbc7-3f48-48da-b850-46799c3c142e
+rt_1fda4b77-0df3-4278-bb9c-3326f242d011	user_60da7484-9e0c-462c-bf78-357c340ae216	d9a6c5a59c0040ac6a1d03c6d0612750586a345e6fbbe0ce559288c2ded759f8	\N	::ffff:127.0.0.1	2026-05-29 06:48:35.818961+08	2026-06-28 06:48:35.817+08	2026-05-29 07:05:11.204782+08	rt_fefc9e1f-b494-4b36-a726-6d5275835700
+rt_fefc9e1f-b494-4b36-a726-6d5275835700	user_60da7484-9e0c-462c-bf78-357c340ae216	ab6249eea3ecd0b5d01322445fa0f49cd8edf8e2825b69aaede89efd4edccbd2	\N	::ffff:127.0.0.1	2026-05-29 07:05:11.17126+08	2026-06-28 07:05:11.168+08	2026-05-29 07:05:11.357002+08	rt_cbdcecc2-e842-4104-8420-7e9bd9a91364
+rt_cbdcecc2-e842-4104-8420-7e9bd9a91364	user_60da7484-9e0c-462c-bf78-357c340ae216	e704b4b4189d826f579f032d1a4acd9d1858a226f73a95664c46f79832d7422b	\N	::ffff:127.0.0.1	2026-05-29 07:05:11.3506+08	2026-06-28 07:05:11.348+08	2026-05-29 07:05:11.601051+08	rt_23e0e288-7f63-48ce-9bde-57a5761b04dc
+rt_23e0e288-7f63-48ce-9bde-57a5761b04dc	user_60da7484-9e0c-462c-bf78-357c340ae216	3aa17aefac41ee8a67c5848616cda4152ba9a588751d35c5cf7a3ab25d512a18	\N	::ffff:127.0.0.1	2026-05-29 07:05:11.538131+08	2026-06-28 07:05:11.535+08	2026-05-29 07:36:49.747844+08	rt_2a346139-2b00-4ad3-bd15-308bbfcb777d
+rt_d67d2c40-d53f-4d53-82c6-358bbf235369	user_60da7484-9e0c-462c-bf78-357c340ae216	acfa7049efe4377edb9cb3042a6ae1b791f151e321eb976debc226249c4f9f3b	Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36	::ffff:10.119.202.97	2026-05-29 07:06:54.897608+08	2026-06-28 07:06:54.895+08	\N	\N
+rt_2a346139-2b00-4ad3-bd15-308bbfcb777d	user_60da7484-9e0c-462c-bf78-357c340ae216	7d5f91fd54535fc18f1c776357c8a15ae65f82a92c8e82ab392e537ae723ba51	\N	::ffff:127.0.0.1	2026-05-29 07:36:49.648881+08	2026-06-28 07:36:49.648+08	2026-05-29 07:36:50.400528+08	rt_514b21ae-a135-4f2c-a2ba-7a52c42534fd
+rt_514b21ae-a135-4f2c-a2ba-7a52c42534fd	user_60da7484-9e0c-462c-bf78-357c340ae216	8fc2e65c2eae7b8ce59cb2e0e227b4efccbc3cc2d6a6666053cb105dab010ffd	\N	::ffff:127.0.0.1	2026-05-29 07:36:50.396601+08	2026-06-28 07:36:50.396+08	2026-05-29 07:51:50.604797+08	rt_d881310c-7a10-4189-ad7b-17c7123d8b99
+rt_d881310c-7a10-4189-ad7b-17c7123d8b99	user_60da7484-9e0c-462c-bf78-357c340ae216	645fda5d9d7919768772944617adbef70e2f8494e6703bd63b14b2e2e21872a9	\N	::ffff:127.0.0.1	2026-05-29 07:51:50.583185+08	2026-06-28 07:51:50.582+08	2026-05-29 08:06:50.609464+08	rt_316f4507-e9f3-482b-8b0a-8a4ba830123a
+rt_316f4507-e9f3-482b-8b0a-8a4ba830123a	user_60da7484-9e0c-462c-bf78-357c340ae216	8048146c20feb5b03091c60606058a73c531e3852b162d13bbc65279cc7b87ed	\N	::ffff:127.0.0.1	2026-05-29 08:06:50.584185+08	2026-06-28 08:06:50.583+08	2026-05-29 08:21:50.652579+08	rt_fea5f485-d239-40de-ba1e-84b5aa5c569d
+rt_3670194b-79bf-4e6e-84b7-d729690a6447	user_60da7484-9e0c-462c-bf78-357c340ae216	7b328878d65bc5c5148bf7e39e7cb7a9406e2233ec987d96d85fe5c32bd3fd04	\N	::ffff:127.0.0.1	2026-05-29 08:36:50.657529+08	2026-06-28 08:36:50.656+08	\N	\N
+rt_fea5f485-d239-40de-ba1e-84b5aa5c569d	user_60da7484-9e0c-462c-bf78-357c340ae216	9ebd05b561770c721d0bb31421d4fc0f374331f363c40bd42b3723aadf6243b8	\N	::ffff:127.0.0.1	2026-05-29 08:21:50.603429+08	2026-06-28 08:21:50.602+08	2026-05-29 08:36:50.659781+08	rt_3670194b-79bf-4e6e-84b7-d729690a6447
 \.
 
 
@@ -7080,7 +9632,7 @@ session_1779940710228_x71pd7	Asyel	2026-05-28 11:58:30.228+08	2026-05-28 12:00:4
 
 COPY public.users (id, email, password_hash, role, created_at, username, pin_hash, alamat, konfigurasi_toko, kode_toko) FROM stdin;
 user_f2c13e69-65e0-4d22-83ad-06e242968fde	\N	$2b$12$DERkrN7MzVT8tg38q04BwuCYkctTPgTFTdm0MwsZvt/1HCAag0Pka	user	2026-05-26 09:06:35.664922+08	masyefta	\N	\N	{}	\N
-user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m	Jl. Sam Ratulangi No. 10	{"kontak": "0823259932", "layanan": {"modeWarna": "both", "hargaDasar": 1000, "batasFileMb": 25, "jenisKertas": ["A5", "F4", "LETTER"], "hargaModeWarna": {"bw": 1000, "color": 2000}, "modeWarnaPilihan": ["bw", "color"]}, "namaToko": "Toko Asyel", "statusToko": "open", "jamOperasional": "Setiap hari 08:00 - 21:00", "waktuOperasional": [{"day": "sunday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "monday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "tuesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "wednesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "thursday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "friday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "saturday", "open": "08:00", "close": "21:00", "enabled": true}], "forceOpenOutsideOperationalHours": false}	TOKO1
+user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUXKR23ucAnvQ7OPBM4LqW08R9GooKbPJWNfhfDEed1BdK	admin	2026-05-05 06:19:32.068634+08	yefta	$2b$12$waX9N4WgLjw7b8i8XowqYOOuu0eXdov3.8sHIgMkDnfg5xMBp/43m	Jl. Sam Ratulangi No. 10	{"kontak": "0823259932", "layanan": {"modeWarna": "both", "hargaDasar": 1000, "batasFileMb": 25, "jenisKertas": ["A4", "F4"], "hargaModeWarna": {"bw": 1000, "color": 2000}, "modeWarnaPilihan": ["bw", "color"]}, "namaToko": "Toko Asyel", "fotoProfil": {"url": "/uploads/profile-photos/profile-user_60da7484-9e0c-462c-bf78-357c340ae216-1780008910415-5hn73qmt.jpg", "mimeType": "image/jpeg", "sizeBytes": 65411, "updatedAt": "2026-05-28T22:55:10.427Z", "originalName": "profile-photo.jpg"}, "statusToko": "open", "jamOperasional": "Setiap hari 08:00 - 21:00", "waktuOperasional": [{"day": "sunday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "monday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "tuesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "wednesday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "thursday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "friday", "open": "08:00", "close": "21:00", "enabled": true}, {"day": "saturday", "open": "08:00", "close": "21:00", "enabled": true}], "forceOpenOutsideOperationalHours": false}	TOKO1
 \.
 
 
@@ -7088,7 +9640,21 @@ user_60da7484-9e0c-462c-bf78-357c340ae216	yeftakun34@gmail.com	$2b$12$cBZqGz8WUX
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 35684, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 37890, true);
+
+
+--
+-- Name: coupon_usages_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.coupon_usages_id_seq', 1, false);
+
+
+--
+-- Name: credit_usages_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.credit_usages_id_seq', 1, false);
 
 
 --
@@ -7115,6 +9681,38 @@ ALTER TABLE ONLY public.clients
 
 
 --
+-- Name: coupon_usages coupon_usages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupon_usages
+    ADD CONSTRAINT coupon_usages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: coupons coupons_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupons
+    ADD CONSTRAINT coupons_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: credit_usages credit_usages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credit_usages
+    ADD CONSTRAINT credit_usages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: credits credits_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credits
+    ADD CONSTRAINT credits_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: events events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7128,6 +9726,38 @@ ALTER TABLE ONLY public.events
 
 ALTER TABLE ONLY public.jobs
     ADD CONSTRAINT jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: orders orders_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: payment_proofs payment_proofs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.payment_proofs
+    ADD CONSTRAINT payment_proofs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: plans plans_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.plans
+    ADD CONSTRAINT plans_code_key UNIQUE (code);
+
+
+--
+-- Name: plans plans_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.plans
+    ADD CONSTRAINT plans_pkey PRIMARY KEY (id);
 
 
 --
@@ -7200,6 +9830,83 @@ CREATE INDEX idx_clients_owner_user ON public.clients USING btree (owner_user_id
 
 
 --
+-- Name: idx_coupon_usages_coupon; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_coupon_usages_coupon ON public.coupon_usages USING btree (coupon_id);
+
+
+--
+-- Name: idx_coupon_usages_order_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_coupon_usages_order_unique ON public.coupon_usages USING btree (order_id);
+
+
+--
+-- Name: idx_coupon_usages_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_coupon_usages_user ON public.coupon_usages USING btree (user_id);
+
+
+--
+-- Name: idx_coupons_active; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_coupons_active ON public.coupons USING btree (is_active);
+
+
+--
+-- Name: idx_coupons_code_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_coupons_code_unique ON public.coupons USING btree (lower((code)::text));
+
+
+--
+-- Name: idx_credit_usages_credit; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_credit_usages_credit ON public.credit_usages USING btree (credit_id);
+
+
+--
+-- Name: idx_credit_usages_job_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_credit_usages_job_unique ON public.credit_usages USING btree (job_id) WHERE (job_id IS NOT NULL);
+
+
+--
+-- Name: idx_credit_usages_user_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_credit_usages_user_created ON public.credit_usages USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_credits_expiry; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_credits_expiry ON public.credits USING btree (expires_at);
+
+
+--
+-- Name: idx_credits_order; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_credits_order ON public.credits USING btree (order_id);
+
+
+--
+-- Name: idx_credits_user_active_expiry; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_credits_user_active_expiry ON public.credits USING btree (user_id, status, expires_at);
+
+
+--
 -- Name: idx_events_client_created; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7267,6 +9974,48 @@ CREATE INDEX idx_jobs_session ON public.jobs USING btree (session_id);
 --
 
 CREATE INDEX idx_jobs_status ON public.jobs USING btree (status);
+
+
+--
+-- Name: idx_orders_plan; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_orders_plan ON public.orders USING btree (plan_id);
+
+
+--
+-- Name: idx_orders_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_orders_status ON public.orders USING btree (status);
+
+
+--
+-- Name: idx_orders_user_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_orders_user_created ON public.orders USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_payment_proofs_order_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_payment_proofs_order_unique ON public.payment_proofs USING btree (order_id);
+
+
+--
+-- Name: idx_payment_proofs_status; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_payment_proofs_status ON public.payment_proofs USING btree (status);
+
+
+--
+-- Name: idx_payment_proofs_user_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_payment_proofs_user_created ON public.payment_proofs USING btree (user_id, submitted_at DESC);
 
 
 --
@@ -7362,6 +10111,94 @@ ALTER TABLE ONLY public.clients
 
 
 --
+-- Name: coupon_usages coupon_usages_coupon_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupon_usages
+    ADD CONSTRAINT coupon_usages_coupon_id_fkey FOREIGN KEY (coupon_id) REFERENCES public.coupons(id) ON DELETE CASCADE;
+
+
+--
+-- Name: coupon_usages coupon_usages_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupon_usages
+    ADD CONSTRAINT coupon_usages_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: coupon_usages coupon_usages_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupon_usages
+    ADD CONSTRAINT coupon_usages_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.plans(id) ON DELETE SET NULL;
+
+
+--
+-- Name: coupon_usages coupon_usages_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupon_usages
+    ADD CONSTRAINT coupon_usages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: coupons coupons_applies_to_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.coupons
+    ADD CONSTRAINT coupons_applies_to_plan_id_fkey FOREIGN KEY (applies_to_plan_id) REFERENCES public.plans(id) ON DELETE SET NULL;
+
+
+--
+-- Name: credit_usages credit_usages_credit_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credit_usages
+    ADD CONSTRAINT credit_usages_credit_id_fkey FOREIGN KEY (credit_id) REFERENCES public.credits(id) ON DELETE SET NULL;
+
+
+--
+-- Name: credit_usages credit_usages_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credit_usages
+    ADD CONSTRAINT credit_usages_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: credit_usages credit_usages_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credit_usages
+    ADD CONSTRAINT credit_usages_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: credits credits_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credits
+    ADD CONSTRAINT credits_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: credits credits_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credits
+    ADD CONSTRAINT credits_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.plans(id) ON DELETE SET NULL;
+
+
+--
+-- Name: credits credits_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.credits
+    ADD CONSTRAINT credits_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: events events_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7407,6 +10244,46 @@ ALTER TABLE ONLY public.jobs
 
 ALTER TABLE ONLY public.jobs
     ADD CONSTRAINT jobs_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: orders orders_coupon_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_coupon_id_fkey FOREIGN KEY (coupon_id) REFERENCES public.coupons(id) ON DELETE SET NULL;
+
+
+--
+-- Name: orders orders_plan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.plans(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: orders orders_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: payment_proofs payment_proofs_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.payment_proofs
+    ADD CONSTRAINT payment_proofs_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: payment_proofs payment_proofs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.payment_proofs
+    ADD CONSTRAINT payment_proofs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -7461,5 +10338,5 @@ ALTER TABLE ONLY public.sessions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3C6yyyMz1afQ4Ih3yhhinW2mdjJwBLaN4LiD4RAH9HrNJSwLIIhx2BI70DBLovq
+\unrestrict 1RoEsU98LMfa2oYQOQ121yi5znkkljDnpjo9CPzhffLlfnoqKuYYW95KdpV2khB
 
