@@ -138,7 +138,17 @@ function mapOrder(row) {
       mimeType: row.proof_mime_type,
       sizeBytes: Number(row.proof_size_bytes || 0),
       status: row.proof_status || null,
-      submittedAt: toIso(row.proof_submitted_at)
+      submittedAt: toIso(row.proof_submitted_at),
+      previewUrl: row.proof_id ? `/api/billing/admin/orders/${encodeURIComponent(row.id)}/payment-proof/preview` : null,
+      downloadUrl: row.proof_id ? `/api/billing/admin/orders/${encodeURIComponent(row.id)}/payment-proof/download` : null
+    } : null,
+    user: row.username || row.email || row.kode_toko || row.store_name ? {
+      id: row.user_id,
+      username: row.username || null,
+      email: row.email || null,
+      kodeToko: row.kode_toko || null,
+      storeName: row.store_name || null,
+      alamat: row.alamat || null
     } : null
   };
 }
@@ -558,6 +568,192 @@ async function getOrderByIdForUser(orderId, userId, client = null) {
   return mapOrder(res.rows[0]);
 }
 
+function getAdminOrderSelectSql() {
+  return `SELECT o.*,
+            p.code AS plan_code, p.name AS plan_name, p.plan_type, p.price_idr AS plan_price_idr,
+            p.credits_per_unit AS plan_credits_per_unit, p.duration_months AS plan_duration_months,
+            p.description AS plan_description,
+            u.username, u.email,
+            mp.kode_toko, mp.alamat, mp.konfigurasi_toko->>'namaToko' AS store_name,
+            pp.id AS proof_id, pp.original_name AS proof_original_name,
+            pp.mime_type AS proof_mime_type, pp.size_bytes AS proof_size_bytes,
+            pp.status AS proof_status, pp.submitted_at AS proof_submitted_at`;
+}
+
+function getAdminOrderFromSql() {
+  return `FROM orders o
+     JOIN plans p ON p.id = o.plan_id
+     JOIN users u ON u.id = o.user_id
+     LEFT JOIN mitra_profiles mp ON mp.user_id = u.id
+     LEFT JOIN LATERAL (
+       SELECT id, original_name, mime_type, size_bytes, status, submitted_at
+       FROM payment_proofs
+       WHERE order_id = o.id
+       ORDER BY submitted_at DESC
+       LIMIT 1
+     ) pp ON true`;
+}
+
+async function listOrdersForAdmin() {
+  ensureDbBilling();
+  const res = await query(
+    `${getAdminOrderSelectSql()}
+     ${getAdminOrderFromSql()}
+     ORDER BY
+       CASE o.status
+         WHEN 'waiting_verification' THEN 1
+         WHEN 'pending_payment' THEN 2
+         WHEN 'paid' THEN 3
+         WHEN 'rejected' THEN 4
+         WHEN 'cancelled' THEN 5
+         WHEN 'expired' THEN 6
+         ELSE 9
+       END ASC,
+       o.created_at DESC`
+  );
+  return res.rows.map(mapOrder);
+}
+
+async function getOrderByIdForAdmin(orderId, client = null) {
+  ensureDbBilling();
+  const executor = client || { query };
+  const res = await executor.query(
+    `${getAdminOrderSelectSql()}
+     ${getAdminOrderFromSql()}
+     WHERE o.id = $1
+     LIMIT 1`,
+    [orderId]
+  );
+  return mapOrder(res.rows[0]);
+}
+
+async function getPaymentProofForAdmin(orderId) {
+  ensureDbBilling();
+  const res = await query(
+    `SELECT pp.*
+     FROM payment_proofs pp
+     JOIN orders o ON o.id = pp.order_id
+     WHERE pp.order_id = $1
+     ORDER BY pp.submitted_at DESC
+     LIMIT 1`,
+    [orderId]
+  );
+  return mapPaymentProof(res.rows[0]);
+}
+
+async function reviewOrderPaymentByAdmin({ orderId, action, rejectedReason = null }) {
+  ensureDbBilling();
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (!["approve", "reject"].includes(normalizedAction)) {
+    const err = new Error("Aksi review tidak valid.");
+    err.statusCode = 400;
+    err.code = "INVALID_REVIEW_ACTION";
+    throw err;
+  }
+
+  return withTransaction(async client => {
+    const orderRes = await client.query(
+      `SELECT o.*, p.plan_type, p.credits_per_unit, p.duration_months
+       FROM orders o
+       JOIN plans p ON p.id = o.plan_id
+       WHERE o.id = $1
+       FOR UPDATE`,
+      [orderId]
+    );
+    const order = orderRes.rows[0];
+    if (!order) {
+      const err = new Error("Order tidak ditemukan.");
+      err.statusCode = 404;
+      err.code = "ORDER_NOT_FOUND";
+      throw err;
+    }
+    if (order.status !== "waiting_verification") {
+      const err = new Error("Hanya order menunggu verifikasi yang dapat direview.");
+      err.statusCode = 409;
+      err.code = "ORDER_NOT_REVIEWABLE";
+      throw err;
+    }
+
+    if (normalizedAction === "reject") {
+      const reason = String(rejectedReason || "").trim().slice(0, 500) || "Pembayaran ditolak.";
+      await client.query(
+        `UPDATE orders
+         SET status = 'rejected',
+             rejected_at = now(),
+             rejected_reason = $2,
+             updated_at = now()
+         WHERE id = $1`,
+        [orderId, reason]
+      );
+      await client.query(
+        "UPDATE payment_proofs SET status = 'rejected' WHERE order_id = $1",
+        [orderId]
+      );
+      return {
+        order: await getOrderByIdForAdmin(orderId, client),
+        credit: null
+      };
+    }
+
+    const existingCredit = await client.query(
+      "SELECT id, total_credits, source_type, expires_at FROM credits WHERE order_id = $1 LIMIT 1",
+      [orderId]
+    );
+    let credit = existingCredit.rows[0] || null;
+    if (!credit) {
+      credit = await createCreditBatchForOrder({
+        client,
+        orderId,
+        userId: order.user_id,
+        plan: {
+          id: order.plan_id,
+          plan_type: order.plan_type,
+          credits_per_unit: order.credits_per_unit,
+          duration_months: order.duration_months
+        },
+        quantity: Number(order.quantity || 1)
+      });
+    }
+
+    if (order.coupon_id) {
+      const existingCouponUsage = await client.query(
+        "SELECT id FROM coupon_usages WHERE order_id = $1 LIMIT 1",
+        [orderId]
+      );
+      if (!existingCouponUsage.rows[0]) {
+        await client.query(
+          `INSERT INTO coupon_usages (coupon_id, order_id, user_id, plan_id, discount_idr)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [order.coupon_id, orderId, order.user_id, order.plan_id, toInt(order.discount_idr)]
+        );
+      }
+    }
+
+    await client.query(
+      `UPDATE orders
+       SET status = 'paid',
+           activated_at = COALESCE(activated_at, now()),
+           updated_at = now()
+       WHERE id = $1`,
+      [orderId]
+    );
+    await client.query(
+      "UPDATE payment_proofs SET status = 'approved' WHERE order_id = $1",
+      [orderId]
+    );
+
+    return {
+      order: await getOrderByIdForAdmin(orderId, client),
+      credit: credit ? {
+        id: credit.id,
+        totalCredits: Number(credit.total_credits || 0),
+        sourceType: credit.source_type,
+        expiresAt: toIso(credit.expires_at)
+      } : null
+    };
+  });
+}
+
 async function attachPaymentProof({ orderId, userId, file, userNote = null }) {
   ensureDbBilling();
   return withTransaction(async client => {
@@ -804,6 +1000,10 @@ module.exports = {
   cancelOrderForUser,
   listOrdersForUser,
   getOrderByIdForUser,
+  listOrdersForAdmin,
+  getOrderByIdForAdmin,
+  getPaymentProofForAdmin,
+  reviewOrderPaymentByAdmin,
   attachPaymentProof,
   getCreditBalance,
   deductCreditForJobPrint

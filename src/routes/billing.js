@@ -17,6 +17,10 @@ const {
   cancelOrderForUser,
   listOrdersForUser,
   getOrderByIdForUser,
+  listOrdersForAdmin,
+  getOrderByIdForAdmin,
+  getPaymentProofForAdmin,
+  reviewOrderPaymentByAdmin,
   attachPaymentProof,
   getCreditBalance
 } = require("../services/billing");
@@ -86,7 +90,89 @@ function normalizeOptionalText(value, maxLength = 500) {
   return text ? text.slice(0, maxLength) : "";
 }
 
+function requireAdminUser(req, res) {
+  if (String(req.user?.role || "").toLowerCase() === "admin") {
+    return true;
+  }
+  res.status(403).json({ error: "Akses admin diperlukan." });
+  return false;
+}
+
 router.use(requireAuth);
+
+router.get("/admin/orders", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const orders = await listOrdersForAdmin();
+  res.json({ orders });
+}));
+
+router.get("/admin/orders/:id", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const order = await getOrderByIdForAdmin(req.params.id);
+  if (!order) {
+    res.status(404).json({ error: "Order tidak ditemukan." });
+    return;
+  }
+  res.json({ order });
+}));
+
+router.get("/admin/orders/:id/payment-proof/preview", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const proof = await getPaymentProofForAdmin(req.params.id);
+  if (!proof?.storedPath) {
+    res.status(404).json({ error: "Bukti pembayaran tidak ditemukan." });
+    return;
+  }
+  try {
+    await fs.promises.access(proof.storedPath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "File bukti pembayaran tidak tersedia." });
+    return;
+  }
+  res.setHeader("Content-Type", proof.mimeType || "application/octet-stream");
+  res.setHeader("Content-Disposition", `inline; filename="${path.basename(proof.originalName || "payment-proof")}"`);
+  res.sendFile(path.resolve(proof.storedPath));
+}));
+
+router.get("/admin/orders/:id/payment-proof/download", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const proof = await getPaymentProofForAdmin(req.params.id);
+  if (!proof?.storedPath) {
+    res.status(404).json({ error: "Bukti pembayaran tidak ditemukan." });
+    return;
+  }
+  try {
+    await fs.promises.access(proof.storedPath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "File bukti pembayaran tidak tersedia." });
+    return;
+  }
+  res.download(proof.storedPath, proof.originalName || "payment-proof");
+}));
+
+router.post("/admin/orders/:id/review", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const result = await reviewOrderPaymentByAdmin({
+    orderId: req.params.id,
+    action: req.body?.action,
+    rejectedReason: normalizeOptionalText(req.body?.rejectedReason, 500)
+  });
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: result.order?.status === "paid" ? "billing.order.approved" : "billing.order.rejected",
+    targetType: "order",
+    targetId: result.order?.id || req.params.id,
+    detail: {
+      status: result.order?.status || null,
+      totalIdr: result.order?.totalIdr || 0,
+      creditId: result.credit?.id || null,
+      rejectedReason: result.order?.rejectedReason || null
+    }
+  });
+  res.json(result);
+}));
 
 router.get("/plans", asyncHandler(async (req, res) => {
   const plans = await listActivePlans();

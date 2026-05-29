@@ -76,8 +76,18 @@
                 <h1>Verifikasi Manual</h1>
               </div>
               <div class="admin-toolbar">
-                <button class="btn btn-outline btn-compact" type="button">Filter</button>
-                <button class="btn btn-primary btn-compact" type="button">Refresh</button>
+                <button class="btn btn-outline btn-compact" id="openAdminPaymentFilterBtn" type="button">Filter</button>
+                <button class="btn btn-ghost btn-compact" id="resetAdminPaymentFilterBtn" type="button">Reset Filter</button>
+                <button class="btn btn-primary btn-compact" id="refreshAdminPaymentsBtn" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="jobs-filter-bar admin-filter-bar" aria-label="Filter pembayaran">
+              <label class="field">
+                <span>Cari</span>
+                <input id="adminPaymentSearchInput" type="search" placeholder="Order, akun, toko, plan...">
+              </label>
+              <div class="jobs-filter-actions">
+                <span id="adminPaymentFilterSummary">Semua order</span>
               </div>
             </div>
             <div class="admin-table-wrap">
@@ -181,6 +191,84 @@
         </section>
       </div>
     </main>
+
+    <div class="modal-backdrop" id="adminPaymentReviewModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide admin-payment-review-modal" role="dialog" aria-modal="true" aria-labelledby="adminPaymentReviewTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminPaymentReviewTitle">Review Pembayaran</h2>
+            <p>Periksa detail order dan bukti pembayaran sebelum menyetujui atau menolak.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminPaymentReviewModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="admin-review-layout">
+          <section class="admin-review-detail" id="adminPaymentReviewDetail"></section>
+          <section class="admin-proof-panel">
+            <div class="admin-proof-head">
+              <div>
+                <span>Bukti Pembayaran</span>
+                <strong id="adminProofName">-</strong>
+              </div>
+              <a class="btn btn-outline btn-compact" id="adminProofDownloadLink" href="#" target="_blank" rel="noopener">Download</a>
+            </div>
+            <div class="admin-proof-preview" id="adminProofPreview"></div>
+          </section>
+        </div>
+        <label class="field admin-reject-field" id="adminRejectReasonField">
+          <span>Alasan Penolakan</span>
+          <textarea id="adminRejectReasonInput" rows="3" placeholder="Isi alasan jika pembayaran perlu ditolak"></textarea>
+        </label>
+        <div class="form-footer account-modal-footer">
+          <button class="btn btn-ghost" type="button" data-admin-close="adminPaymentReviewModalBackdrop">Batal</button>
+          <button class="btn btn-outline" id="adminRejectPaymentBtn" type="button">Tolak</button>
+          <button class="btn btn-primary" id="adminApprovePaymentBtn" type="button">Setujui & Aktifkan Kredit</button>
+        </div>
+        <div class="status" id="adminPaymentReviewStatus" role="status"></div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminPaymentFilterModalBackdrop" aria-hidden="true">
+      <div class="modal jobs-filter-modal" role="dialog" aria-modal="true" aria-labelledby="adminPaymentFilterTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminPaymentFilterTitle">Filter Pembayaran</h2>
+            <p>Aktifkan filter yang ingin diterapkan pada tabel pembayaran.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminPaymentFilterModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="jobs-filter-modal-body">
+          <fieldset class="jobs-filter-group">
+            <legend>Status Order</legend>
+            <label><input type="checkbox" name="adminPaymentStatusFilters" value="pending_payment"> Menunggu bayar</label>
+            <label><input type="checkbox" name="adminPaymentStatusFilters" value="waiting_verification"> Menunggu verifikasi</label>
+            <label><input type="checkbox" name="adminPaymentStatusFilters" value="paid"> Paid</label>
+            <label><input type="checkbox" name="adminPaymentStatusFilters" value="rejected"> Ditolak</label>
+            <label><input type="checkbox" name="adminPaymentStatusFilters" value="cancelled"> Dibatalkan</label>
+            <label><input type="checkbox" name="adminPaymentStatusFilters" value="expired"> Kedaluwarsa</label>
+          </fieldset>
+          <fieldset class="jobs-filter-group">
+            <legend>Waktu Order</legend>
+            <label><input type="radio" name="adminPaymentDateMode" value="day" checked> Hari</label>
+            <input id="adminPaymentDateDayInput" type="date">
+            <label><input type="radio" name="adminPaymentDateMode" value="range"> Rentang</label>
+            <div class="jobs-date-range">
+              <input id="adminPaymentDateStartInput" type="date">
+              <input id="adminPaymentDateEndInput" type="date">
+            </div>
+            <label><input type="radio" name="adminPaymentDateMode" value="all"> Semua</label>
+          </fieldset>
+          <fieldset class="jobs-filter-group">
+            <legend>Bukti Pembayaran</legend>
+            <label><input type="checkbox" name="adminPaymentProofFilters" value="available"> Ada bukti</label>
+            <label><input type="checkbox" name="adminPaymentProofFilters" value="not-available"> Belum ada bukti</label>
+          </fieldset>
+        </div>
+        <div class="form-footer jobs-filter-footer">
+          <button class="btn btn-ghost" id="resetAdminPaymentFilterModalBtn" type="button">Reset Filter</button>
+          <button class="btn btn-primary" id="applyAdminPaymentFilterBtn" type="button">Terapkan</button>
+        </div>
+      </div>
+    </div>
 
     <script src="/portal/auth-client.js"></script>
     <script src="/portal/admin/index.js"></script>

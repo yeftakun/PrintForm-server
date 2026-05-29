@@ -3868,6 +3868,127 @@ body.portal-dashboard-active .page {
   display: none;
 }
 
+.admin-filter-bar {
+  margin-bottom: 12px;
+}
+
+.admin-payment-review-modal {
+  width: min(980px, calc(100vw - 28px));
+}
+
+.admin-review-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(320px, 1.15fr);
+  gap: 14px;
+}
+
+.admin-review-detail,
+.admin-proof-panel,
+.admin-reject-field {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e7ecf2;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.admin-review-list {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-review-list div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-review-list dt {
+  color: #667085;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-review-list dd {
+  min-width: 0;
+  margin: 0;
+  color: #101828;
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.admin-proof-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-proof-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-proof-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.admin-proof-head span {
+  color: #667085;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-proof-head strong {
+  color: #101828;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-proof-preview {
+  min-height: 360px;
+  max-height: 58vh;
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+}
+
+.admin-proof-preview img,
+.admin-proof-preview iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  border: 0;
+}
+
+.admin-proof-preview img {
+  object-fit: contain;
+  padding: 10px;
+}
+
+.admin-proof-empty {
+  padding: 22px;
+  color: #667085;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.admin-reject-field {
+  margin-top: 14px;
+}
+
 @media (max-width: 1120px) {
   .admin-stat-grid,
   .admin-billing-grid {
@@ -3937,5 +4058,20 @@ body.portal-dashboard-active .page {
 
   .admin-row-actions {
     min-width: 164px;
+  }
+
+  .admin-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-review-list div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .admin-proof-preview,
+  .admin-proof-preview img,
+  .admin-proof-preview iframe {
+    min-height: 280px;
   }
 }
