@@ -5,50 +5,181 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Portal PrintForm</title>
     <link rel="stylesheet" href="/portal/style.css">
-    <style>
-      body {
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        margin: 0;
-        background: #f6f7f9;
-      }
-
-      .admin-plain-card {
-        width: min(520px, calc(100vw - 32px));
-        padding: 24px;
-        border: 1px solid #dfe4ec;
-        border-radius: 14px;
-        background: #ffffff;
-        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
-      }
-
-      .admin-plain-card h1 {
-        margin: 0 0 8px;
-        font-size: 1.5rem;
-      }
-
-      .admin-plain-card p {
-        margin: 0 0 18px;
-        color: #526071;
-      }
-
-      .admin-plain-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-    </style>
   </head>
-  <body>
-    <main class="admin-plain-card" aria-labelledby="adminPortalTitle">
-      <p class="dashboard-kicker">Portal PrintForm</p>
-      <h1 id="adminPortalTitle">Dashboard Admin</h1>
-      <p id="adminWelcomeText">Memuat akun admin...</p>
-      <div class="admin-plain-actions">
-        <button class="btn btn-primary btn-compact" id="adminLogoutBtn" type="button">Logout</button>
+  <body class="admin-dashboard-page">
+    <main class="admin-shell" aria-labelledby="adminPortalTitle">
+      <header class="admin-topbar">
+        <div class="admin-brand-row">
+          <span class="dashboard-brand-mark" aria-hidden="true">P</span>
+          <div>
+            <strong>Portal PrintForm</strong>
+            <span>Admin Console</span>
+          </div>
+        </div>
+        <div class="admin-topbar-actions">
+          <span class="status-pill online">Sistem aktif</span>
+          <span class="admin-user-chip" id="adminUserChip">Admin</span>
+          <button class="btn btn-ghost btn-compact" id="adminLogoutBtn" type="button">Logout</button>
+        </div>
+      </header>
+
+      <div class="admin-layout">
+        <aside class="admin-sidebar" aria-label="Navigasi admin">
+          <button class="admin-nav-link active" type="button" data-admin-target="adminOverview">Ringkasan</button>
+          <button class="admin-nav-link" type="button" data-admin-target="adminPayments">Pembayaran</button>
+          <button class="admin-nav-link" type="button" data-admin-target="adminStores">Toko</button>
+          <button class="admin-nav-link" type="button" data-admin-target="adminJobs">Job</button>
+          <button class="admin-nav-link" type="button" data-admin-target="adminBilling">Billing</button>
+          <button class="admin-nav-link" type="button" data-admin-target="adminAudit">Audit</button>
+        </aside>
+
+        <section class="admin-content">
+          <section class="admin-panel" id="adminOverview" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Ringkasan</p>
+                <h1 id="adminPortalTitle">Kontrol Operasional</h1>
+              </div>
+              <span id="adminWelcomeText">Memuat akun admin...</span>
+            </div>
+
+            <div class="admin-stat-grid" id="adminStatsGrid"></div>
+
+            <div class="admin-overview-grid">
+              <article class="admin-panel admin-panel-flat">
+                <div class="admin-panel-head">
+                  <div>
+                    <p class="dashboard-kicker">Butuh Tindakan</p>
+                    <h2>Antrean Verifikasi</h2>
+                  </div>
+                  <button class="btn btn-outline btn-compact" type="button" data-admin-jump="adminPayments">Lihat</button>
+                </div>
+                <div class="admin-queue-list" id="adminVerificationQueue"></div>
+              </article>
+
+              <article class="admin-panel admin-panel-flat">
+                <div class="admin-panel-head">
+                  <div>
+                    <p class="dashboard-kicker">Kesehatan Sistem</p>
+                    <h2>Sinyal Operasional</h2>
+                  </div>
+                </div>
+                <div class="admin-signal-list" id="adminSignalsList"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="admin-panel hidden" id="adminPayments" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Pembayaran</p>
+                <h1>Verifikasi Manual</h1>
+              </div>
+              <div class="admin-toolbar">
+                <button class="btn btn-outline btn-compact" type="button">Filter</button>
+                <button class="btn btn-primary btn-compact" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Akun</th>
+                    <th>Plan</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Bukti</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="adminPaymentsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-panel hidden" id="adminStores" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Toko</p>
+                <h1>Monitoring Akun Toko</h1>
+              </div>
+              <div class="admin-toolbar">
+                <button class="btn btn-outline btn-compact" type="button">Export</button>
+                <button class="btn btn-primary btn-compact" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Toko</th>
+                    <th>Kode</th>
+                    <th>Client</th>
+                    <th>Kredit</th>
+                    <th>Order Terakhir</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="adminStoresTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-panel hidden" id="adminJobs" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Job</p>
+                <h1>Aktivitas Cetak</h1>
+              </div>
+              <div class="admin-toolbar">
+                <button class="btn btn-outline btn-compact" type="button">Status</button>
+                <button class="btn btn-primary btn-compact" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Job</th>
+                    <th>Toko</th>
+                    <th>Session</th>
+                    <th>File</th>
+                    <th>Harga</th>
+                    <th>Status</th>
+                    <th>Waktu</th>
+                  </tr>
+                </thead>
+                <tbody id="adminJobsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="admin-panel hidden" id="adminBilling" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Billing</p>
+                <h1>Plan, Kupon, dan Kredit</h1>
+              </div>
+              <span class="admin-muted">Placeholder UI untuk logic approval dan master data nanti.</span>
+            </div>
+            <div class="admin-billing-grid" id="adminBillingGrid"></div>
+          </section>
+
+          <section class="admin-panel hidden" id="adminAudit" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Audit</p>
+                <h1>Aktivitas Sistem</h1>
+              </div>
+              <button class="btn btn-outline btn-compact" type="button">Refresh</button>
+            </div>
+            <div class="admin-audit-list" id="adminAuditList"></div>
+          </section>
+
+          <div class="status admin-status" id="adminStatus" role="status"></div>
+        </section>
       </div>
-      <div class="status" id="adminStatus" role="status"></div>
     </main>
 
     <script src="/portal/auth-client.js"></script>
