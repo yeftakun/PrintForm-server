@@ -335,7 +335,7 @@ router.post("/register", asyncHandler(async (req, res) => {
   }
 
   const usersCount = await countUsers();
-  const role = usersCount === 0 ? "admin" : "user";
+  const role = usersCount === 0 ? "admin" : "mitra";
   const passwordHash = await hashPassword(password);
   const user = await createUser({
     id: createOpaqueId("user"),
@@ -354,7 +354,7 @@ router.post("/register", asyncHandler(async (req, res) => {
     detail: {
       username: user.username || null,
       email: user.email || null,
-      role: user.role || "user"
+      role: user.role || "mitra"
     }
   });
 

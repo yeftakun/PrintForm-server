@@ -28,7 +28,7 @@ function toPublicUser(user) {
     id: user.id,
     username: user.username || null,
     email: user.email || null,
-    role: user.role || "user",
+    role: user.role || "mitra",
     createdAt: user.createdAt || null,
     hasPin: Boolean(user.pinHash),
     alamat: user.alamat || null,
@@ -65,7 +65,7 @@ function buildAccessTokenPayload(user) {
   return {
     sub: user.id,
     username: user.username || null,
-    role: user.role || "user",
+    role: user.role || "mitra",
     tokenType: ACCESS_TOKEN_TYPE
   };
 }

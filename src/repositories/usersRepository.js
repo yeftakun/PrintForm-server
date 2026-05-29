@@ -2,6 +2,7 @@ const { useDb } = require("../config");
 const { query } = require("../db");
 
 const columnExistsCache = new Map();
+const tableExistsCache = new Map();
 
 function ensureDbEnabled() {
   if (useDb) {
@@ -36,34 +37,94 @@ async function hasUserColumn(columnName) {
 }
 
 async function hasPinHashColumn() {
+  if (await hasMitraProfilesTable()) {
+    return true;
+  }
   return hasUserColumn("pin_hash");
 }
 
+async function hasTable(tableName) {
+  ensureDbEnabled();
+  if (tableExistsCache.has(tableName)) {
+    return tableExistsCache.get(tableName);
+  }
+
+  const res = await query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = $1
+    ) AS exists`,
+    [tableName]
+  );
+
+  const exists = Boolean(res.rows[0]?.exists);
+  tableExistsCache.set(tableName, exists);
+  return exists;
+}
+
+async function hasMitraProfilesTable() {
+  return hasTable("mitra_profiles");
+}
+
 async function getUserSelectColumnsSql() {
+  const hasMitraProfiles = await hasMitraProfilesTable();
   const [
-    hasPinColumn,
-    hasAlamatColumn,
-    hasKonfigurasiTokoColumn,
-    hasKodeTokoColumn
-  ] = await Promise.all([
-    hasUserColumn("pin_hash"),
-    hasUserColumn("alamat"),
-    hasUserColumn("konfigurasi_toko"),
-    hasUserColumn("kode_toko")
-  ]);
+    hasUserPinColumn,
+    hasUserAlamatColumn,
+    hasUserKonfigurasiTokoColumn,
+    hasUserKodeTokoColumn
+  ] = hasMitraProfiles
+    ? [false, false, false, false]
+    : await Promise.all([
+      hasUserColumn("pin_hash"),
+      hasUserColumn("alamat"),
+      hasUserColumn("konfigurasi_toko"),
+      hasUserColumn("kode_toko")
+    ]);
 
   return [
-    "id",
-    "username",
-    "email",
-    "password_hash",
-    hasPinColumn ? "pin_hash" : "NULL::text AS pin_hash",
-    "role",
-    "created_at",
-    hasAlamatColumn ? "alamat" : "NULL::text AS alamat",
-    hasKonfigurasiTokoColumn ? "konfigurasi_toko" : "'{}'::jsonb AS konfigurasi_toko",
-    hasKodeTokoColumn ? "kode_toko" : "NULL::text AS kode_toko"
+    "u.id",
+    "u.username",
+    "u.email",
+    "u.password_hash",
+    hasMitraProfiles ? "mp.pin_hash" : hasUserPinColumn ? "u.pin_hash" : "NULL::text AS pin_hash",
+    "u.role",
+    "u.created_at",
+    hasMitraProfiles ? "mp.alamat" : hasUserAlamatColumn ? "u.alamat" : "NULL::text AS alamat",
+    hasMitraProfiles ? "COALESCE(mp.konfigurasi_toko, '{}'::jsonb) AS konfigurasi_toko" : hasUserKonfigurasiTokoColumn ? "COALESCE(u.konfigurasi_toko, '{}'::jsonb) AS konfigurasi_toko" : "'{}'::jsonb AS konfigurasi_toko",
+    hasMitraProfiles ? "mp.kode_toko" : hasUserKodeTokoColumn ? "u.kode_toko" : "NULL::text AS kode_toko"
   ].join(", ");
+}
+
+async function getUserFromSql(whereSql, values) {
+  const hasMitraProfiles = await hasMitraProfilesTable();
+  const selectColumns = await getUserSelectColumnsSql();
+  const res = await query(
+    `SELECT ${selectColumns}
+       FROM users u
+       ${hasMitraProfiles ? "LEFT JOIN mitra_profiles mp ON mp.user_id = u.id" : ""}
+      WHERE ${whereSql}
+      LIMIT 1`,
+    values
+  );
+
+  return mapUserRow(res.rows[0]);
+}
+
+async function ensureMitraProfile(userId) {
+  ensureDbEnabled();
+  if (!userId || !await hasMitraProfilesTable()) {
+    return;
+  }
+
+  await query(
+    `INSERT INTO mitra_profiles (user_id, konfigurasi_toko)
+     VALUES ($1, '{}'::jsonb)
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId]
+  );
 }
 
 function mapUserRow(row) {
@@ -71,13 +132,15 @@ function mapUserRow(row) {
     return null;
   }
 
+  const role = String(row.role || "").trim().toLowerCase();
+
   return {
     id: row.id,
     username: row.username || null,
     email: row.email || null,
     passwordHash: row.password_hash || null,
     pinHash: row.pin_hash || null,
-    role: row.role || "user",
+    role: role === "admin" ? "admin" : "mitra",
     createdAt: row.created_at?.toISOString?.() || row.created_at,
     alamat: row.alamat || null,
     konfigurasiToko: row.konfigurasi_toko || {},
@@ -97,16 +160,7 @@ async function getUserById(userId) {
     return null;
   }
 
-  const selectColumns = await getUserSelectColumnsSql();
-  const res = await query(
-    `SELECT ${selectColumns}
-       FROM users
-      WHERE id = $1
-      LIMIT 1`,
-    [userId]
-  );
-
-  return mapUserRow(res.rows[0]);
+  return getUserFromSql("u.id = $1", [userId]);
 }
 
 async function getUserByUsername(username) {
@@ -115,16 +169,7 @@ async function getUserByUsername(username) {
     return null;
   }
 
-  const selectColumns = await getUserSelectColumnsSql();
-  const res = await query(
-    `SELECT ${selectColumns}
-       FROM users
-      WHERE lower(username) = lower($1)
-      LIMIT 1`,
-    [username]
-  );
-
-  return mapUserRow(res.rows[0]);
+  return getUserFromSql("lower(u.username) = lower($1)", [username]);
 }
 
 async function getUserByEmail(email) {
@@ -133,16 +178,7 @@ async function getUserByEmail(email) {
     return null;
   }
 
-  const selectColumns = await getUserSelectColumnsSql();
-  const res = await query(
-    `SELECT ${selectColumns}
-       FROM users
-      WHERE lower(email) = lower($1)
-      LIMIT 1`,
-    [email]
-  );
-
-  return mapUserRow(res.rows[0]);
+  return getUserFromSql("lower(u.email) = lower($1)", [email]);
 }
 
 async function getUserByIdentifier(identifier) {
@@ -151,72 +187,65 @@ async function getUserByIdentifier(identifier) {
     return null;
   }
 
-  const selectColumns = await getUserSelectColumnsSql();
-  const res = await query(
-    `SELECT ${selectColumns}
-       FROM users
-      WHERE lower(username) = lower($1)
-         OR lower(email) = lower($1)
-      LIMIT 1`,
-    [identifier]
-  );
-
-  return mapUserRow(res.rows[0]);
+  return getUserFromSql("(lower(u.username) = lower($1) OR lower(u.email) = lower($1))", [identifier]);
 }
 
 async function getUserByStoreCode(kodeToko) {
   ensureDbEnabled();
   const normalizedKodeToko = String(kodeToko || "").trim();
-  if (!normalizedKodeToko || !await hasUserColumn("kode_toko")) {
+  if (!normalizedKodeToko) {
     return null;
   }
 
-  const selectColumns = await getUserSelectColumnsSql();
-  const res = await query(
-    `SELECT ${selectColumns}
-       FROM users
-      WHERE lower(kode_toko) = lower($1)
-      LIMIT 1`,
-    [normalizedKodeToko]
-  );
+  if (await hasMitraProfilesTable()) {
+    return getUserFromSql("lower(mp.kode_toko) = lower($1)", [normalizedKodeToko]);
+  }
 
-  return mapUserRow(res.rows[0]);
+  if (!await hasUserColumn("kode_toko")) {
+    return null;
+  }
+
+  return getUserFromSql("lower(u.kode_toko) = lower($1)", [normalizedKodeToko]);
 }
 
 async function createUser({ id, username, email, passwordHash, role }) {
   ensureDbEnabled();
 
-  const hasPinColumn = await hasPinHashColumn();
-  const returningColumns = await getUserSelectColumnsSql();
+  const hasLegacyPinColumn = !await hasMitraProfilesTable() && await hasUserColumn("pin_hash");
+  const resolvedRole = role || "mitra";
 
-  const res = hasPinColumn
+  const res = hasLegacyPinColumn
     ? await query(
       `INSERT INTO users (id, username, email, password_hash, pin_hash, role)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING ${returningColumns}`,
+       RETURNING id`,
       [
         id,
         username || null,
         email || null,
         passwordHash,
         null,
-        role || "user"
+        resolvedRole
       ]
     )
     : await query(
       `INSERT INTO users (id, username, email, password_hash, role)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING ${returningColumns}`,
+       RETURNING id`,
       [
         id,
         username || null,
         email || null,
         passwordHash,
-        role || "user"
+        resolvedRole
       ]
     );
 
-  return mapUserRow(res.rows[0]);
+  if (resolvedRole !== "admin") {
+    await ensureMitraProfile(res.rows[0]?.id);
+  }
+
+  return getUserById(res.rows[0]?.id);
 }
 
 async function updateUserProfile(userId, {
@@ -247,16 +276,15 @@ async function updateUserProfile(userId, {
     return getUserById(userId);
   }
 
-  const returningColumns = await getUserSelectColumnsSql();
   const res = await query(
     `UPDATE users
         SET ${setClauses.join(", ")}
       WHERE id = $1
-      RETURNING ${returningColumns}`,
+      RETURNING id`,
     values
   );
 
-  return mapUserRow(res.rows[0]);
+  return getUserById(res.rows[0]?.id);
 }
 
 async function updateUserStoreSettings(userId, {
@@ -267,6 +295,25 @@ async function updateUserStoreSettings(userId, {
   ensureDbEnabled();
   if (!userId) {
     return null;
+  }
+
+  if (await hasMitraProfilesTable()) {
+    await query(
+      `INSERT INTO mitra_profiles (user_id, alamat, kode_toko, konfigurasi_toko)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO UPDATE
+         SET alamat = EXCLUDED.alamat,
+             kode_toko = EXCLUDED.kode_toko,
+             konfigurasi_toko = EXCLUDED.konfigurasi_toko`,
+      [
+        userId,
+        alamat || null,
+        kodeToko || null,
+        konfigurasiToko || {}
+      ]
+    );
+
+    return getUserById(userId);
   }
 
   const [
@@ -280,28 +327,22 @@ async function updateUserStoreSettings(userId, {
   ]);
 
   if (!hasAlamatColumn || !hasKonfigurasiTokoColumn || !hasKodeTokoColumn) {
-    const err = new Error("Store settings columns are not ready: run the account/store migration first");
+    const err = new Error("Store settings columns are not ready: create mitra_profiles or run the legacy account/store migration first");
     err.statusCode = 409;
     throw err;
   }
 
-  const returningColumns = await getUserSelectColumnsSql();
   const res = await query(
     `UPDATE users
         SET alamat = $2,
             kode_toko = $3,
             konfigurasi_toko = $4
       WHERE id = $1
-      RETURNING ${returningColumns}`,
-    [
-      userId,
-      alamat || null,
-      kodeToko || null,
-      konfigurasiToko || {}
-    ]
+      RETURNING id`,
+    [userId, alamat || null, kodeToko || null, konfigurasiToko || {}]
   );
 
-  return mapUserRow(res.rows[0]);
+  return getUserById(res.rows[0]?.id);
 }
 
 async function updateUserPasswordHash(userId, passwordHash) {
@@ -310,16 +351,15 @@ async function updateUserPasswordHash(userId, passwordHash) {
     return null;
   }
 
-  const returningColumns = await getUserSelectColumnsSql();
   const res = await query(
     `UPDATE users
         SET password_hash = $2
       WHERE id = $1
-      RETURNING ${returningColumns}`,
+      RETURNING id`,
     [userId, passwordHash]
   );
 
-  return mapUserRow(res.rows[0]);
+  return getUserById(res.rows[0]?.id);
 }
 
 async function updateUserPinHash(userId, pinHash) {
@@ -329,22 +369,32 @@ async function updateUserPinHash(userId, pinHash) {
   }
 
   if (!await hasPinHashColumn()) {
-    const err = new Error("PIN feature is not ready: run migration 20260312_step8_account_pin.sql");
+    const err = new Error("PIN feature is not ready: create mitra_profiles or run the legacy PIN migration first");
     err.statusCode = 409;
     throw err;
   }
 
-  const returningColumns = await getUserSelectColumnsSql();
+  if (await hasMitraProfilesTable()) {
+    await query(
+      `INSERT INTO mitra_profiles (user_id, pin_hash, konfigurasi_toko)
+       VALUES ($1, $2, '{}'::jsonb)
+       ON CONFLICT (user_id) DO UPDATE
+         SET pin_hash = EXCLUDED.pin_hash`,
+      [userId, pinHash]
+    );
+
+    return getUserById(userId);
+  }
 
   const res = await query(
     `UPDATE users
         SET pin_hash = $2
       WHERE id = $1
-      RETURNING ${returningColumns}`,
+      RETURNING id`,
     [userId, pinHash]
   );
 
-  return mapUserRow(res.rows[0]);
+  return getUserById(res.rows[0]?.id);
 }
 
 module.exports = {
