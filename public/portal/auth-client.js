@@ -1,5 +1,5 @@
 (() => {
-  const STORAGE_KEY = "printformMitraAuth";
+  const STORAGE_KEY = "printformPortalAuth";
 
   function safeParse(value) {
     if (!value || typeof value !== "string") {
@@ -132,7 +132,7 @@
     clearState();
   }
 
-  window.MitraAuth = {
+  window.PortalAuth = {
     getState,
     saveState,
     clearState,

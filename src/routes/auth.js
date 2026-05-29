@@ -812,7 +812,7 @@ router.post("/verify-pin", requireAuth, asyncHandler(async (req, res) => {
   }
 
   if (!req.user.pinHash) {
-    res.status(409).json({ error: "PIN akun belum diatur. Atur PIN di halaman akun mitra." });
+    res.status(409).json({ error: "PIN akun belum diatur. Atur PIN di halaman akun portal." });
     return;
   }
 

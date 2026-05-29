@@ -19,6 +19,7 @@ function createApp() {
     res.set("Cache-Control", "no-store");
     next();
   });
+  app.use("/portal", express.static(path.join(rootDir, "public", "portal")));
   app.use(express.static(path.join(rootDir, "public")));
   app.use("/uploads/profile-photos", express.static(profilePhotosDir));
 

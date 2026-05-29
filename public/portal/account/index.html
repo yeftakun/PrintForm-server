@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Akun Mitra - PrintForm</title>
-    <link rel="stylesheet" href="/mitra/style.css">
+    <title>Akun Portal - PrintForm</title>
+    <link rel="stylesheet" href="/portal/style.css">
     <link rel="stylesheet" href="/shared/alerts.css">
   </head>
   <body>
     <main class="page account-page">
       <header class="topbar">
-        <a href="/mitra/" class="brand">
-          <span class="brand-mark">M</span>
-          <span>PrintForm Mitra</span>
+        <a href="/portal/" class="brand">
+          <span class="brand-mark">P</span>
+          <span>Portal PrintForm</span>
         </a>
 
         <div class="top-actions">
-          <a href="/mitra/" class="btn btn-outline">Kembali</a>
+          <a href="/portal/" class="btn btn-outline">Kembali</a>
           <button class="btn btn-ghost" id="logoutBtn" type="button">Logout</button>
         </div>
       </header>
@@ -26,10 +26,10 @@
         <p>Perbarui data profil dan password akun Anda secara mandiri.</p>
         <div class="panel" id="authRequiredPanel">
           <h2>Perlu login</h2>
-          <p>Anda belum login. Silakan kembali ke halaman mitra untuk masuk.</p>
+          <p>Anda belum login. Silakan kembali ke portal untuk masuk.</p>
           <div class="status" id="authRequiredStatus"></div>
           <div style="margin-top: 12px;">
-            <a class="btn btn-primary" href="/mitra/">Ke Halaman Mitra</a>
+            <a class="btn btn-primary" href="/portal/">Ke Portal</a>
           </div>
         </div>
       </section>
@@ -37,7 +37,7 @@
       <section class="account-grid hidden" id="accountGrid">
         <article class="panel">
           <h2>Profil Saya</h2>
-          <p class="page-note">Username dan email ini dipakai sebagai identitas akun mitra.</p>
+          <p class="page-note">Username dan email ini dipakai sebagai identitas akun portal.</p>
 
           <form class="form" id="profileForm" style="margin-top: 12px;">
             <label class="field">
@@ -106,7 +106,7 @@
     </main>
 
     <script src="/shared/alerts.js"></script>
-    <script src="/mitra/auth-client.js"></script>
-    <script src="/mitra/account/index.js"></script>
+    <script src="/portal/auth-client.js"></script>
+    <script src="/portal/account/index.js"></script>
   </body>
 </html>

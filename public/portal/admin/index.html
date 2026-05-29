@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Portal PrintForm</title>
+    <link rel="stylesheet" href="/portal/style.css">
+    <style>
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        background: #f6f7f9;
+      }
+
+      .admin-plain-card {
+        width: min(520px, calc(100vw - 32px));
+        padding: 24px;
+        border: 1px solid #dfe4ec;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+      }
+
+      .admin-plain-card h1 {
+        margin: 0 0 8px;
+        font-size: 1.5rem;
+      }
+
+      .admin-plain-card p {
+        margin: 0 0 18px;
+        color: #526071;
+      }
+
+      .admin-plain-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="admin-plain-card" aria-labelledby="adminPortalTitle">
+      <p class="dashboard-kicker">Portal PrintForm</p>
+      <h1 id="adminPortalTitle">Dashboard Admin</h1>
+      <p id="adminWelcomeText">Memuat akun admin...</p>
+      <div class="admin-plain-actions">
+        <button class="btn btn-primary btn-compact" id="adminLogoutBtn" type="button">Logout</button>
+      </div>
+      <div class="status" id="adminStatus" role="status"></div>
+    </main>
+
+    <script src="/portal/auth-client.js"></script>
+    <script src="/portal/admin/index.js"></script>
+  </body>
+</html>

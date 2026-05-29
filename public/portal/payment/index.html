@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Payment Mitra PrintForm</title>
-    <link rel="stylesheet" href="/mitra/style.css">
+    <title>Payment Portal PrintForm</title>
+    <link rel="stylesheet" href="/portal/style.css">
     <link rel="stylesheet" href="/shared/alerts.css">
   </head>
-  <body class="mitra-payment-page">
+  <body class="portal-payment-page">
     <main class="page payment-page">
-      <section class="partner-dashboard payment-shell" aria-labelledby="paymentTitle">
+      <section class="portal-dashboard payment-shell" aria-labelledby="paymentTitle">
         <header class="dashboard-header">
-          <a href="/mitra/" class="dashboard-brand" aria-label="Mitra PrintForm">
+          <a href="/portal/" class="dashboard-brand" aria-label="Portal PrintForm">
             <span class="dashboard-brand-mark" aria-hidden="true">P</span>
-            <span>Mitra PrintForm</span>
+            <span>Portal PrintForm</span>
           </a>
           <div class="dashboard-actions">
-            <a class="btn btn-ghost btn-compact" href="/mitra/#creditSection">Kembali</a>
+            <a class="btn btn-ghost btn-compact" href="/portal/#creditSection">Kembali</a>
             <span class="auth-chip" id="paymentUserChip">@user</span>
           </div>
         </header>
@@ -81,8 +81,8 @@
                   <p id="paymentInstructionText">-</p>
                 </div>
                 <div class="section-actions hidden" id="paymentResultActions">
-                  <a class="btn btn-outline btn-compact" href="/mitra/#creditSection">Lihat Billing</a>
-                  <a class="btn btn-ghost btn-compact" href="/mitra/#creditSection">Pilih Plan Lain</a>
+                  <a class="btn btn-outline btn-compact" href="/portal/#creditSection">Lihat Billing</a>
+                  <a class="btn btn-ghost btn-compact" href="/portal/#creditSection">Pilih Plan Lain</a>
                 </div>
                 <div class="status" id="paymentStatus" role="status"></div>
               </div>
@@ -93,7 +93,7 @@
     </main>
 
     <script src="/shared/alerts.js"></script>
-    <script src="/mitra/auth-client.js"></script>
-    <script src="/mitra/payment/index.js"></script>
+    <script src="/portal/auth-client.js"></script>
+    <script src="/portal/payment/index.js"></script>
   </body>
 </html>

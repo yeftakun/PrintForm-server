@@ -1093,7 +1093,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
       } catch (err) {
         if (err?.code === "INSUFFICIENT_CREDIT") {
           res.status(402).json({
-            error: "Kredit mitra tidak cukup untuk mencetak tugas ini.",
+            error: "Kredit akun tidak cukup untuk mencetak tugas ini.",
             code: "INSUFFICIENT_CREDIT",
             jobId: job.id
           });

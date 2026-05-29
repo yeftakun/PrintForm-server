@@ -1,4 +1,7 @@
 (() => {
+  const PORTAL_HOME_PATH = "/portal/";
+  const PORTAL_ADMIN_PATH = "/portal/admin/";
+
   const paymentUserChip = document.getElementById("paymentUserChip");
   const paymentPlanName = document.getElementById("paymentPlanName");
   const paymentQuantityControl = document.getElementById("paymentQuantityControl");
@@ -96,7 +99,7 @@
 
   async function quotePayment({ includeCoupon = false } = {}) {
     const couponCode = includeCoupon ? String(couponCodeInput.value || "").trim() : "";
-    const body = await window.MitraAuth.apiJson("/api/billing/coupons/validate", {
+    const body = await window.PortalAuth.apiJson("/api/billing/coupons/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -110,15 +113,23 @@
   }
 
   async function loadPaymentPage() {
-    const state = window.MitraAuth.getState();
+    const state = window.PortalAuth.getState();
     if (!state?.accessToken) {
-      setStatus("Silakan login sebagai mitra terlebih dahulu.", "error");
+      setStatus("Silakan login melalui Portal PrintForm terlebih dahulu.", "error");
       createOrderBtn.disabled = true;
       checkCouponBtn.disabled = true;
       return;
     }
 
-    paymentUserChip.textContent = state.user?.username ? `@${escapeHtml(state.user.username)}` : "@user";
+    const meBody = await window.PortalAuth.apiJson("/api/auth/me", { method: "GET" });
+    const currentUser = meBody.user || state.user || null;
+    window.PortalAuth.saveState({ ...state, user: currentUser });
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      window.location.href = PORTAL_ADMIN_PATH;
+      return;
+    }
+
+    paymentUserChip.textContent = currentUser?.username ? `@${escapeHtml(currentUser.username)}` : "@user";
     const { planId, quantity } = getQueryParams();
     if (!planId) {
       setStatus("Plan tidak ditemukan dari URL. Silakan pilih plan dari dashboard.", "error");
@@ -130,8 +141,8 @@
     selectedQuantity = quantity;
     setStatus("Memuat rincian pembayaran...");
     const [plansBody, balanceBody] = await Promise.all([
-      window.MitraAuth.apiJson("/api/billing/plans", { method: "GET" }),
-      window.MitraAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
+      window.PortalAuth.apiJson("/api/billing/plans", { method: "GET" }),
+      window.PortalAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
     ]);
     hasActiveCredits = Number(balanceBody.balance?.totalCredits || 0) > 0;
     selectedPlan = (plansBody.plans || []).find(plan => plan.id === planId || plan.code === planId);
@@ -189,7 +200,7 @@
     setStatus("Membuat order...");
     createOrderBtn.disabled = true;
     try {
-      const result = await window.MitraAuth.apiJson("/api/billing/orders", {
+      const result = await window.PortalAuth.apiJson("/api/billing/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

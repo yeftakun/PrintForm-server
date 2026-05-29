@@ -1,4 +1,8 @@
 (() => {
+  const PORTAL_HOME_PATH = "/portal/";
+  const PORTAL_ADMIN_PATH = "/portal/admin/";
+  const PORTAL_PAYMENT_PATH = "/portal/payment/";
+
   const authShell = document.querySelector(".auth-shell");
   const dashboardShell = document.getElementById("dashboardShell");
   const dashboardSidebar = document.getElementById("dashboardSidebar");
@@ -172,6 +176,19 @@
     AMPLOP: { label: "Amplop", size: "110 x 220 mm" }
   };
   let currentUser = null;
+
+  function getUserRole(user) {
+    return String(user?.role || "").trim().toLowerCase();
+  }
+
+  function isAdminUser(user) {
+    return getUserRole(user) === "admin";
+  }
+
+  function goToAdminPortal() {
+    window.location.href = PORTAL_ADMIN_PATH;
+  }
+
   let latestClients = [];
   let latestJobs = [];
   let latestPlans = [];
@@ -620,7 +637,7 @@
       const steps = [
         ["1", "Scan QR"],
         ["2", "Upload dokumen & atur cetak"],
-        ["3", "Cetak di mitra"]
+        ["3", "Cetak di toko"]
       ];
       steps.forEach(([number, label], index) => {
         const y = 1150 + index * 68;
@@ -1847,7 +1864,7 @@
   }
 
   async function loadDashboardData() {
-    const authState = window.MitraAuth.getState();
+    const authState = window.PortalAuth.getState();
     if (!authState?.accessToken) {
       setLinkedClientsEmpty("Silakan login untuk melihat daftar client.");
       setStatus(linkedClientsStatus, "");
@@ -1859,11 +1876,11 @@
     setStatus(billingStatus, "Memuat data billing...");
 
     const [clientsResult, jobsResult, plansResult, ordersResult, creditResult] = await Promise.allSettled([
-      window.MitraAuth.apiJson("/api/clients", { method: "GET" }),
-      window.MitraAuth.apiJson("/api/jobs", { method: "GET" }),
-      window.MitraAuth.apiJson("/api/billing/plans", { method: "GET" }),
-      window.MitraAuth.apiJson("/api/billing/orders", { method: "GET" }),
-      window.MitraAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
+      window.PortalAuth.apiJson("/api/clients", { method: "GET" }),
+      window.PortalAuth.apiJson("/api/jobs", { method: "GET" }),
+      window.PortalAuth.apiJson("/api/billing/plans", { method: "GET" }),
+      window.PortalAuth.apiJson("/api/billing/orders", { method: "GET" }),
+      window.PortalAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
     ]);
 
     if (clientsResult.status === "fulfilled") {
@@ -1925,7 +1942,7 @@
       planId: plan.id,
       quantity: "1"
     });
-    window.location.href = `/mitra/payment/?${params.toString()}`;
+    window.location.href = `${PORTAL_PAYMENT_PATH}?${params.toString()}`;
   }
 
   function openPaymentProofModal(orderId) {
@@ -1953,7 +1970,7 @@
 
     setStatus(billingStatus, "Membatalkan order...");
     try {
-      await window.MitraAuth.apiJson(`/api/billing/orders/${encodeURIComponent(safeOrderId)}/cancel`, {
+      await window.PortalAuth.apiJson(`/api/billing/orders/${encodeURIComponent(safeOrderId)}/cancel`, {
         method: "POST"
       });
       notify({
@@ -1976,7 +1993,7 @@
     const formData = new FormData(paymentProofForm);
     setStatus(paymentProofStatus, "Mengupload bukti pembayaran...");
     try {
-      const response = await window.MitraAuth.apiFetch(
+      const response = await window.PortalAuth.apiFetch(
         `/api/billing/orders/${encodeURIComponent(activePaymentProofOrderId)}/payment-proof`,
         {
           method: "POST",
@@ -2013,7 +2030,7 @@
 
     const confirmed = await confirmAction({
       title: "Lepas client?",
-      message: `Client "${clientName || "client"}" akan dilepas dari akun mitra ini.`,
+      message: `Client "${clientName || "client"}" akan dilepas dari akun portal ini.`,
       okText: "Lepas",
       cancelText: "Batal",
       variant: "warning"
@@ -2027,7 +2044,7 @@
     setStatus(linkedClientsStatus, `Melepas binding ${clientName || "client"}...`);
 
     try {
-      await window.MitraAuth.apiJson(`/api/clients/${encodeURIComponent(safeClientId)}/unbind`, {
+      await window.PortalAuth.apiJson(`/api/clients/${encodeURIComponent(safeClientId)}/unbind`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
@@ -2047,23 +2064,23 @@
   }
 
   async function syncMe() {
-    const state = window.MitraAuth.getState();
+    const state = window.PortalAuth.getState();
     if (!state?.accessToken) {
       return null;
     }
 
     try {
-      const meRes = await window.MitraAuth.apiJson("/api/auth/me", {
+      const meRes = await window.PortalAuth.apiJson("/api/auth/me", {
         method: "GET"
       });
       const nextState = {
-        ...window.MitraAuth.getState(),
+        ...window.PortalAuth.getState(),
         user: meRes.user
       };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       return meRes.user;
     } catch {
-      window.MitraAuth.clearState();
+      window.PortalAuth.clearState();
       return null;
     }
   }
@@ -2106,7 +2123,7 @@
     serviceSettingsForm.elements.priceColor.value = Number.isFinite(Number(modePrices.color))
       ? String(Number(modePrices.color))
       : String(legacyBasePrice || "");
-    dashboardUserChip.textContent = user?.username ? `@${user.username}` : "Akun Mitra";
+    dashboardUserChip.textContent = user?.username ? `@${user.username}` : "Akun Portal";
     dashboardStoreCode.textContent = `Kode toko: ${user?.kodeToko || "-"}`;
     dashboardUserStoreCode.textContent = `Kode toko: ${user?.kodeToko || "-"}`;
     const profilePhotoUrl = getProfilePhotoUrl(user);
@@ -2169,17 +2186,17 @@
     setStatus(statusEl, "Menyimpan pengaturan...");
 
     try {
-      const body = await window.MitraAuth.apiJson("/api/auth/me/store", {
+      const body = await window.PortalAuth.apiJson("/api/auth/me/store", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildSettingsPayload())
       });
 
       const nextState = {
-        ...window.MitraAuth.getState(),
+        ...window.PortalAuth.getState(),
         user: body.user
       };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       currentUser = body.user;
       fillDashboardForms(body.user);
       setStatus(statusEl, successMessage, "success");
@@ -2203,7 +2220,7 @@
       const blob = await createProfilePhotoBlob();
       const formData = new FormData();
       formData.append("photo", blob, "profile-photo.jpg");
-      const res = await window.MitraAuth.apiFetch("/api/auth/me/store/profile-photo", {
+      const res = await window.PortalAuth.apiFetch("/api/auth/me/store/profile-photo", {
         method: "POST",
         body: formData
       });
@@ -2212,9 +2229,9 @@
         throw new Error(body?.error || `Upload gagal (${res.status})`);
       }
 
-      const state = window.MitraAuth.getState() || {};
+      const state = window.PortalAuth.getState() || {};
       const nextState = { ...state, user: body.user };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       currentUser = body.user;
       fillDashboardForms(body.user);
       setStatus(storeProfilePhotoStatus, "Foto profil berhasil diperbarui.", "success");
@@ -2230,8 +2247,12 @@
   }
 
   function renderAuthedState(user) {
+    if (isAdminUser(user)) {
+      goToAdminPortal();
+      return;
+    }
     currentUser = user;
-    document.body.classList.add("mitra-dashboard-active");
+    document.body.classList.add("portal-dashboard-active");
     authShell?.classList.add("hidden");
     dashboardShell?.classList.remove("hidden");
     fillDashboardForms(user);
@@ -2244,7 +2265,7 @@
     currentUser = null;
     latestClients = [];
     latestJobs = [];
-    document.body.classList.remove("mitra-dashboard-active");
+    document.body.classList.remove("portal-dashboard-active");
     closeDashboardSidebar();
     dashboardShell?.classList.add("hidden");
     authShell?.classList.remove("hidden");
@@ -2254,7 +2275,7 @@
   }
 
   async function renderAuthState() {
-    const state = window.MitraAuth.getState();
+    const state = window.PortalAuth.getState();
     if (!state?.accessToken) {
       renderGuestState();
       return;
@@ -2279,13 +2300,13 @@
     const password = String(formData.get("password") || "");
 
     try {
-      const body = await window.MitraAuth.apiJson("/api/auth/login", {
+      const body = await window.PortalAuth.apiJson("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password })
       }, { retry: false });
 
-      window.MitraAuth.saveState({
+      window.PortalAuth.saveState({
         accessToken: body.accessToken,
         refreshToken: body.refreshToken,
         accessTokenTtl: body.accessTokenTtl,
@@ -2318,13 +2339,13 @@
     }
 
     try {
-      const body = await window.MitraAuth.apiJson("/api/auth/register", {
+      const body = await window.PortalAuth.apiJson("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password })
       }, { retry: false });
 
-      window.MitraAuth.saveState({
+      window.PortalAuth.saveState({
         accessToken: body.accessToken,
         refreshToken: body.refreshToken,
         accessTokenTtl: body.accessTokenTtl,
@@ -2349,23 +2370,23 @@
     const email = String(accountProfileForm.elements.email.value || "").trim();
 
     try {
-      const body = await window.MitraAuth.apiJson("/api/auth/me", {
+      const body = await window.PortalAuth.apiJson("/api/auth/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email })
       });
 
       const nextState = {
-        ...window.MitraAuth.getState(),
+        ...window.PortalAuth.getState(),
         user: body.user
       };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       currentUser = body.user;
       fillDashboardForms(body.user);
       setStatus(accountProfileStatus, "Profil berhasil diperbarui.", "success");
       notify({
         title: "Profil tersimpan",
-        message: "Data akun mitra berhasil diperbarui.",
+        message: "Data akun portal berhasil diperbarui.",
         variant: "success"
       });
     } catch (err) {
@@ -2388,7 +2409,7 @@
     }
 
     try {
-      await window.MitraAuth.apiJson("/api/auth/me/password", {
+      await window.PortalAuth.apiJson("/api/auth/me/password", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword })
@@ -2403,7 +2424,7 @@
       });
 
       setTimeout(async () => {
-        await window.MitraAuth.logoutCurrentSession();
+        await window.PortalAuth.logoutCurrentSession();
         closeModal(passwordModalBackdrop);
         renderGuestState();
       }, 900);
@@ -2433,7 +2454,7 @@
     }
 
     try {
-      await window.MitraAuth.apiJson("/api/auth/me/pin", {
+      await window.PortalAuth.apiJson("/api/auth/me/pin", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, pin })
@@ -2441,20 +2462,20 @@
 
       accountPinForm.reset();
       const nextUser = {
-        ...(currentUser || window.MitraAuth.getState()?.user || {}),
+        ...(currentUser || window.PortalAuth.getState()?.user || {}),
         hasPin: true
       };
       const nextState = {
-        ...window.MitraAuth.getState(),
+        ...window.PortalAuth.getState(),
         user: nextUser
       };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       currentUser = nextUser;
       fillDashboardForms(nextUser);
       setStatus(accountPinStatusMessage, "PIN berhasil disimpan.", "success");
       notify({
         title: "PIN tersimpan",
-        message: "PIN akun mitra berhasil diperbarui.",
+        message: "PIN akun portal berhasil diperbarui.",
         variant: "success"
       });
     } catch (err) {
@@ -2463,11 +2484,11 @@
   }
 
   async function onLogout() {
-    await window.MitraAuth.logoutCurrentSession();
+    await window.PortalAuth.logoutCurrentSession();
     renderGuestState();
     notify({
       title: "Logout berhasil",
-      message: "Anda sudah keluar dari dashboard mitra.",
+      message: "Anda sudah keluar dari Portal PrintForm.",
       variant: "success"
     });
   }
@@ -2488,18 +2509,18 @@
     if (window.PrintFormAlert?.ok) {
       window.PrintFormAlert.ok({
         title: "Hubungkan Client Baru",
-        message: "Install aplikasi desktop PrintForm, login dengan akun mitra ini, lalu pilih printer aktif dari aplikasi client.",
+        message: "Install aplikasi desktop PrintForm, login dengan akun portal ini, lalu pilih printer aktif dari aplikasi client.",
         variant: "info"
       });
       return;
     }
-    window.alert("Install aplikasi desktop PrintForm dan login dengan akun mitra ini.");
+    window.alert("Install aplikasi desktop PrintForm dan login dengan akun portal ini.");
   }
 
   function showHelpInfo(action) {
     const messages = {
       download: ["Download aplikasi desktop", "Tambahkan file installer ke folder public agar tombol download dapat diarahkan langsung ke file tersebut."],
-      install: ["Panduan instalasi", "Install client desktop, login dengan akun mitra, pilih printer, lalu pastikan status client online."],
+      install: ["Panduan instalasi", "Install client desktop, login dengan akun portal, pilih printer, lalu pastikan status client online."],
       troubleshoot: ["Troubleshooting", "Pastikan server aktif, client desktop login, printer terpilih, dan koneksi jaringan stabil."]
     };
     const [title, message] = messages[action] || messages.troubleshoot;
@@ -2553,7 +2574,7 @@
         setStatus(accountProfileStatus, "");
         setStatus(accountPasswordStatus, "");
         setStatus(accountPinStatusMessage, "");
-        fillAccountProfileForm(currentUser || window.MitraAuth.getState()?.user);
+        fillAccountProfileForm(currentUser || window.PortalAuth.getState()?.user);
         openModal(target);
       });
     });
@@ -2589,7 +2610,7 @@
     dashboardSidebarClose?.addEventListener("click", closeDashboardSidebar);
     dashboardSidebarBackdrop?.addEventListener("click", closeDashboardSidebar);
     window.addEventListener("hashchange", () => {
-      if (document.body.classList.contains("mitra-dashboard-active")) {
+      if (document.body.classList.contains("portal-dashboard-active")) {
         activateDashboardPanel(getDashboardTargetFromHash(), { updateHash: false, closeSidebar: true });
       }
     });

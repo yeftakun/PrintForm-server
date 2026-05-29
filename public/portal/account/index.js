@@ -40,27 +40,27 @@
   }
 
   async function loadCurrentUser() {
-    const state = window.MitraAuth.getState();
+    const state = window.PortalAuth.getState();
     if (!state?.accessToken) {
       showGuestView();
       return null;
     }
 
     try {
-      const res = await window.MitraAuth.apiJson("/api/auth/me", {
+      const res = await window.PortalAuth.apiJson("/api/auth/me", {
         method: "GET"
       });
 
       const nextState = {
-        ...window.MitraAuth.getState(),
+        ...window.PortalAuth.getState(),
         user: res.user
       };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       showAccountView();
       fillProfileForm(res.user);
       return res.user;
     } catch {
-      window.MitraAuth.clearState();
+      window.PortalAuth.clearState();
       showGuestView();
       return null;
     }
@@ -74,7 +74,7 @@
     const email = String(profileForm.elements.email.value || "").trim();
 
     try {
-      const body = await window.MitraAuth.apiJson("/api/auth/me", {
+      const body = await window.PortalAuth.apiJson("/api/auth/me", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
@@ -86,10 +86,10 @@
       });
 
       const nextState = {
-        ...window.MitraAuth.getState(),
+        ...window.PortalAuth.getState(),
         user: body.user
       };
-      window.MitraAuth.saveState(nextState);
+      window.PortalAuth.saveState(nextState);
       fillProfileForm(body.user);
       setStatus(profileStatus, "Profil berhasil diperbarui.", "success");
     } catch (err) {
@@ -111,7 +111,7 @@
     }
 
     try {
-      await window.MitraAuth.apiJson("/api/auth/me/password", {
+      await window.PortalAuth.apiJson("/api/auth/me/password", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
@@ -126,8 +126,8 @@
       setStatus(passwordStatus, "Password berhasil diubah. Anda akan logout otomatis.", "success");
 
       setTimeout(async () => {
-        await window.MitraAuth.logoutCurrentSession();
-        window.location.href = "/mitra/";
+        await window.PortalAuth.logoutCurrentSession();
+        window.location.href = "/portal/";
       }, 900);
     } catch (err) {
       setStatus(passwordStatus, err.message || "Gagal memperbarui password.", "error");
@@ -153,7 +153,7 @@
     }
 
     try {
-      await window.MitraAuth.apiJson("/api/auth/me/pin", {
+      await window.PortalAuth.apiJson("/api/auth/me/pin", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
@@ -172,8 +172,8 @@
   }
 
   async function onLogout() {
-    await window.MitraAuth.logoutCurrentSession();
-    window.location.href = "/mitra/";
+    await window.PortalAuth.logoutCurrentSession();
+    window.location.href = "/portal/";
   }
 
   logoutBtn.addEventListener("click", onLogout);
