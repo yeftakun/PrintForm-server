@@ -480,6 +480,32 @@ function filterJobsByClaimClient(jobs, claimClientId) {
   });
 }
 
+function isTruthyQueryValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1"
+    || normalized === "true"
+    || normalized === "yes"
+    || normalized === "on";
+}
+
+function shouldFilterActiveSessions(req) {
+  return isTruthyQueryValue(req.query?.activeSessionOnly)
+    || isTruthyQueryValue(req.query?.activeSessionsOnly);
+}
+
+function filterJobsByActiveSessions(jobs, sessions) {
+  const activeSessionIds = new Set(
+    sessions
+      .filter(session => isSessionActive(session))
+      .map(session => session.id)
+  );
+
+  return jobs.filter(job => {
+    const sessionId = String(job?.sessionId || "").trim();
+    return sessionId && activeSessionIds.has(sessionId);
+  });
+}
+
 const upload = multer({
   dest: filesDir,
   limits: {
@@ -587,12 +613,19 @@ router.get("/", asyncHandler(async (req, res) => {
       res.set("Warning", warningMessage);
     }
   }
-  if (req.query.sessionId) {
+    if (req.query.sessionId) {
     jobs = jobs.filter(job => job.sessionId === req.query.sessionId);
   }
+
   if (req.query.status) {
     jobs = jobs.filter(job => job.status === req.query.status);
   }
+
+  if (shouldFilterActiveSessions(req)) {
+    const sessions = await getSessions();
+    jobs = filterJobsByActiveSessions(jobs, sessions);
+  }
+
   const jobsWithFileStatus = await Promise.all(jobs.map(withPhysicalJobFileStatus));
   res.json(jobsWithFileStatus.map(toPublicJob));
 }));
