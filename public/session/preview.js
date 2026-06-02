@@ -203,7 +203,7 @@ function safeParseJson(value) {
 }
 
 function getStoreServiceConfig() {
-  return safeParseJson(sessionStorage.getItem("printformSessionStoreServices")) || {};
+  return safeParseJson(sessionStorage.getItem("printorderSessionStoreServices")) || {};
 }
 
 function canonicalPaperSize(value) {

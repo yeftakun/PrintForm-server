@@ -10,9 +10,9 @@ const sessionActive = document.getElementById("sessionActive");
 const realtimeStatus = document.getElementById("realtimeStatus");
 const requiresSessionSections = document.querySelectorAll(".requires-session");
 
-let sessionId = sessionStorage.getItem("printformSessionId") || "";
-let sessionClient = sessionStorage.getItem("printformSessionClientName") || "";
-let sessionAlias = sessionStorage.getItem("printformSessionAlias") || "";
+let sessionId = sessionStorage.getItem("printorderSessionId") || "";
+let sessionClient = sessionStorage.getItem("printorderSessionClientName") || "";
+let sessionAlias = sessionStorage.getItem("printorderSessionAlias") || "";
 let sessionHeartbeatFailures = 0;
 let realtimeSocket = null;
 let realtimeReconnectTimer = null;
@@ -66,13 +66,13 @@ function clearSessionState() {
   sessionClient = "";
   sessionAlias = "";
   sessionHeartbeatFailures = 0;
-  sessionStorage.removeItem("printformSessionId");
-  sessionStorage.removeItem("printformSessionClientName");
-  sessionStorage.removeItem("printformSessionStoreCode");
-  sessionStorage.removeItem("printformSessionStoreAddress");
-  sessionStorage.removeItem("printformSessionStoreHours");
-  sessionStorage.removeItem("printformSessionStoreServices");
-  sessionStorage.removeItem("printformSessionAlias");
+  sessionStorage.removeItem("printorderSessionId");
+  sessionStorage.removeItem("printorderSessionClientName");
+  sessionStorage.removeItem("printorderSessionStoreCode");
+  sessionStorage.removeItem("printorderSessionStoreAddress");
+  sessionStorage.removeItem("printorderSessionStoreHours");
+  sessionStorage.removeItem("printorderSessionStoreServices");
+  sessionStorage.removeItem("printorderSessionAlias");
   setSessionUi(false);
   callbacks.resetPreviewState();
 }
@@ -323,8 +323,8 @@ export function initSession(nextCallbacks = {}) {
 
   if (endSessionBtn) {
     endSessionBtn.addEventListener("click", async () => {
-      const choice = window.PrintFormAlert
-        ? await window.PrintFormAlert.confirm({
+      const choice = window.PrintOrderAlert
+        ? await window.PrintOrderAlert.confirm({
             variant: "warning",
             title: "Akhiri sesi cetak?",
             message: "Setelah sesi diakhiri, Anda akan kembali ke halaman utama. Unduh semua bukti cetak lebih dulu jika diperlukan.",

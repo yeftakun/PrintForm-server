@@ -1,7 +1,7 @@
-# Rencana Langganan Mitra PrintForm
+# Rencana Langganan Mitra PrintOrder
 
 ## Rencana Free Test
-Ditujukan untuk mitra yang ingin mencoba layanan PrintForm dengan fitur terbatas sebelum memutuskan untuk berlangganan rencana berbayar.
+Ditujukan untuk mitra yang ingin mencoba layanan PrintOrder dengan fitur terbatas sebelum memutuskan untuk berlangganan rencana berbayar.
 - Gratis
 - 7 hari trial
 - Unlimited job

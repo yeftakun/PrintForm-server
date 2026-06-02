@@ -1,8 +1,8 @@
 {
-  "name": "printform-server",
+  "name": "printorder-server",
   "version": "0.1.0",
   "private": true,
-  "description": "Simple print job server for PrintForm client",
+  "description": "Simple print job server for PrintOrder client",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

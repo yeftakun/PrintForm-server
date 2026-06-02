@@ -335,7 +335,7 @@
     });
   }
 
-  window.PrintFormQr = {
+  window.PrintOrderQr = {
     createMatrixForText,
     drawMatrixToCanvas
   };

@@ -17,7 +17,7 @@ function buildPasswordResetEmail({
   userName,
   expiresInMinutes = PASSWORD_RESET_TOKEN_TTL_MINUTES
 }) {
-  const appName = MAIL_FROM_NAME || "PrintForm";
+  const appName = MAIL_FROM_NAME || "PrintOrder";
   const safeAppName = escapeHtml(appName);
   const safeResetUrl = escapeHtml(resetUrl);
   const greetingName = userName ? ` ${userName}` : "";

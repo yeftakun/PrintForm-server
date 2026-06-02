@@ -1,7 +1,7 @@
-# A. Konsep Mockup UI PrintForm (WEB)
+# A. Konsep Mockup UI PrintOrder (WEB)
 
 ## Halaman Utama (endpoint `/`) (Pelanggan)
-Pelanggan yang ingin mencetak dokumennya dengan memakai layanan PrintForm akan membuka halaman ini (Untuk lebih lengkap lihat [USER_FLOW.md](FINAL_USER_FLOW.md)).
+Pelanggan yang ingin mencetak dokumennya dengan memakai layanan PrintOrder akan membuka halaman ini (Untuk lebih lengkap lihat [USER_FLOW.md](FINAL_USER_FLOW.md)).
 - [Metode 1 temukan toko] Untuk memudahkan apabila mitra sudah banyak akan menggunakan fitur pencarian toko/kios berdasarkan username toko/kios.
 - [Metode 2 temukan toko] Selain itu terdapat "Scan QR code" (QR code akan di scan di lokasi toko/kios).
 - Tombol Daftar/Login Pelanggan (akan membuka modal login/daftar).

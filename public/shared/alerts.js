@@ -215,7 +215,7 @@
     });
   }
 
-  window.PrintFormAlert = {
+  window.PrintOrderAlert = {
     notify,
     confirm,
     ok: options => confirm({ ...normalizeOptions(options), mode: "ok" }),

@@ -1,5 +1,5 @@
 (() => {
-  const STORAGE_KEY = "printformPortalAuth";
+  const STORAGE_KEY = "printorderPortalAuth";
 
   function safeParse(value) {
     if (!value || typeof value !== "string") {

@@ -28,7 +28,7 @@ Input yang direkomendasikan untuk fase ini:
 
 ### 13b. Spesifikasi Implementasi Client (Desktop)
 
-Berdasarkan diskusi arsitektur (Margin 0 vs Force Shrink), berikut adalah spesifikasi rendering untuk PrintForm Client (.NET):
+Berdasarkan diskusi arsitektur (Margin 0 vs Force Shrink), berikut adalah spesifikasi rendering untuk PrintOrder Client (.NET):
 
 1.  **Margin Strategy: "Hardware Margin Pass-through"**
     *   Client **TIDAK BOLEH** melakukan *auto-shrink* atau *fit-to-page* secara paksa jika user meminta Scale 100%.

@@ -608,8 +608,8 @@ router.get("/", asyncHandler(async (req, res) => {
     if (req.user) {
       // target_client_id has been removed from schema; legacy query filter is ignored.
       const warningMessage = JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER
-        ? "299 PrintForm API: query clientId is legacy and ignored after target_client_id removal; use claimClientId"
-        : "299 PrintForm API: query clientId is legacy and ignored; use claimClientId";
+        ? "299 PrintOrder API: query clientId is legacy and ignored after target_client_id removal; use claimClientId"
+        : "299 PrintOrder API: query clientId is legacy and ignored; use claimClientId";
       res.set("Warning", warningMessage);
     }
   }

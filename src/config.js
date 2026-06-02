@@ -56,7 +56,7 @@ const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES) || 25 * 1024 * 102
 const PAYMENT_PROOF_MAX_BYTES = Number(process.env.PAYMENT_PROOF_MAX_BYTES) || MAX_UPLOAD_BYTES;
 const PROFILE_PHOTO_MAX_BYTES = Number(process.env.PROFILE_PHOTO_MAX_BYTES) || 5 * 1024 * 1024;
 const PAYMENT_MANUAL_INSTRUCTIONS = process.env.PAYMENT_MANUAL_INSTRUCTIONS
-  || "Transfer manual ke rekening PrintForm, lalu upload bukti pembayaran dari halaman order.";
+  || "Transfer manual ke rekening PrintOrder, lalu upload bukti pembayaran dari halaman order.";
 const PAYMENT_ORDER_TTL_HOURS = Number(process.env.PAYMENT_ORDER_TTL_HOURS) || 24;
 const ALLOWED_UPLOAD_MIME_TYPES = parseCsvList(process.env.ALLOWED_UPLOAD_MIME_TYPES, [
   "application/pdf",
@@ -109,8 +109,8 @@ const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_SECURE = parseBoolean(process.env.SMTP_SECURE, false);
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
-const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || "PrintForm";
-const MAIL_FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || "no-reply@printform.local";
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || "PrintOrder";
+const MAIL_FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || "no-reply@printorder.local";
 const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${port}`;
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = Math.max(
   1,

@@ -115,7 +115,7 @@
   async function loadPaymentPage() {
     const state = window.PortalAuth.getState();
     if (!state?.accessToken) {
-      setStatus("Silakan login melalui Portal PrintForm terlebih dahulu.", "error");
+      setStatus("Silakan login melalui Portal PrintOrder terlebih dahulu.", "error");
       createOrderBtn.disabled = true;
       checkCouponBtn.disabled = true;
       return;

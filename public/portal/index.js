@@ -254,8 +254,8 @@
   }
 
   function notify(options) {
-    if (window.PrintFormAlert?.notify) {
-      window.PrintFormAlert.notify(options);
+    if (window.PrintOrderAlert?.notify) {
+      window.PrintOrderAlert.notify(options);
       return;
     }
 
@@ -265,8 +265,8 @@
   }
 
   async function confirmAction(options) {
-    if (window.PrintFormAlert?.confirm) {
-      return window.PrintFormAlert.confirm(options);
+    if (window.PrintOrderAlert?.confirm) {
+      return window.PrintOrderAlert.confirm(options);
     }
     return window.confirm(options?.message || "Lanjutkan aksi ini?");
   }
@@ -474,10 +474,10 @@
 
   function getQrMatrix() {
     const qrText = getStoreQrUrl();
-    if (!qrText || !window.PrintFormQr?.createMatrixForText) {
+    if (!qrText || !window.PrintOrderQr?.createMatrixForText) {
       return null;
     }
-    return window.PrintFormQr.createMatrixForText(qrText);
+    return window.PrintOrderQr.createMatrixForText(qrText);
   }
 
   function renderStoreQr() {
@@ -494,7 +494,7 @@
 
     try {
       const matrix = getQrMatrix();
-      window.PrintFormQr.drawMatrixToCanvas(storeQrCanvas, matrix, {
+      window.PrintOrderQr.drawMatrixToCanvas(storeQrCanvas, matrix, {
         pixelSize: 5,
         foreground: "#241006",
         background: "#ffffff"
@@ -584,7 +584,7 @@
       drawRoundRect(ctx, 22, 18, 1036, 1404, 24);
       ctx.stroke();
 
-      drawCenteredText(ctx, "PrintForm", 540, 100, 520, 48, "700", ink);
+      drawCenteredText(ctx, "PrintOrder", 540, 100, 520, 48, "700", ink);
       ctx.strokeStyle = softLine;
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -676,7 +676,7 @@
         .toLowerCase()
         .replace(/[^a-z0-9._-]+/g, "-")
         .replace(/^-+|-+$/g, "") || "toko";
-      link.download = `printform-qr-${safeName}.png`;
+      link.download = `printorder-qr-${safeName}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (err) {
@@ -2522,14 +2522,14 @@
     renderGuestState();
     notify({
       title: "Logout berhasil",
-      message: "Anda sudah keluar dari Portal PrintForm.",
+      message: "Anda sudah keluar dari Portal PrintOrder.",
       variant: "success"
     });
   }
 
   function showDownloadInfo() {
-    if (window.PrintFormAlert?.ok) {
-      window.PrintFormAlert.ok({
+    if (window.PrintOrderAlert?.ok) {
+      window.PrintOrderAlert.ok({
         title: "Download Klien",
         message: "Paket installer desktop belum tersedia di folder public. Setelah file installer ditambahkan, tombol ini bisa diarahkan ke file tersebut.",
         variant: "info"
@@ -2540,15 +2540,15 @@
   }
 
   function showConnectClientInfo() {
-    if (window.PrintFormAlert?.ok) {
-      window.PrintFormAlert.ok({
+    if (window.PrintOrderAlert?.ok) {
+      window.PrintOrderAlert.ok({
         title: "Hubungkan Client Baru",
-        message: "Install aplikasi desktop PrintForm, login dengan akun portal ini, lalu pilih printer aktif dari aplikasi client.",
+        message: "Install aplikasi desktop PrintOrder, login dengan akun portal ini, lalu pilih printer aktif dari aplikasi client.",
         variant: "info"
       });
       return;
     }
-    window.alert("Install aplikasi desktop PrintForm dan login dengan akun portal ini.");
+    window.alert("Install aplikasi desktop PrintOrder dan login dengan akun portal ini.");
   }
 
   function showHelpInfo(action) {
@@ -2559,8 +2559,8 @@
     };
     const [title, message] = messages[action] || messages.troubleshoot;
 
-    if (window.PrintFormAlert?.ok) {
-      window.PrintFormAlert.ok({ title, message, variant: "info" });
+    if (window.PrintOrderAlert?.ok) {
+      window.PrintOrderAlert.ok({ title, message, variant: "info" });
       return;
     }
     window.alert(message);

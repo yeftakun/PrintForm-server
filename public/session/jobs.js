@@ -19,7 +19,7 @@ let latestJobs = [];
 let selectedDetailJobId = "";
 
 function notify(variant, title, message) {
-  window.PrintFormAlert?.notify({ variant, title, message });
+  window.PrintOrderAlert?.notify({ variant, title, message });
 }
 
 function escapeHtml(value) {
@@ -153,12 +153,12 @@ function openJobDetail(jobId) {
 
 function getReceiptContext() {
   return {
-    storeName: sessionStorage.getItem("printformSessionClientName") || "Toko Percetakan",
-    storeCode: sessionStorage.getItem("printformSessionStoreCode") || "-",
-    storeAddress: sessionStorage.getItem("printformSessionStoreAddress") || "Alamat toko belum tersedia",
-    storeHours: sessionStorage.getItem("printformSessionStoreHours") || "Jam operasional belum tersedia",
+    storeName: sessionStorage.getItem("printorderSessionClientName") || "Toko Percetakan",
+    storeCode: sessionStorage.getItem("printorderSessionStoreCode") || "-",
+    storeAddress: sessionStorage.getItem("printorderSessionStoreAddress") || "Alamat toko belum tersedia",
+    storeHours: sessionStorage.getItem("printorderSessionStoreHours") || "Jam operasional belum tersedia",
     sessionId: getSessionId() || "-",
-    alias: sessionStorage.getItem("printformSessionAlias") || "-"
+    alias: sessionStorage.getItem("printorderSessionAlias") || "-"
   };
 }
 
@@ -229,7 +229,7 @@ function buildReceiptCanvas(jobs, { title = "BUKTI CETAK" } = {}) {
   ctx.fillRect(0, 0, width, estimatedHeight);
 
   let y = 28;
-  drawReceiptText(ctx, "PrintForm", width / 2, y, { size: 38, weight: "700", align: "center" });
+  drawReceiptText(ctx, "PrintOrder", width / 2, y, { size: 38, weight: "700", align: "center" });
   y += 46;
   drawReceiptText(ctx, title, width / 2, y, { size: 22, weight: "700", align: "center" });
   y += 34;

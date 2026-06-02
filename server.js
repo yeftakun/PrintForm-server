@@ -21,7 +21,7 @@ ensureStorage()
       });
 
     server.listen(port, () => {
-      console.log(`PrintForm server running on http://localhost:${port}`);
+      console.log(`PrintOrder server running on http://localhost:${port}`);
     });
 
     startInternalScheduler({ runOnStart: true });

@@ -1,6 +1,6 @@
-# PrintForm Server
+# PrintOrder Server
 
-Simple Node.js server for the PrintForm prototype. It hosts the web UI, stores uploaded files, and coordinates print jobs with the .NET client.
+Simple Node.js server for the PrintOrder prototype. It hosts the web UI, stores uploaded files, and coordinates print jobs with the .NET client.
 
 [Next move](PLAN.md)
 
@@ -84,7 +84,7 @@ psql "$DATABASE_URL" -f scripts/migrations/20260323_step8j_drop_sessions_client_
 
 ### Core
 
-- `PORT`: HTTP port untuk PrintForm server.
+- `PORT`: HTTP port untuk PrintOrder server.
 - `USE_DB`: `true` untuk Postgres repository, `false` untuk JSON storage.
 - `DATABASE_URL`: connection string Postgres, wajib jika `USE_DB=true`.
 - `MONITORING_PORT`: port app monitoring (optional, dipakai `monitoring/server.js`).

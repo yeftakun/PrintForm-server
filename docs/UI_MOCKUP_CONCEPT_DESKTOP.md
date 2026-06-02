@@ -1,6 +1,6 @@
 # Konsep UI Mockup - Aplikasi Desktop Client (WinForms)
 
-Dokumen ini merangkum konsep tata letak dan interaksi antarmuka (User Interface) untuk aplikasi Desktop Client (`PrintForm`) yang berjalan di mesin komputer Mitra. Mengingat aplikasi ini dibangun menggunakan Windows Forms (.NET), pendekatan desain mengutamakan aspek fungsional, ringan, serta informatif.
+Dokumen ini merangkum konsep tata letak dan interaksi antarmuka (User Interface) untuk aplikasi Desktop Client (`PrintOrder`) yang berjalan di mesin komputer Mitra. Mengingat aplikasi ini dibangun menggunakan Windows Forms (.NET), pendekatan desain mengutamakan aspek fungsional, ringan, serta informatif.
 
 ## 1. Jendela Utama (Main Dashboard - `Form1`)
 
@@ -8,7 +8,7 @@ Jendela utama adalah pusat kendali klien. Tujuannya untuk memberikan konfirmasi 
 
 ```text
 +-------------------------------------------------------------+
-|  PrintForm Client - Dashboard                         [-][X]|
+|  PrintOrder Client - Dashboard                         [-][X]|
 +-------------------------------------------------------------+
 |                                                             |
 |  [ INFORMASI KONEKSI & AKUN ]                               |

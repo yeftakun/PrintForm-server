@@ -16,7 +16,7 @@ const storePageStatus = document.getElementById("storePageStatus");
 const storeLayout = document.querySelector(".store-layout");
 const storeNotFound = document.getElementById("storeNotFound");
 const notFoundStoreCode = document.getElementById("notFoundStoreCode");
-const aliasStorageKey = "printformAlias";
+const aliasStorageKey = "printorderAlias";
 
 let currentStore = null;
 
@@ -190,13 +190,13 @@ confirmStoreBtn.addEventListener("click", async () => {
       return;
     }
 
-    sessionStorage.setItem("printformSessionId", body.id);
-    sessionStorage.setItem("printformSessionClientName", currentStore.displayName || "toko");
-    sessionStorage.setItem("printformSessionStoreCode", currentStore.kodeToko || "");
-    sessionStorage.setItem("printformSessionStoreAddress", currentStore.alamat || "");
-    sessionStorage.setItem("printformSessionStoreHours", currentStore.jamOperasional || "");
-    sessionStorage.setItem("printformSessionStoreServices", JSON.stringify(currentStore.layanan || {}));
-    sessionStorage.setItem("printformSessionAlias", body.alias || alias || "");
+    sessionStorage.setItem("printorderSessionId", body.id);
+    sessionStorage.setItem("printorderSessionClientName", currentStore.displayName || "toko");
+    sessionStorage.setItem("printorderSessionStoreCode", currentStore.kodeToko || "");
+    sessionStorage.setItem("printorderSessionStoreAddress", currentStore.alamat || "");
+    sessionStorage.setItem("printorderSessionStoreHours", currentStore.jamOperasional || "");
+    sessionStorage.setItem("printorderSessionStoreServices", JSON.stringify(currentStore.layanan || {}));
+    sessionStorage.setItem("printorderSessionAlias", body.alias || alias || "");
     window.location.href = "/session/";
   } catch {
     setPageStatus("Gagal terhubung ke server.", "error");

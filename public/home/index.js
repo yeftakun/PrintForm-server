@@ -13,7 +13,7 @@ const qrStatus = document.getElementById("qrStatus");
 const toastStack = document.getElementById("toastStack");
 const mobileIntroCarousel = document.querySelector(".home-mobile-intro-card");
 const mobileIntroItems = Array.from(document.querySelectorAll(".home-mobile-intro-main, .home-mobile-benefit"));
-const aliasStorageKey = "printformAlias";
+const aliasStorageKey = "printorderAlias";
 
 let qrStream = null;
 let qrDetector = null;
@@ -77,10 +77,10 @@ function setQrStatus(text, kind = "") {
 }
 
 function showToast(message, kind = "") {
-  if (window.PrintFormAlert) {
-    window.PrintFormAlert.notify({
+  if (window.PrintOrderAlert) {
+    window.PrintOrderAlert.notify({
       variant: kind || "info",
-      title: kind === "error" ? "Terjadi Kesalahan" : "PrintForm",
+      title: kind === "error" ? "Terjadi Kesalahan" : "PrintOrder",
       message
     });
     return;
@@ -280,7 +280,7 @@ storeSearchForm.addEventListener("submit", event => {
 saveAliasBtn.addEventListener("click", () => {
   saveAlias(aliasInput.value);
   const alias = normalizeStoreCode(aliasInput.value);
-  window.PrintFormAlert?.notify({
+  window.PrintOrderAlert?.notify({
     variant: "success",
     title: alias ? "Alias Disimpan" : "Alias Dikosongkan",
     message: alias ? `Alias "${alias}" tersimpan di browser ini.` : "Alias pengirim berhasil dikosongkan."
@@ -321,7 +321,7 @@ if (mobileIntroCarousel && mobileIntroItems.length) {
 
 window.addEventListener("beforeunload", stopQrScanner);
 
-if (sessionStorage.getItem("printformSessionId")) {
+if (sessionStorage.getItem("printorderSessionId")) {
   window.location.replace("/session/");
 }
 
