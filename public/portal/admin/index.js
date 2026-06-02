@@ -8,6 +8,8 @@
   const adminStatsGrid = document.getElementById("adminStatsGrid");
   const adminActionQueue = document.getElementById("adminActionQueue");
   const adminSignalsList = document.getElementById("adminSignalsList");
+  const adminOverviewSync = document.getElementById("adminOverviewSync");
+  const refreshOverviewBtn = document.getElementById("refreshOverviewBtn");
 
   const adminPaymentsTable = document.getElementById("adminPaymentsTable");
   const refreshAdminPaymentsBtn = document.getElementById("refreshAdminPaymentsBtn");
@@ -77,6 +79,9 @@
   const adminAuditList = document.getElementById("adminAuditList");
 
   let adminPaymentOrders = [];
+  let adminOverviewSummary = null;
+  let adminOverviewLoading = false;
+  let adminOverviewError = "";
   let activeReviewOrderId = null;
   let activeStoreId = null;
   const paymentFilterState = {
@@ -418,23 +423,74 @@
     });
   }
 
+  function setOverviewSyncText(text, kind = "") {
+    if (!adminOverviewSync) return;
+    adminOverviewSync.textContent = text || "";
+    adminOverviewSync.className = kind ? `admin-sync-text ${kind}` : "admin-sync-text";
+  }
+
   function renderStats() {
-    const paymentSource = getPaymentSource();
-    const waitingPayments = paymentSource.filter(order => order.status === "waiting_verification").length;
-    const paidThisMonth = paymentSource
-      .filter(order => order.status === "paid")
-      .reduce((sum, order) => sum + Number(order.totalIdr || 0), 0);
-    const suspendedStores = stores.filter(store => store.is_suspend).length;
-    const onlineClients = stores.reduce((sum, store) => sum + store.clients.filter(client => client.status === "online").length, 0);
-    const jobsToday = jobs.length;
-    const statItems = [
-      { label: "Verifikasi", value: String(waitingPayments), tone: "warning", caption: "Pembayaran menunggu review" },
-      { label: "Paid Bulan Ini", value: formatCurrency(paidThisMonth), tone: "accent", caption: "Total order paid" },
-      { label: "Toko Aktif", value: String(stores.length - suspendedStores), tone: "success", caption: "Tidak suspended" },
-      { label: "Suspended", value: String(suspendedStores), tone: suspendedStores ? "warning" : "neutral", caption: "Toko dibatasi" },
-      { label: "Client Online", value: String(onlineClients), tone: "info", caption: "Siap menerima job" },
-      { label: "Job Hari Ini", value: String(jobsToday), tone: "neutral", caption: "Aktivitas lintas toko" }
-    ];
+    if (adminOverviewLoading && !adminOverviewSummary) {
+      adminStatsGrid.innerHTML = '<div class="admin-empty">Memuat ringkasan operasional...</div>';
+      return;
+    }
+
+    const stats = adminOverviewSummary?.stats;
+    const statItems = stats ? [
+      {
+        label: "Verifikasi",
+        value: formatNumber(stats.payments?.waitingVerification),
+        tone: Number(stats.payments?.waitingVerification || 0) ? "warning" : "success",
+        caption: "Pembayaran menunggu review"
+      },
+      {
+        label: "Paid Bulan Ini",
+        value: formatCurrency(stats.payments?.paidThisMonth),
+        tone: "accent",
+        caption: "Total order paid bulan berjalan"
+      },
+      {
+        label: "Toko Ready",
+        value: `${formatNumber(stats.stores?.ready)}/${formatNumber(stats.stores?.total)}`,
+        tone: Number(stats.stores?.ready || 0) ? "success" : "warning",
+        caption: "Kios siap menerima job"
+      },
+      {
+        label: "Client Online",
+        value: `${formatNumber(stats.clients?.online)}/${formatNumber(stats.clients?.total)}`,
+        tone: Number(stats.clients?.online || 0) ? "info" : "warning",
+        caption: "Client terhubung"
+      },
+      {
+        label: "Job Hari Ini",
+        value: formatNumber(stats.jobs?.today),
+        tone: "neutral",
+        caption: `${formatNumber(stats.jobs?.active)} job masih aktif`
+      },
+      {
+        label: "Perlu Tindak",
+        value: formatNumber(stats.actionCount),
+        tone: Number(stats.actionCount || 0) ? "warning" : "success",
+        caption: "Pembayaran, toko offline, job bermasalah"
+      }
+    ] : (() => {
+      const paymentSource = getPaymentSource();
+      const waitingPayments = paymentSource.filter(order => order.status === "waiting_verification").length;
+      const paidThisMonth = paymentSource
+        .filter(order => order.status === "paid")
+        .reduce((sum, order) => sum + Number(order.totalIdr || 0), 0);
+      const suspendedStores = stores.filter(store => store.is_suspend).length;
+      const onlineClients = stores.reduce((sum, store) => sum + store.clients.filter(client => client.status === "online").length, 0);
+      return [
+        { label: "Verifikasi", value: String(waitingPayments), tone: "warning", caption: "Pembayaran menunggu review" },
+        { label: "Paid Bulan Ini", value: formatCurrency(paidThisMonth), tone: "accent", caption: "Total order paid" },
+        { label: "Toko Aktif", value: String(stores.length - suspendedStores), tone: "success", caption: "Tidak suspended" },
+        { label: "Suspended", value: String(suspendedStores), tone: suspendedStores ? "warning" : "neutral", caption: "Toko dibatasi" },
+        { label: "Client Online", value: String(onlineClients), tone: "info", caption: "Siap menerima job" },
+        { label: "Job Hari Ini", value: String(jobs.length), tone: "neutral", caption: "Aktivitas lintas toko" }
+      ];
+    })();
+
     adminStatsGrid.innerHTML = statItems.map(item => `
       <article class="admin-stat-card ${escapeHtml(item.tone)}">
         <span>${escapeHtml(item.label)}</span>
@@ -445,9 +501,13 @@
   }
 
   function renderActionQueue() {
-    const paymentSource = getPaymentSource();
-    const queue = [
-      ...paymentSource
+    if (adminOverviewLoading && !adminOverviewSummary) {
+      adminActionQueue.innerHTML = '<div class="admin-empty">Memuat antrean tindakan...</div>';
+      return;
+    }
+
+    const queue = adminOverviewSummary ? (Array.isArray(adminOverviewSummary.actionQueue) ? adminOverviewSummary.actionQueue : []) : [
+      ...getPaymentSource()
         .filter(order => order.status === "waiting_verification")
         .slice(0, 3)
         .map(order => ({
@@ -477,7 +537,7 @@
     ];
 
     adminActionQueue.innerHTML = queue.length ? queue.map(item => `
-      <button class="admin-queue-item admin-queue-button" type="button" data-admin-jump="${escapeHtml(item.target)}">
+      <button class="admin-queue-item admin-queue-button" type="button" data-admin-jump="${escapeHtml(item.target || "adminOverview")}">
         <div>
           <strong>${escapeHtml(item.title)}</strong>
           <span>${escapeHtml(item.detail)}</span>
@@ -488,14 +548,27 @@
   }
 
   function renderSignals() {
-    const offlineClients = stores.reduce((sum, store) => sum + store.clients.filter(client => client.status !== "online").length, 0);
-    const pendingLong = getPaymentSource().filter(order => order.status === "pending_payment").length;
-    const signals = [
-      { title: "Mode SMTP", value: "Sesuai konfigurasi .env", status: "Dipantau" },
-      { title: "Client offline", value: `${offlineClients} client`, status: offlineClients ? "Perlu cek" : "Normal" },
-      { title: "Order pending", value: `${pendingLong} order`, status: pendingLong ? "Perlu tindak" : "Normal" },
-      { title: "Storage file job", value: "Pantau cleanup scheduler", status: "Normal" }
-    ];
+    if (adminOverviewLoading && !adminOverviewSummary) {
+      adminSignalsList.innerHTML = '<div class="admin-empty">Memuat sinyal operasional...</div>';
+      return;
+    }
+
+    const fallbackSignals = (() => {
+      const offlineClients = stores.reduce((sum, store) => sum + store.clients.filter(client => client.status !== "online").length, 0);
+      const pendingLong = getPaymentSource().filter(order => order.status === "pending_payment").length;
+      return [
+        { title: "Mode SMTP", value: "Sesuai konfigurasi .env", status: "Dipantau" },
+        { title: "Client offline", value: `${offlineClients} client`, status: offlineClients ? "Perlu cek" : "Normal" },
+        { title: "Order pending", value: `${pendingLong} order`, status: pendingLong ? "Perlu tindak" : "Normal" },
+        { title: "Storage file job", value: "Pantau cleanup scheduler", status: "Normal" }
+      ];
+    })();
+    const signals = adminOverviewSummary
+      ? (Array.isArray(adminOverviewSummary.signals) ? adminOverviewSummary.signals : [])
+      : adminOverviewError
+        ? [{ title: "Ringkasan", value: adminOverviewError, status: "Perlu cek" }, ...fallbackSignals]
+        : fallbackSignals;
+
     adminSignalsList.innerHTML = signals.map(item => `
       <div class="admin-signal-item">
         <div>
@@ -636,16 +709,43 @@
     renderSignals();
   }
 
-  async function loadAdminPayments() {
-    setStatus("Memuat data pembayaran...");
+  async function loadOverviewSummary({ silent = false } = {}) {
+    adminOverviewLoading = true;
+    adminOverviewError = "";
+    if (!silent) {
+      setStatus("Memuat ringkasan admin...");
+      setOverviewSyncText("Memuat data...");
+    }
+    refreshOverview();
+
+    try {
+      const body = await window.PortalAuth.apiJson("/api/admin/summary", { method: "GET" });
+      adminOverviewSummary = body && typeof body === "object" ? body : null;
+      adminOverviewError = "";
+      const errorCount = Array.isArray(body?.errors) ? body.errors.length : 0;
+      const syncText = body?.generatedAt ? `Sinkron ${formatDateTime(body.generatedAt)}` : "Sinkron";
+      setOverviewSyncText(errorCount ? `${syncText} · ${errorCount} sumber gagal` : syncText, errorCount ? "warning" : "");
+      if (!silent) setStatus("");
+    } catch (err) {
+      adminOverviewError = err.message || "Gagal memuat ringkasan.";
+      setOverviewSyncText("Ringkasan gagal dimuat", "error");
+      if (!silent) setStatus(adminOverviewError, "error");
+    } finally {
+      adminOverviewLoading = false;
+      refreshOverview();
+    }
+  }
+
+  async function loadAdminPayments({ silent = false } = {}) {
+    if (!silent) setStatus("Memuat data pembayaran...");
     try {
       const body = await window.PortalAuth.apiJson("/api/billing/admin/orders", { method: "GET" });
       adminPaymentOrders = Array.isArray(body.orders) ? body.orders : [];
       renderPayments();
       refreshOverview();
-      setStatus("");
+      if (!silent) setStatus("");
     } catch (err) {
-      setStatus(`${err.message || "Gagal memuat pembayaran."} Data contoh UI tetap ditampilkan.`, "error");
+      if (!silent) setStatus(`${err.message || "Gagal memuat pembayaran."} Data contoh UI tetap ditampilkan.`, "error");
       adminPaymentOrders = [];
       renderPayments();
       refreshOverview();
@@ -746,6 +846,7 @@
       });
       setReviewStatus(isReject ? "Pembayaran ditolak." : "Pembayaran disetujui dan kredit diaktifkan.", "success");
       await loadAdminPayments();
+      await loadOverviewSummary({ silent: true });
       setTimeout(() => closeModal(adminPaymentReviewModalBackdrop), 500);
     } catch (err) {
       setReviewStatus(err.message || "Gagal menyimpan review.", "error");
@@ -1136,7 +1237,8 @@
       adminUserChip.textContent = user.username ? `@${user.username}` : "Admin";
       renderAllUi();
       activatePanel("adminOverview");
-      await loadAdminPayments();
+      await loadOverviewSummary();
+      await loadAdminPayments({ silent: true });
       setStatus("");
     } catch {
       window.PortalAuth.clearState();
@@ -1208,6 +1310,7 @@
     button.addEventListener("click", () => activateBillingTab(button.dataset.adminBillingTab));
   });
 
+  refreshOverviewBtn.addEventListener("click", () => loadOverviewSummary());
   refreshAdminPaymentsBtn.addEventListener("click", loadAdminPayments);
   openAdminPaymentFilterBtn.addEventListener("click", () => {
     syncPaymentFilterInputs();

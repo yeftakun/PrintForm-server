@@ -40,7 +40,11 @@
                 <p class="dashboard-kicker">Ringkasan</p>
                 <h1 id="adminPortalTitle">Kontrol Operasional</h1>
               </div>
-              <span id="adminWelcomeText">Memuat akun admin...</span>
+              <div class="admin-toolbar admin-overview-toolbar">
+                <span id="adminWelcomeText">Memuat akun admin...</span>
+                <span class="admin-sync-text" id="adminOverviewSync">Belum sinkron</span>
+                <button class="btn btn-primary btn-compact" id="refreshOverviewBtn" type="button">Refresh</button>
+              </div>
             </div>
 
             <div class="admin-stat-grid admin-stat-grid-wide" id="adminStatsGrid"></div>

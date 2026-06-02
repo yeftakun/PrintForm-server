@@ -3741,6 +3741,24 @@ body.portal-dashboard-active .page {
   gap: 8px;
 }
 
+.admin-overview-toolbar {
+  justify-content: flex-end;
+}
+
+.admin-sync-text {
+  color: #667085;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-sync-text.warning {
+  color: #b54708;
+}
+
+.admin-sync-text.error {
+  color: #b42318;
+}
+
 .admin-tab-btn {
   min-height: 36px;
   padding: 0 13px;

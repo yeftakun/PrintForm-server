@@ -10,6 +10,7 @@ const clientsRouter = require("./routes/clients");
 const sessionsRouter = require("./routes/sessions");
 const jobsRouter = require("./routes/jobs");
 const billingRouter = require("./routes/billing");
+const adminRouter = require("./routes/admin");
 
 function createApp() {
   const app = express();
@@ -34,6 +35,7 @@ function createApp() {
   app.use("/api/sessions", optionalAuth, sessionsRouter);
   app.use("/api/jobs", optionalAuth, jobsRouter);
   app.use("/api/billing", billingRouter);
+  app.use("/api/admin", adminRouter);
 
   app.get("/p/:kodeToko", (req, res, next) => {
     const kodeToko = String(req.params.kodeToko || "").trim();
