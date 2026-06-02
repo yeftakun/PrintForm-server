@@ -103,6 +103,19 @@ const AUTH_REFRESH_TOKEN_SECRET = process.env.AUTH_REFRESH_TOKEN_SECRET || "dev-
 const AUTH_ACCESS_TOKEN_TTL = process.env.AUTH_ACCESS_TOKEN_TTL || "15m";
 const AUTH_REFRESH_TOKEN_TTL_DAYS = Number(process.env.AUTH_REFRESH_TOKEN_TTL_DAYS) || 30;
 const AUTH_BCRYPT_ROUNDS = Number(process.env.AUTH_BCRYPT_ROUNDS) || 12;
+const MAIL_DRIVER = (process.env.MAIL_DRIVER || "log").trim().toLowerCase();
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const SMTP_SECURE = parseBoolean(process.env.SMTP_SECURE, false);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || "PrintForm";
+const MAIL_FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || "no-reply@printform.local";
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${port}`;
+const PASSWORD_RESET_TOKEN_TTL_MINUTES = Math.max(
+  1,
+  Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES) || 60
+);
 const ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE = parseBoolean(
   process.env.ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE,
   false
@@ -161,6 +174,16 @@ module.exports = {
   AUTH_ACCESS_TOKEN_TTL,
   AUTH_REFRESH_TOKEN_TTL_DAYS,
   AUTH_BCRYPT_ROUNDS,
+  MAIL_DRIVER,
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  SMTP_USER,
+  SMTP_PASS,
+  MAIL_FROM_NAME,
+  MAIL_FROM_ADDRESS,
+  APP_BASE_URL,
+  PASSWORD_RESET_TOKEN_TTL_MINUTES,
   ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE,
   JOBS_LIST_ALLOW_LEGACY_CLIENT_FILTER
 };

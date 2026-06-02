@@ -114,17 +114,21 @@
   const passwordModalBackdrop = document.getElementById("passwordModalBackdrop");
   const pinModalBackdrop = document.getElementById("pinModalBackdrop");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
+  const openForgotPasswordBtn = document.getElementById("openForgotPasswordBtn");
+  const forgotPasswordModalBackdrop = document.getElementById("forgotPasswordModalBackdrop");
   const logoutBtn = document.getElementById("logoutBtn");
   const toLoginBtn = document.getElementById("toLoginBtn");
 
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
+  const forgotPasswordForm = document.getElementById("forgotPasswordForm");
   const accountProfileForm = document.getElementById("accountProfileForm");
   const accountPasswordForm = document.getElementById("accountPasswordForm");
   const accountPinForm = document.getElementById("accountPinForm");
 
   const loginStatus = document.getElementById("loginStatus");
   const registerStatus = document.getElementById("registerStatus");
+  const forgotPasswordStatus = document.getElementById("forgotPasswordStatus");
   const operationalHoursStatus = document.getElementById("operationalHoursStatus");
   const operationalDaysList = document.getElementById("operationalDaysList");
   const saveOperationalHoursBtn = document.getElementById("saveOperationalHoursBtn");
@@ -2322,6 +2326,36 @@
     }
   }
 
+  async function submitForgotPassword(event) {
+    event.preventDefault();
+    setStatus(forgotPasswordStatus, "Mengirim tautan reset...");
+
+    const submitButton = forgotPasswordForm.querySelector('button[type="submit"]');
+    const formData = new FormData(forgotPasswordForm);
+    const email = String(formData.get("email") || "").trim();
+
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    try {
+      await window.PortalAuth.apiJson("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      }, { retry: false });
+
+      forgotPasswordForm.reset();
+      setStatus(forgotPasswordStatus, "Jika email terdaftar, tautan reset password telah dikirim.", "success");
+    } catch (err) {
+      setStatus(forgotPasswordStatus, err.message || "Gagal mengirim tautan reset password.", "error");
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
+    }
+  }
+
   async function submitRegister(event) {
     event.preventDefault();
     setStatus(registerStatus, "Membuat akun...");
@@ -2555,6 +2589,13 @@
       openModal(registerModalBackdrop);
     });
 
+    openForgotPasswordBtn.addEventListener("click", () => {
+      forgotPasswordForm.reset();
+      setStatus(forgotPasswordStatus, "");
+      openModal(forgotPasswordModalBackdrop);
+      forgotPasswordForm.elements.email?.focus();
+    });
+
     toLoginBtn.addEventListener("click", () => {
       closeModal(registerModalBackdrop);
       setStatus(loginStatus, "");
@@ -2589,7 +2630,7 @@
       });
     });
 
-    [registerModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, forgotPasswordModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -2632,6 +2673,7 @@
 
     loginForm.addEventListener("submit", submitLogin);
     registerForm.addEventListener("submit", submitRegister);
+    forgotPasswordForm.addEventListener("submit", submitForgotPassword);
     accountProfileForm.addEventListener("submit", submitAccountProfile);
     accountPasswordForm.addEventListener("submit", submitAccountPassword);
     accountPinForm.addEventListener("submit", submitAccountPin);

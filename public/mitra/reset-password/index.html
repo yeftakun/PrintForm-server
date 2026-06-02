@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reset Password Mitra - PrintForm</title>
+    <link rel="stylesheet" href="/portal/style.css">
+    <link rel="stylesheet" href="/shared/alerts.css">
+  </head>
+  <body class="reset-password-page">
+    <main class="page">
+      <section class="auth-shell reset-password-shell" aria-labelledby="resetPasswordTitle">
+        <header class="shell-header">
+          <a href="/portal/" class="brand" aria-label="Portal PrintForm">
+            <span class="brand-glow" aria-hidden="true"></span>
+            <span>Portal PrintForm</span>
+          </a>
+        </header>
+
+        <div class="reset-password-grid">
+          <section class="hero reset-password-hero" aria-labelledby="resetPasswordTitle">
+            <div class="partner-badge">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <span>Akun Mitra</span>
+            </div>
+            <h1 id="resetPasswordTitle">Reset password</h1>
+            <p>Buat password baru untuk masuk kembali ke Portal PrintForm.</p>
+          </section>
+
+          <section class="login-panel reset-password-panel" aria-labelledby="resetPasswordFormTitle">
+            <div class="login-copy">
+              <h2 id="resetPasswordFormTitle">Password Baru</h2>
+              <p id="resetPasswordCopy">Memeriksa tautan reset password...</p>
+            </div>
+
+            <div class="status" id="resetPasswordStatus" role="status">Memeriksa tautan reset password...</div>
+
+            <form class="form hidden" id="resetPasswordForm">
+              <label class="field">
+                <span>Password Baru</span>
+                <span class="input-shell">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect width="18" height="11" x="3" y="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <input
+                    id="newPassword"
+                    type="password"
+                    name="password"
+                    minlength="8"
+                    autocomplete="new-password"
+                    placeholder="Masukkan password baru"
+                    required
+                  >
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    aria-label="Tampilkan password"
+                    data-password-toggle
+                    data-target="newPassword"
+                  >
+                    <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m2 2 20 20"/>
+                      <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                      <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                    </svg>
+                  </button>
+                </span>
+              </label>
+
+              <label class="field">
+                <span>Konfirmasi Password Baru</span>
+                <span class="input-shell">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect width="18" height="11" x="3" y="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <input
+                    id="passwordConfirm"
+                    type="password"
+                    name="passwordConfirm"
+                    minlength="8"
+                    autocomplete="new-password"
+                    placeholder="Konfirmasi password baru"
+                    required
+                  >
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    aria-label="Tampilkan password"
+                    data-password-toggle
+                    data-target="passwordConfirm"
+                  >
+                    <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m2 2 20 20"/>
+                      <path d="M6.7 6.7C3.7 8.7 2 12 2 12s3.5 7 10 7c1.8 0 3.3-.5 4.6-1.2"/>
+                      <path d="M19.4 15.1C21 13.6 22 12 22 12s-3.5-7-10-7c-.8 0-1.6.1-2.3.3"/>
+                    </svg>
+                  </button>
+                </span>
+              </label>
+
+              <button class="btn btn-primary btn-login" id="saveResetPasswordBtn" type="submit">Simpan Password</button>
+            </form>
+
+            <a class="btn btn-outline reset-login-link hidden" id="backToLoginBtn" href="/portal/">Kembali ke Login Mitra</a>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/mitra/reset-password/reset-password.js"></script>
+  </body>
+</html>

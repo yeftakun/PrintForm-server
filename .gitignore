@@ -1,5 +1,5 @@
 node_modules/
 # storage/
-# .env
+.env
 temp/
 # uploads/profile-photos/

@@ -115,6 +115,10 @@
                 </span>
               </label>
 
+              <div class="forgot-password-row">
+                <button class="text-button" id="openForgotPasswordBtn" type="button">Lupa Password?</button>
+              </div>
+
               <button class="btn btn-primary btn-login" type="submit">Masuk</button>
               <div class="status" id="loginStatus" role="status"></div>
             </form>
@@ -832,6 +836,41 @@
             <button class="text-button" type="button" id="toLoginBtn">Masuk</button>
           </p>
           <div class="status" id="registerStatus" role="status"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="forgotPasswordModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="forgotPasswordModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="forgotPasswordModalTitle">Lupa Password</h2>
+            <p>Masukkan email akun mitra Anda. Jika email terdaftar, kami akan mengirim tautan reset password.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="forgotPasswordModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="forgotPasswordForm">
+          <label class="field">
+            <span>Email</span>
+            <span class="input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="20" height="16" x="2" y="4" rx="2"/>
+                <path d="m22 7-8.97 5.7a2 2 0 0 1-2.06 0L2 7"/>
+              </svg>
+              <input
+                type="email"
+                name="email"
+                autocomplete="email"
+                placeholder="Masukkan email akun mitra"
+                required
+              >
+            </span>
+          </label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-primary" type="submit">Kirim Tautan Reset</button>
+            <button class="btn btn-ghost" type="button" data-close="forgotPasswordModalBackdrop">Batal</button>
+          </div>
+          <div class="status" id="forgotPasswordStatus" role="status"></div>
         </form>
       </div>
     </div>

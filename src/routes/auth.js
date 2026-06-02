@@ -1,10 +1,13 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const multer = require("multer");
 const {
   AUTH_ALLOW_PUBLIC_REGISTER,
   AUTH_ACCESS_TOKEN_TTL,
+  APP_BASE_URL,
+  PASSWORD_RESET_TOKEN_TTL_MINUTES,
   PROFILE_PHOTO_MAX_BYTES,
   profilePhotosDir
 } = require("../config");
@@ -29,6 +32,12 @@ const {
   revokeAllUserRefreshTokens
 } = require("../repositories/refreshTokensRepository");
 const {
+  createPasswordResetToken,
+  getActivePasswordResetTokenByHash,
+  invalidateActivePasswordResetTokensForUser,
+  resetPasswordWithToken
+} = require("../repositories/passwordResetTokensRepository");
+const {
   REFRESH_TOKEN_TYPE,
   createOpaqueId,
   toPublicUser,
@@ -42,6 +51,9 @@ const {
 } = require("../services/auth");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { optionalAuth, requireAuth } = require("../middleware/auth");
+const { createInMemoryRateLimiter } = require("../middleware/rateLimiter");
+const { sendEmail } = require("../services/emailService");
+const { buildPasswordResetEmail } = require("../templates/emailTemplates");
 const { writeAuditLogSafe } = require("../services/audit");
 const {
   normalizeOperationalSchedule,
@@ -264,6 +276,28 @@ function getRequesterIp(req) {
   return req.ip || null;
 }
 
+function createPasswordResetRawToken() {
+  return crypto.randomBytes(32)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function buildPasswordResetUrl(token) {
+  const baseUrl = String(APP_BASE_URL || "").replace(/\/+$/, "");
+  return `${baseUrl}/mitra/reset-password?token=${encodeURIComponent(token)}`;
+}
+
+const PASSWORD_RESET_RESPONSE_MESSAGE = "Jika email terdaftar, tautan reset password akan dikirim.";
+
+const forgotPasswordRateLimiter = createInMemoryRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  keyFn: req => `forgot-password:${getRequesterIp(req) || "unknown"}`,
+  errorMessage: "Terlalu banyak permintaan reset password. Coba lagi nanti."
+});
+
 async function issueAuthTokens(user, req) {
   const refreshTokenId = createOpaqueId("rt");
   const accessToken = createAccessToken(user);
@@ -295,6 +329,131 @@ function toPublicTokenBundle(tokenBundle) {
 }
 
 router.use(optionalAuth);
+
+router.post("/forgot-password", forgotPasswordRateLimiter, asyncHandler(async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+
+  if (email) {
+    const user = await getUserByEmail(email);
+
+    if (user) {
+      try {
+        const rawToken = createPasswordResetRawToken();
+        const tokenHash = hashToken(rawToken);
+        const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+        const resetUrl = buildPasswordResetUrl(rawToken);
+        const emailContent = buildPasswordResetEmail({
+          resetUrl,
+          userName: user.username || user.email,
+          expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES
+        });
+
+        await invalidateActivePasswordResetTokensForUser(user.id);
+        await createPasswordResetToken({
+          id: createOpaqueId("prt"),
+          userId: user.id,
+          tokenHash,
+          expiresAt
+        });
+
+        await sendEmail({
+          to: user.email,
+          subject: emailContent.subject,
+          text: emailContent.text,
+          html: emailContent.html
+        });
+
+        await writeAuditLogSafe({
+          actorType: "user",
+          actorId: user.id,
+          action: "auth.password_reset.requested",
+          targetType: "user",
+          targetId: user.id,
+          detail: {
+            email
+          }
+        });
+      } catch (err) {
+        console.error(JSON.stringify({
+          level: "error",
+          msg: "password_reset_request_failed",
+          userId: user.id,
+          error: err?.message || String(err)
+        }));
+      }
+    }
+  }
+
+  res.json({
+    ok: true,
+    message: PASSWORD_RESET_RESPONSE_MESSAGE
+  });
+}));
+
+router.get("/reset-password/validate", asyncHandler(async (req, res) => {
+  const token = String(req.query?.token || "").trim();
+  if (!token) {
+    res.json({ valid: false });
+    return;
+  }
+
+  const resetToken = await getActivePasswordResetTokenByHash(hashToken(token));
+  res.json({ valid: Boolean(resetToken) });
+}));
+
+router.post("/reset-password", asyncHandler(async (req, res) => {
+  const token = String(req.body?.token || "").trim();
+  const password = normalizePassword(req.body?.password);
+  const passwordConfirm = String(req.body?.passwordConfirm || "");
+
+  if (!token || !password || !passwordConfirm) {
+    res.status(400).json({ error: "token, password, and passwordConfirm are required (password min 8 chars)" });
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    res.status(400).json({ error: "passwordConfirm must match password" });
+    return;
+  }
+
+  const tokenHash = hashToken(token);
+  const activeToken = await getActivePasswordResetTokenByHash(tokenHash);
+  if (!activeToken) {
+    res.status(400).json({ error: "Token reset password tidak valid atau sudah kedaluwarsa." });
+    return;
+  }
+
+  const nextPasswordHash = await hashPassword(password);
+  const resetResult = await resetPasswordWithToken({
+    tokenHash,
+    passwordHash: nextPasswordHash
+  });
+
+  if (!resetResult) {
+    res.status(400).json({ error: "Token reset password tidak valid atau sudah kedaluwarsa." });
+    return;
+  }
+
+  const revokedCount = await revokeAllUserRefreshTokens(resetResult.userId);
+
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: resetResult.userId,
+    action: "auth.password_reset.completed",
+    targetType: "user",
+    targetId: resetResult.userId,
+    detail: {
+      resetTokenId: resetResult.tokenId,
+      activeResetTokensInvalidated: resetResult.invalidatedCount,
+      refreshTokensRevoked: revokedCount
+    }
+  });
+
+  res.json({
+    ok: true,
+    message: "Password berhasil direset. Silakan login dengan password baru."
+  });
+}));
 
 router.post("/register", asyncHandler(async (req, res) => {
   if (!AUTH_ALLOW_PUBLIC_REGISTER && !req.user) {

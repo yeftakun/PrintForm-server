@@ -20,6 +20,9 @@ function createApp() {
     next();
   });
   app.use("/portal", express.static(path.join(rootDir, "public", "portal")));
+  app.get(["/mitra/reset-password", "/mitra/reset-password/"], (req, res) => {
+    res.sendFile(path.join(rootDir, "public", "mitra", "reset-password", "index.html"));
+  });
   app.use(express.static(path.join(rootDir, "public")));
   app.use("/uploads/profile-photos", express.static(profilePhotosDir));
 
