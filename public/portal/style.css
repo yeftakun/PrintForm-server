@@ -3741,10 +3741,44 @@ body.portal-dashboard-active .page {
   gap: 8px;
 }
 
+.admin-tab-btn {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #e6ebf1;
+  border-radius: 999px;
+  color: #475467;
+  background: #fff;
+  font-size: 0.86rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-tab-btn.active,
+.admin-tab-btn:hover {
+  border-color: #ffd8c8;
+  color: #c64721;
+  background: #fff3ed;
+}
+
+.admin-inline-search {
+  width: min(320px, 100%);
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  color: #101828;
+  background: #fff;
+  font-size: 0.88rem;
+}
+
 .admin-stat-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
+}
+
+.admin-stat-grid-wide {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .admin-stat-card,
@@ -3854,6 +3888,28 @@ body.portal-dashboard-active .page {
   font-size: 0.95rem;
 }
 
+.admin-queue-button {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-queue-button:hover {
+  border-color: #ffd8c8;
+  background: #fff8f4;
+}
+
+.admin-empty {
+  padding: 14px;
+  border: 1px dashed #d0d5dd;
+  border-radius: 12px;
+  color: #667085;
+  background: #fbfcfe;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .admin-table-wrap {
   overflow-x: auto;
   border: 1px solid #e7ecf2;
@@ -3933,6 +3989,88 @@ body.portal-dashboard-active .page {
 
 .admin-filter-bar {
   margin-bottom: 12px;
+}
+
+.admin-subsection-head {
+  margin-top: 4px;
+}
+
+.admin-subsection-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.admin-billing-panel.hidden {
+  display: none;
+}
+
+.admin-checkbox-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.admin-checkbox-line input {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-detail-modal {
+  width: min(1040px, calc(100vw - 28px));
+}
+
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-detail-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e7ecf2;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.admin-detail-card-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-detail-card h3 {
+  margin: 0 0 12px;
+  color: #101828;
+  font-size: 0.98rem;
+}
+
+.admin-mini-list {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-mini-list > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #edf1f5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-mini-list strong {
+  display: block;
+  color: #101828;
+  font-size: 0.88rem;
+}
+
+.admin-mini-list span {
+  display: block;
+  margin-top: 3px;
+  color: #667085;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .admin-payment-review-modal {

@@ -27,9 +27,9 @@
         <aside class="admin-sidebar" aria-label="Navigasi admin">
           <button class="admin-nav-link active" type="button" data-admin-target="adminOverview">Ringkasan</button>
           <button class="admin-nav-link" type="button" data-admin-target="adminPayments">Pembayaran</button>
+          <button class="admin-nav-link" type="button" data-admin-target="adminBilling">Billing</button>
           <button class="admin-nav-link" type="button" data-admin-target="adminStores">Toko</button>
           <button class="admin-nav-link" type="button" data-admin-target="adminJobs">Job</button>
-          <button class="admin-nav-link" type="button" data-admin-target="adminBilling">Billing</button>
           <button class="admin-nav-link" type="button" data-admin-target="adminAudit">Audit</button>
         </aside>
 
@@ -43,18 +43,18 @@
               <span id="adminWelcomeText">Memuat akun admin...</span>
             </div>
 
-            <div class="admin-stat-grid" id="adminStatsGrid"></div>
+            <div class="admin-stat-grid admin-stat-grid-wide" id="adminStatsGrid"></div>
 
             <div class="admin-overview-grid">
               <article class="admin-panel admin-panel-flat">
                 <div class="admin-panel-head">
                   <div>
                     <p class="dashboard-kicker">Butuh Tindakan</p>
-                    <h2>Antrean Verifikasi</h2>
+                    <h2>Antrean Operasional</h2>
                   </div>
-                  <button class="btn btn-outline btn-compact" type="button" data-admin-jump="adminPayments">Lihat</button>
+                  <button class="btn btn-outline btn-compact" type="button" data-admin-jump="adminPayments">Pembayaran</button>
                 </div>
-                <div class="admin-queue-list" id="adminVerificationQueue"></div>
+                <div class="admin-queue-list" id="adminActionQueue"></div>
               </article>
 
               <article class="admin-panel admin-panel-flat">
@@ -97,6 +97,7 @@
                     <th>Order</th>
                     <th>Akun</th>
                     <th>Plan</th>
+                    <th>Kupon</th>
                     <th>Total</th>
                     <th>Status</th>
                     <th>Bukti</th>
@@ -108,15 +109,90 @@
             </div>
           </section>
 
+          <section class="admin-panel hidden" id="adminBilling" data-admin-panel>
+            <div class="admin-section-head">
+              <div>
+                <p class="dashboard-kicker">Billing</p>
+                <h1>Plan dan Kupon Diskon</h1>
+              </div>
+              <div class="admin-toolbar">
+                <button class="admin-tab-btn active" type="button" data-admin-billing-tab="plans">Plan</button>
+                <button class="admin-tab-btn" type="button" data-admin-billing-tab="coupons">Kupon</button>
+              </div>
+            </div>
+
+            <div class="admin-billing-panel" id="adminPlansPanel" data-admin-billing-panel="plans">
+              <div class="admin-section-head admin-subsection-head">
+                <div>
+                  <p class="dashboard-kicker">Konfigurasi Plan</p>
+                  <h2>Daftar Plan</h2>
+                </div>
+                <button class="btn btn-primary btn-compact" id="openPlanModalBtn" type="button">Tambah Plan</button>
+              </div>
+              <div class="admin-table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Plan</th>
+                      <th>Harga</th>
+                      <th>Kredit</th>
+                      <th>Masa Berlaku</th>
+                      <th>Status</th>
+                      <th>Update</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminPlansTable"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="admin-billing-panel hidden" id="adminCouponsPanel" data-admin-billing-panel="coupons">
+              <div class="admin-section-head admin-subsection-head">
+                <div>
+                  <p class="dashboard-kicker">Kupon Diskon</p>
+                  <h2>Daftar Kupon</h2>
+                </div>
+                <button class="btn btn-primary btn-compact" id="openCouponModalBtn" type="button">Tambah Kupon</button>
+              </div>
+              <div class="admin-table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Kode</th>
+                      <th>Diskon</th>
+                      <th>Minimum</th>
+                      <th>Limit</th>
+                      <th>Periode</th>
+                      <th>Status</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminCouponsTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section class="admin-panel hidden" id="adminStores" data-admin-panel>
             <div class="admin-section-head">
               <div>
                 <p class="dashboard-kicker">Toko</p>
-                <h1>Monitoring Akun Toko</h1>
+                <h1>Monitoring Akun Mitra</h1>
               </div>
               <div class="admin-toolbar">
-                <button class="btn btn-outline btn-compact" type="button">Export</button>
-                <button class="btn btn-primary btn-compact" type="button">Refresh</button>
+                <button class="btn btn-outline btn-compact" id="openStoreFilterBtn" type="button">Filter</button>
+                <button class="btn btn-ghost btn-compact" id="resetStoreFilterBtn" type="button">Reset Filter</button>
+                <button class="btn btn-primary btn-compact" id="refreshStoresBtn" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="jobs-filter-bar admin-filter-bar" aria-label="Filter toko">
+              <label class="field">
+                <span>Cari</span>
+                <input id="adminStoreSearchInput" type="search" placeholder="Toko, username, email, kode toko...">
+              </label>
+              <div class="jobs-filter-actions">
+                <span id="adminStoreFilterSummary">Semua toko</span>
               </div>
             </div>
             <div class="admin-table-wrap">
@@ -124,11 +200,13 @@
                 <thead>
                   <tr>
                     <th>Toko</th>
-                    <th>Kode</th>
+                    <th>Akun</th>
                     <th>Client</th>
                     <th>Kredit</th>
                     <th>Order Terakhir</th>
                     <th>Status</th>
+                    <th>Suspended</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="adminStoresTable"></tbody>
@@ -140,11 +218,21 @@
             <div class="admin-section-head">
               <div>
                 <p class="dashboard-kicker">Job</p>
-                <h1>Aktivitas Cetak</h1>
+                <h1>Monitoring Aktivitas Cetak</h1>
               </div>
               <div class="admin-toolbar">
-                <button class="btn btn-outline btn-compact" type="button">Status</button>
-                <button class="btn btn-primary btn-compact" type="button">Refresh</button>
+                <button class="btn btn-outline btn-compact" id="openJobFilterBtn" type="button">Filter</button>
+                <button class="btn btn-ghost btn-compact" id="resetJobFilterBtn" type="button">Reset Filter</button>
+                <button class="btn btn-primary btn-compact" id="refreshJobsBtn" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="jobs-filter-bar admin-filter-bar" aria-label="Filter job">
+              <label class="field">
+                <span>Cari</span>
+                <input id="adminJobSearchInput" type="search" placeholder="Job, toko, file, session, client...">
+              </label>
+              <div class="jobs-filter-actions">
+                <span id="adminJobFilterSummary">Semua job</span>
               </div>
             </div>
             <div class="admin-table-wrap">
@@ -158,6 +246,7 @@
                     <th>Harga</th>
                     <th>Status</th>
                     <th>Waktu</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="adminJobsTable"></tbody>
@@ -165,24 +254,16 @@
             </div>
           </section>
 
-          <section class="admin-panel hidden" id="adminBilling" data-admin-panel>
-            <div class="admin-section-head">
-              <div>
-                <p class="dashboard-kicker">Billing</p>
-                <h1>Plan, Kupon, dan Kredit</h1>
-              </div>
-              <span class="admin-muted">Placeholder UI untuk logic approval dan master data nanti.</span>
-            </div>
-            <div class="admin-billing-grid" id="adminBillingGrid"></div>
-          </section>
-
           <section class="admin-panel hidden" id="adminAudit" data-admin-panel>
             <div class="admin-section-head">
               <div>
                 <p class="dashboard-kicker">Audit</p>
-                <h1>Aktivitas Sistem</h1>
+                <h1>Aktivitas Terbaru</h1>
               </div>
-              <button class="btn btn-outline btn-compact" type="button">Refresh</button>
+              <div class="admin-toolbar">
+                <input class="admin-inline-search" id="adminAuditSearchInput" type="search" placeholder="Cari actor, action, target...">
+                <button class="btn btn-outline btn-compact" id="refreshAuditBtn" type="button">Refresh</button>
+              </div>
             </div>
             <div class="admin-audit-list" id="adminAuditList"></div>
           </section>
@@ -266,6 +347,161 @@
         <div class="form-footer jobs-filter-footer">
           <button class="btn btn-ghost" id="resetAdminPaymentFilterModalBtn" type="button">Reset Filter</button>
           <button class="btn btn-primary" id="applyAdminPaymentFilterBtn" type="button">Terapkan</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminPlanModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminPlanModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminPlanModalTitle">Tambah Plan</h2>
+            <p>Konfigurasi plan dan kredit yang diterima mitra.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminPlanModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="adminPlanForm">
+          <input type="hidden" name="id">
+          <label class="field"><span>Nama Plan</span><input name="name" type="text" required></label>
+          <label class="field"><span>Deskripsi</span><input name="description" type="text" required></label>
+          <label class="field"><span>Harga</span><input name="price" type="number" min="0" required></label>
+          <label class="field"><span>Kredit</span><input name="credits" type="number" min="0" required></label>
+          <label class="field"><span>Masa Berlaku Hari</span><input name="validDays" type="number" min="1" required></label>
+          <label class="admin-checkbox-line"><input name="active" type="checkbox"> Aktif</label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-ghost" type="button" data-admin-close="adminPlanModalBackdrop">Batal</button>
+            <button class="btn btn-primary" type="submit">Simpan Plan</button>
+          </div>
+          <div class="status" id="adminPlanStatus" role="status"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminCouponModalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminCouponModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminCouponModalTitle">Tambah Kupon</h2>
+            <p>Atur kupon diskon untuk order plan/top up mitra.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminCouponModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <form class="form form-modal" id="adminCouponForm">
+          <input type="hidden" name="id">
+          <label class="field"><span>Kode Kupon</span><input name="code" type="text" required></label>
+          <label class="field">
+            <span>Tipe Diskon</span>
+            <select name="type" required>
+              <option value="percent">Persen</option>
+              <option value="amount">Nominal</option>
+            </select>
+          </label>
+          <label class="field"><span>Nilai Diskon</span><input name="value" type="number" min="0" required></label>
+          <label class="field"><span>Minimum Transaksi</span><input name="minOrder" type="number" min="0"></label>
+          <label class="field"><span>Limit Penggunaan</span><input name="usageLimit" type="number" min="1" required></label>
+          <label class="field"><span>Mulai</span><input name="startsAt" type="date" required></label>
+          <label class="field"><span>Berakhir</span><input name="endsAt" type="date" required></label>
+          <label class="admin-checkbox-line"><input name="active" type="checkbox"> Aktif</label>
+          <div class="form-footer account-modal-footer">
+            <button class="btn btn-ghost" type="button" data-admin-close="adminCouponModalBackdrop">Batal</button>
+            <button class="btn btn-primary" type="submit">Simpan Kupon</button>
+          </div>
+          <div class="status" id="adminCouponStatus" role="status"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminStoreFilterModalBackdrop" aria-hidden="true">
+      <div class="modal jobs-filter-modal" role="dialog" aria-modal="true" aria-labelledby="adminStoreFilterTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminStoreFilterTitle">Filter Toko</h2>
+            <p>Filter monitoring toko berdasarkan status suspend dan sinyal operasional.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminStoreFilterModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="jobs-filter-modal-body">
+          <fieldset class="jobs-filter-group">
+            <legend>Status Suspend</legend>
+            <label><input type="radio" name="adminStoreSuspendFilter" value="all" checked> Semua</label>
+            <label><input type="radio" name="adminStoreSuspendFilter" value="suspended"> Suspended</label>
+            <label><input type="radio" name="adminStoreSuspendFilter" value="active"> Tidak suspended</label>
+          </fieldset>
+          <fieldset class="jobs-filter-group">
+            <legend>Sinyal Toko</legend>
+            <label><input type="checkbox" name="adminStoreSignalFilters" value="client_online"> Client online</label>
+            <label><input type="checkbox" name="adminStoreSignalFilters" value="client_offline"> Client offline</label>
+            <label><input type="checkbox" name="adminStoreSignalFilters" value="no_credit"> Kredit habis</label>
+          </fieldset>
+        </div>
+        <div class="form-footer jobs-filter-footer">
+          <button class="btn btn-ghost" id="resetStoreFilterModalBtn" type="button">Reset Filter</button>
+          <button class="btn btn-primary" id="applyStoreFilterBtn" type="button">Terapkan</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminStoreDetailModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide admin-detail-modal" role="dialog" aria-modal="true" aria-labelledby="adminStoreDetailTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminStoreDetailTitle">Detail Toko</h2>
+            <p>Profil akun, client, billing ringkas, dan job terbaru.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminStoreDetailModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="admin-detail-grid" id="adminStoreDetailBody"></div>
+        <div class="form-footer account-modal-footer">
+          <button class="btn btn-ghost" type="button" data-admin-close="adminStoreDetailModalBackdrop">Tutup</button>
+          <button class="btn btn-outline" id="adminToggleStoreSuspendBtn" type="button">Suspend</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminJobFilterModalBackdrop" aria-hidden="true">
+      <div class="modal jobs-filter-modal" role="dialog" aria-modal="true" aria-labelledby="adminJobFilterTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminJobFilterTitle">Filter Job</h2>
+            <p>Filter monitoring job berdasarkan status dan tanggal.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminJobFilterModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="jobs-filter-modal-body">
+          <fieldset class="jobs-filter-group">
+            <legend>Status Job</legend>
+            <label><input type="checkbox" name="adminJobStatusFilters" value="pending"> Menunggu</label>
+            <label><input type="checkbox" name="adminJobStatusFilters" value="sent"> Terkirim</label>
+            <label><input type="checkbox" name="adminJobStatusFilters" value="done"> Selesai</label>
+            <label><input type="checkbox" name="adminJobStatusFilters" value="rejected"> Ditolak</label>
+            <label><input type="checkbox" name="adminJobStatusFilters" value="canceled"> Batal</label>
+          </fieldset>
+          <fieldset class="jobs-filter-group">
+            <legend>Waktu Job</legend>
+            <label><input type="radio" name="adminJobDateMode" value="all" checked> Semua</label>
+            <label><input type="radio" name="adminJobDateMode" value="day"> Hari</label>
+            <input id="adminJobDateDayInput" type="date">
+          </fieldset>
+        </div>
+        <div class="form-footer jobs-filter-footer">
+          <button class="btn btn-ghost" id="resetJobFilterModalBtn" type="button">Reset Filter</button>
+          <button class="btn btn-primary" id="applyJobFilterBtn" type="button">Terapkan</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminJobDetailModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide admin-detail-modal" role="dialog" aria-modal="true" aria-labelledby="adminJobDetailTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminJobDetailTitle">Detail Job</h2>
+            <p>Metadata, file, pricing, dan timeline job dalam mode read-only.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminJobDetailModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="admin-detail-grid" id="adminJobDetailBody"></div>
+        <div class="form-footer account-modal-footer">
+          <button class="btn btn-ghost" type="button" data-admin-close="adminJobDetailModalBackdrop">Tutup</button>
         </div>
       </div>
     </div>
