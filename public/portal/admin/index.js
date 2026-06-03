@@ -20,6 +20,12 @@
   const resetAdminPaymentFilterBtn = document.getElementById("resetAdminPaymentFilterBtn");
   const adminPaymentSearchInput = document.getElementById("adminPaymentSearchInput");
   const adminPaymentFilterSummary = document.getElementById("adminPaymentFilterSummary");
+  const adminPaymentPageSizeSelect = document.getElementById("adminPaymentPageSizeSelect");
+  const adminPaymentFirstPageBtn = document.getElementById("adminPaymentFirstPageBtn");
+  const adminPaymentPrevPageBtn = document.getElementById("adminPaymentPrevPageBtn");
+  const adminPaymentNextPageBtn = document.getElementById("adminPaymentNextPageBtn");
+  const adminPaymentLastPageBtn = document.getElementById("adminPaymentLastPageBtn");
+  const adminPaymentPageText = document.getElementById("adminPaymentPageText");
   const adminPaymentReviewModalBackdrop = document.getElementById("adminPaymentReviewModalBackdrop");
   const adminPaymentReviewDetail = document.getElementById("adminPaymentReviewDetail");
   const adminProofName = document.getElementById("adminProofName");
@@ -54,6 +60,12 @@
   const adminStoresTable = document.getElementById("adminStoresTable");
   const adminStoreSearchInput = document.getElementById("adminStoreSearchInput");
   const adminStoreFilterSummary = document.getElementById("adminStoreFilterSummary");
+  const adminStorePageSizeSelect = document.getElementById("adminStorePageSizeSelect");
+  const adminStoreFirstPageBtn = document.getElementById("adminStoreFirstPageBtn");
+  const adminStorePrevPageBtn = document.getElementById("adminStorePrevPageBtn");
+  const adminStoreNextPageBtn = document.getElementById("adminStoreNextPageBtn");
+  const adminStoreLastPageBtn = document.getElementById("adminStoreLastPageBtn");
+  const adminStorePageText = document.getElementById("adminStorePageText");
   const openStoreFilterBtn = document.getElementById("openStoreFilterBtn");
   const resetStoreFilterBtn = document.getElementById("resetStoreFilterBtn");
   const refreshStoresBtn = document.getElementById("refreshStoresBtn");
@@ -68,6 +80,12 @@
   const adminJobsTable = document.getElementById("adminJobsTable");
   const adminJobSearchInput = document.getElementById("adminJobSearchInput");
   const adminJobFilterSummary = document.getElementById("adminJobFilterSummary");
+  const adminJobPageSizeSelect = document.getElementById("adminJobPageSizeSelect");
+  const adminJobFirstPageBtn = document.getElementById("adminJobFirstPageBtn");
+  const adminJobPrevPageBtn = document.getElementById("adminJobPrevPageBtn");
+  const adminJobNextPageBtn = document.getElementById("adminJobNextPageBtn");
+  const adminJobLastPageBtn = document.getElementById("adminJobLastPageBtn");
+  const adminJobPageText = document.getElementById("adminJobPageText");
   const openJobFilterBtn = document.getElementById("openJobFilterBtn");
   const resetJobFilterBtn = document.getElementById("resetJobFilterBtn");
   const refreshJobsBtn = document.getElementById("refreshJobsBtn");
@@ -89,6 +107,9 @@
   const adminAuditNextPageBtn = document.getElementById("adminAuditNextPageBtn");
   const adminAuditLastPageBtn = document.getElementById("adminAuditLastPageBtn");
   const adminAuditPageText = document.getElementById("adminAuditPageText");
+  const adminAuditDetailModalBackdrop = document.getElementById("adminAuditDetailModalBackdrop");
+  const adminAuditDetailTitle = document.getElementById("adminAuditDetailTitle");
+  const adminAuditDetailBody = document.getElementById("adminAuditDetailBody");
   const adminProfileModalBackdrop = document.getElementById("adminProfileModalBackdrop");
   const adminProfileForm = document.getElementById("adminProfileForm");
   const adminPasswordForm = document.getElementById("adminPasswordForm");
@@ -97,18 +118,26 @@
 
   let adminCurrentUser = null;
   let adminPaymentOrders = [];
+  let adminPaymentsLoading = false;
+  let adminPaymentsError = "";
+  let adminPaymentTotal = 0;
+  let adminPaymentTotalPages = 1;
   let adminOverviewSummary = null;
   let adminOverviewLoading = false;
   let adminOverviewError = "";
   let adminStoresLoaded = false;
   let adminStoresLoading = false;
   let adminStoresError = "";
+  let adminStoresTotal = 0;
+  let adminStoresTotalPages = 1;
   let adminBillingLoaded = false;
   let adminBillingLoading = false;
   let adminBillingError = "";
   let adminJobsLoaded = false;
   let adminJobsLoading = false;
   let adminJobsError = "";
+  let adminJobsTotal = 0;
+  let adminJobsTotalPages = 1;
   let adminAuditRows = [];
   let adminAuditLoading = false;
   let adminAuditError = "";
@@ -124,18 +153,24 @@
     dateMode: "all",
     date: "",
     startDate: "",
-    endDate: ""
+    endDate: "",
+    page: 1,
+    perPage: "20"
   };
   const storeFilterState = {
     search: "",
     suspend: "all",
-    signals: new Set()
+    signals: new Set(),
+    page: 1,
+    perPage: "20"
   };
   const jobFilterState = {
     search: "",
     statusFilters: new Set(),
     dateMode: "all",
-    date: ""
+    date: "",
+    page: 1,
+    perPage: "20"
   };
   const auditFilterState = {
     search: "",
@@ -317,13 +352,6 @@
     { time: "07:50", actor: "system", action: "billing.coupon.applied", target: "LAUNCH10", detail: "10% discount", group: "Billing" }
   ];
 
-  const fallbackPayments = [
-    { id: "ORD-2405-1081", user: { username: "printaja", email: "owner@printaja.test", storeName: "Print Aja", kodeToko: "PRTAJA" }, plan: { name: "Pro" }, couponCode: "LAUNCH10", subtotalIdr: 20000, discountIdr: 2000, totalIdr: 18000, status: "waiting_verification", paymentProof: { originalName: "bukti-transfer.jpg" }, createdAt: "2026-06-02T09:18:00+08:00" },
-    { id: "ORD-2405-1078", user: { username: "yefta", email: "yefta@example.test", storeName: "Kopi Print", kodeToko: "KOPI01" }, plan: { name: "Starter" }, couponCode: "", subtotalIdr: 13000, discountIdr: 0, totalIdr: 13000, status: "waiting_verification", paymentProof: { originalName: "transfer.pdf" }, createdAt: "2026-06-02T08:55:00+08:00" },
-    { id: "ORD-2405-1073", user: { username: "snapdoc", email: "admin@snapdoc.test", storeName: "Snapdoc", kodeToko: "SNAP12" }, plan: { name: "Buy Credit" }, couponCode: "MITRA5K", subtotalIdr: 5000, discountIdr: 0, totalIdr: 5000, status: "pending_payment", paymentProof: null, createdAt: "2026-06-02T07:45:00+08:00" },
-    { id: "ORD-2405-1067", user: { username: "kampuscopy", email: "kasir@kampuscopy.test", storeName: "Kampus Copy", kodeToko: "KAMPUS" }, plan: { name: "Pro" }, couponCode: "", subtotalIdr: 20000, discountIdr: 0, totalIdr: 20000, status: "paid", paymentProof: { originalName: "paid.png" }, createdAt: "2026-06-01T16:20:00+08:00" }
-  ];
-
   function setStatus(text, kind = "") {
     adminStatus.textContent = text || "";
     adminStatus.className = kind ? `status admin-status ${kind}` : "status admin-status";
@@ -484,7 +512,7 @@
 
   function statusClass(status) {
     const normalized = String(status || "").toLowerCase();
-    if (["paid", "done", "sent", "aktif", "normal", "active", "online", "ready"].includes(normalized)) return "online";
+    if (["paid", "done", "send", "sent", "aktif", "normal", "active", "online", "ready"].includes(normalized)) return "online";
     if (["waiting_verification", "pending", "dipantau", "pending_payment", "printing", "claimed", "client belum siap"].includes(normalized)) return "warning";
     if (["canceled", "cancelled", "rejected", "perlu kredit", "perlu cek", "perlu tindak", "suspended", "offline"].includes(normalized)) return "offline";
     return "";
@@ -500,6 +528,7 @@
       printing: "Printing",
       claimed: "Claimed",
       done: "Selesai",
+      send: "Terkirim",
       sent: "Terkirim",
       canceled: "Batal",
       cancelled: "Dibatalkan",
@@ -509,7 +538,7 @@
   }
 
   function getPaymentSource() {
-    return adminPaymentOrders.length ? adminPaymentOrders : fallbackPayments;
+    return adminPaymentOrders;
   }
 
   function activatePanel(panelId) {
@@ -716,12 +745,7 @@
   }
 
   function getFilteredPaymentOrders() {
-    const search = String(paymentFilterState.search || "").trim().toLowerCase();
-    return getPaymentSource()
-      .filter(order => paymentFilterState.statusFilters.size === 0 || paymentFilterState.statusFilters.has(String(order.status || "").toLowerCase()))
-      .filter(order => paymentFilterState.proofFilters.size === 0 || paymentFilterState.proofFilters.has(getProofGroup(order)))
-      .filter(order => !search || getOrderText(order).includes(search))
-      .filter(isOrderWithinDateFilter);
+    return getPaymentSource();
   }
 
   function updatePaymentFilterSummary(filteredCount = null) {
@@ -737,11 +761,55 @@
       : `${countText || "Semua order"}`;
   }
 
+  function renderRemotePagination({ state, total, totalPages, loading, pageText, firstBtn, prevBtn, nextBtn, lastBtn }) {
+    const isAll = state.perPage === "all";
+    const currentPage = isAll ? 1 : Number(state.page || 1);
+    const safeTotalPages = isAll ? 1 : Math.max(1, Number(totalPages || 1));
+    if (pageText) {
+      pageText.textContent = isAll
+        ? `Semua (${formatNumber(total)} item)`
+        : `Page ${formatNumber(currentPage)} / ${formatNumber(safeTotalPages)} · ${formatNumber(total)} item`;
+    }
+    [firstBtn, prevBtn].forEach(button => {
+      if (button) button.disabled = isAll || currentPage <= 1 || loading;
+    });
+    [nextBtn, lastBtn].forEach(button => {
+      if (button) button.disabled = isAll || currentPage >= safeTotalPages || loading;
+    });
+  }
+
+  function renderPaymentPagination() {
+    renderRemotePagination({
+      state: paymentFilterState,
+      total: adminPaymentTotal,
+      totalPages: adminPaymentTotalPages,
+      loading: adminPaymentsLoading,
+      pageText: adminPaymentPageText,
+      firstBtn: adminPaymentFirstPageBtn,
+      prevBtn: adminPaymentPrevPageBtn,
+      nextBtn: adminPaymentNextPageBtn,
+      lastBtn: adminPaymentLastPageBtn
+    });
+  }
+
   function renderPayments() {
+    if (adminPaymentsLoading && !adminPaymentOrders.length) {
+      adminPaymentsTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Memuat data pembayaran...</td></tr>';
+      updatePaymentFilterSummary(0);
+      renderPaymentPagination();
+      return;
+    }
+    if (adminPaymentsError) {
+      adminPaymentsTable.innerHTML = `<tr><td colspan="8" class="muted-cell">${escapeHtml(adminPaymentsError)}</td></tr>`;
+      updatePaymentFilterSummary(0);
+      renderPaymentPagination();
+      return;
+    }
     const rows = getFilteredPaymentOrders();
-    updatePaymentFilterSummary(rows.length);
+    updatePaymentFilterSummary(adminPaymentTotal);
     if (!rows.length) {
       adminPaymentsTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Tidak ada order sesuai filter.</td></tr>';
+      renderPaymentPagination();
       return;
     }
     adminPaymentsTable.innerHTML = rows.map(item => `
@@ -760,6 +828,7 @@
         </td>
       </tr>
     `).join("");
+    renderPaymentPagination();
   }
 
   function syncPaymentFilterInputs() {
@@ -797,9 +866,10 @@
     paymentFilterState.date = todayInputValue();
     paymentFilterState.startDate = "";
     paymentFilterState.endDate = "";
+    paymentFilterState.page = 1;
     if (adminPaymentSearchInput) adminPaymentSearchInput.value = "";
     syncPaymentFilterInputs();
-    renderPayments();
+    loadAdminPayments();
   }
 
   function refreshOverview() {
@@ -836,18 +906,47 @@
   }
 
   async function loadAdminPayments({ silent = false } = {}) {
+    adminPaymentsLoading = true;
+    adminPaymentsError = "";
     if (!silent) setStatus("Memuat data pembayaran...");
+    renderPayments();
+    const params = new URLSearchParams();
+    params.set("page", String(paymentFilterState.page || 1));
+    params.set("perPage", paymentFilterState.perPage || "20");
+    if (paymentFilterState.search) params.set("search", paymentFilterState.search);
+    if (paymentFilterState.statusFilters.size) params.set("status", Array.from(paymentFilterState.statusFilters).join(","));
+    if (paymentFilterState.proofFilters.size) params.set("proof", Array.from(paymentFilterState.proofFilters).join(","));
+    if (paymentFilterState.dateMode === "day" && paymentFilterState.date) {
+      params.set("date", paymentFilterState.date);
+    }
+    if (paymentFilterState.dateMode === "range") {
+      if (paymentFilterState.startDate) params.set("dateStart", paymentFilterState.startDate);
+      if (paymentFilterState.endDate) params.set("dateEnd", paymentFilterState.endDate);
+    }
     try {
-      const body = await window.PortalAuth.apiJson("/api/billing/admin/orders", { method: "GET" });
+      const body = await window.PortalAuth.apiJson(`/api/billing/admin/orders?${params.toString()}`, { method: "GET" });
       adminPaymentOrders = Array.isArray(body.orders) ? body.orders : [];
+      adminPaymentTotal = Number(body.total || adminPaymentOrders.length);
+      adminPaymentTotalPages = Number(body.totalPages || 1);
+      paymentFilterState.page = Number(body.page || paymentFilterState.page || 1);
+      paymentFilterState.perPage = String(body.perPage || paymentFilterState.perPage || "20");
+      if (adminPaymentPageSizeSelect) adminPaymentPageSizeSelect.value = paymentFilterState.perPage;
+      adminPaymentsError = "";
       renderPayments();
       refreshOverview();
       if (!silent) setStatus("");
     } catch (err) {
-      if (!silent) setStatus(`${err.message || "Gagal memuat pembayaran."} Data contoh UI tetap ditampilkan.`, "error");
       adminPaymentOrders = [];
+      adminPaymentTotal = 0;
+      adminPaymentTotalPages = 1;
+      adminPaymentsError = err.message || "Gagal memuat pembayaran.";
+      adminPaymentsLoading = false;
       renderPayments();
       refreshOverview();
+      if (!silent) setStatus(adminPaymentsError, "error");
+    } finally {
+      adminPaymentsLoading = false;
+      renderPaymentPagination();
     }
   }
 
@@ -950,7 +1049,6 @@
     openModal(adminPaymentReviewModalBackdrop);
     adminPaymentReviewDetail.innerHTML = "";
     adminProofPreview.innerHTML = "";
-    const fallbackOrder = fallbackPayments.find(item => item.id === orderId);
     try {
       const body = await window.PortalAuth.apiJson(`/api/billing/admin/orders/${encodeURIComponent(orderId)}`, { method: "GET" });
       const order = body.order;
@@ -958,12 +1056,6 @@
       await renderProofPreview(order);
       setReviewStatus("");
     } catch (err) {
-      if (fallbackOrder) {
-        renderPaymentReviewDetail(fallbackOrder);
-        await renderProofPreview(fallbackOrder);
-        setReviewStatus("Detail contoh UI ditampilkan karena backend order belum tersedia.", "error");
-        return;
-      }
       setReviewStatus(err.message || "Gagal memuat detail order.", "error");
     }
   }
@@ -1262,25 +1354,8 @@
   }
 
   function getFilteredStores() {
-    const search = storeFilterState.search.trim().toLowerCase();
     if (!adminStoresLoaded) return [];
-    return stores
-      .filter(store => !search || getStoreText(store).includes(search))
-      .filter(store => {
-        if (storeFilterState.suspend === "suspended") return store.is_suspend;
-        if (storeFilterState.suspend === "active") return !store.is_suspend;
-        return true;
-      })
-      .filter(store => {
-        if (!storeFilterState.signals.size) return true;
-        const hasOnline = store.clients.some(client => client.status === "online");
-        const hasOffline = store.clients.some(client => client.status !== "online");
-        const noCredit = Number(store.credit || 0) <= 0;
-        if (storeFilterState.signals.has("client_online") && !hasOnline) return false;
-        if (storeFilterState.signals.has("client_offline") && !hasOffline) return false;
-        if (storeFilterState.signals.has("no_credit") && !noCredit) return false;
-        return true;
-      });
+    return stores;
   }
 
   function updateStoreFilterSummary(count) {
@@ -1291,21 +1366,38 @@
     adminStoreFilterSummary.textContent = pieces.length ? `${count} toko · ${pieces.join(" · ")}` : `${count} toko`;
   }
 
+  function renderStorePagination() {
+    renderRemotePagination({
+      state: storeFilterState,
+      total: adminStoresTotal,
+      totalPages: adminStoresTotalPages,
+      loading: adminStoresLoading,
+      pageText: adminStorePageText,
+      firstBtn: adminStoreFirstPageBtn,
+      prevBtn: adminStorePrevPageBtn,
+      nextBtn: adminStoreNextPageBtn,
+      lastBtn: adminStoreLastPageBtn
+    });
+  }
+
   function renderStores() {
     if (adminStoresLoading && !adminStoresLoaded) {
       adminStoresTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Memuat data toko...</td></tr>';
       updateStoreFilterSummary(0);
+      renderStorePagination();
       return;
     }
     if (adminStoresError) {
       adminStoresTable.innerHTML = `<tr><td colspan="8" class="muted-cell">${escapeHtml(adminStoresError)}</td></tr>`;
       updateStoreFilterSummary(0);
+      renderStorePagination();
       return;
     }
     const rows = getFilteredStores();
-    updateStoreFilterSummary(rows.length);
+    updateStoreFilterSummary(adminStoresTotal);
     if (!rows.length) {
       adminStoresTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Tidak ada toko sesuai filter.</td></tr>';
+      renderStorePagination();
       return;
     }
     adminStoresTable.innerHTML = rows.map(store => {
@@ -1328,6 +1420,7 @@
         </tr>
       `;
     }).join("");
+    renderStorePagination();
   }
 
   function syncStoreFilterInputs() {
@@ -1348,9 +1441,10 @@
     storeFilterState.search = "";
     storeFilterState.suspend = "all";
     storeFilterState.signals = new Set();
+    storeFilterState.page = 1;
     if (adminStoreSearchInput) adminStoreSearchInput.value = "";
     syncStoreFilterInputs();
-    renderStores();
+    loadAdminStores();
   }
 
   async function loadAdminStores({ silent = false } = {}) {
@@ -1358,21 +1452,36 @@
     adminStoresError = "";
     if (!silent) setStatus("Memuat data toko...");
     renderStores();
+    const params = new URLSearchParams();
+    params.set("page", String(storeFilterState.page || 1));
+    params.set("perPage", storeFilterState.perPage || "20");
+    if (storeFilterState.search) params.set("search", storeFilterState.search);
+    if (storeFilterState.suspend !== "all") params.set("suspend", storeFilterState.suspend);
+    if (storeFilterState.signals.size) params.set("signals", Array.from(storeFilterState.signals).join(","));
     try {
-      const body = await window.PortalAuth.apiJson("/api/admin/stores", { method: "GET" });
+      const body = await window.PortalAuth.apiJson(`/api/admin/stores?${params.toString()}`, { method: "GET" });
       stores = Array.isArray(body.stores) ? body.stores : [];
+      adminStoresTotal = Number(body.total || stores.length);
+      adminStoresTotalPages = Number(body.totalPages || 1);
+      storeFilterState.page = Number(body.page || storeFilterState.page || 1);
+      storeFilterState.perPage = String(body.perPage || storeFilterState.perPage || "20");
+      if (adminStorePageSizeSelect) adminStorePageSizeSelect.value = storeFilterState.perPage;
       adminStoresLoaded = true;
       adminStoresError = "";
       renderStores();
       if (!silent) setStatus("");
     } catch (err) {
       stores = [];
+      adminStoresTotal = 0;
+      adminStoresTotalPages = 1;
       adminStoresLoaded = true;
       adminStoresError = err.message || "Gagal memuat data toko.";
+      adminStoresLoading = false;
       renderStores();
       if (!silent) setStatus(adminStoresError, "error");
     } finally {
       adminStoresLoading = false;
+      renderStorePagination();
     }
   }
 
@@ -1474,15 +1583,8 @@
   }
 
   function getFilteredJobs() {
-    const search = jobFilterState.search.trim().toLowerCase();
     if (!adminJobsLoaded) return [];
-    return jobs
-      .filter(job => !search || getJobText(job).includes(search))
-      .filter(job => jobFilterState.statusFilters.size === 0 || jobFilterState.statusFilters.has(job.status))
-      .filter(job => {
-        if (jobFilterState.dateMode !== "day") return true;
-        return dateInputValue(job.createdAt) === jobFilterState.date;
-      });
+    return jobs;
   }
 
   function updateJobFilterSummary(count) {
@@ -1493,21 +1595,38 @@
     adminJobFilterSummary.textContent = pieces.length ? `${count} job · ${pieces.join(" · ")}` : `${count} job`;
   }
 
+  function renderJobPagination() {
+    renderRemotePagination({
+      state: jobFilterState,
+      total: adminJobsTotal,
+      totalPages: adminJobsTotalPages,
+      loading: adminJobsLoading,
+      pageText: adminJobPageText,
+      firstBtn: adminJobFirstPageBtn,
+      prevBtn: adminJobPrevPageBtn,
+      nextBtn: adminJobNextPageBtn,
+      lastBtn: adminJobLastPageBtn
+    });
+  }
+
   function renderJobs() {
     if (adminJobsLoading && !adminJobsLoaded) {
       adminJobsTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Memuat data job...</td></tr>';
       updateJobFilterSummary(0);
+      renderJobPagination();
       return;
     }
     if (adminJobsError) {
       adminJobsTable.innerHTML = `<tr><td colspan="8" class="muted-cell">${escapeHtml(adminJobsError)}</td></tr>`;
       updateJobFilterSummary(0);
+      renderJobPagination();
       return;
     }
     const rows = getFilteredJobs();
-    updateJobFilterSummary(rows.length);
+    updateJobFilterSummary(adminJobsTotal);
     if (!rows.length) {
       adminJobsTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Tidak ada job sesuai filter.</td></tr>';
+      renderJobPagination();
       return;
     }
     adminJobsTable.innerHTML = rows.map(job => `
@@ -1522,6 +1641,7 @@
         <td><button class="btn btn-outline btn-compact" type="button" data-job-detail-id="${escapeHtml(job.id)}">Detail</button></td>
       </tr>
     `).join("");
+    renderJobPagination();
   }
 
   function syncJobFilterInputs() {
@@ -1548,9 +1668,10 @@
     jobFilterState.statusFilters = new Set();
     jobFilterState.dateMode = "all";
     jobFilterState.date = todayInputValue();
+    jobFilterState.page = 1;
     if (adminJobSearchInput) adminJobSearchInput.value = "";
     syncJobFilterInputs();
-    renderJobs();
+    loadAdminJobs();
   }
 
   async function loadAdminJobs({ silent = false } = {}) {
@@ -1558,21 +1679,36 @@
     adminJobsError = "";
     if (!silent) setStatus("Memuat data job...");
     renderJobs();
+    const params = new URLSearchParams();
+    params.set("page", String(jobFilterState.page || 1));
+    params.set("perPage", jobFilterState.perPage || "20");
+    if (jobFilterState.search) params.set("search", jobFilterState.search);
+    if (jobFilterState.statusFilters.size) params.set("status", Array.from(jobFilterState.statusFilters).join(","));
+    if (jobFilterState.dateMode === "day" && jobFilterState.date) params.set("date", jobFilterState.date);
     try {
-      const body = await window.PortalAuth.apiJson("/api/admin/jobs", { method: "GET" });
+      const body = await window.PortalAuth.apiJson(`/api/admin/jobs?${params.toString()}`, { method: "GET" });
       jobs = Array.isArray(body.jobs) ? body.jobs : [];
+      adminJobsTotal = Number(body.total || jobs.length);
+      adminJobsTotalPages = Number(body.totalPages || 1);
+      jobFilterState.page = Number(body.page || jobFilterState.page || 1);
+      jobFilterState.perPage = String(body.perPage || jobFilterState.perPage || "20");
+      if (adminJobPageSizeSelect) adminJobPageSizeSelect.value = jobFilterState.perPage;
       adminJobsLoaded = true;
       adminJobsError = "";
       renderJobs();
       if (!silent) setStatus("");
     } catch (err) {
       jobs = [];
+      adminJobsTotal = 0;
+      adminJobsTotalPages = 1;
       adminJobsLoaded = true;
       adminJobsError = err.message || "Gagal memuat data job.";
+      adminJobsLoading = false;
       renderJobs();
       if (!silent) setStatus(adminJobsError, "error");
     } finally {
       adminJobsLoading = false;
+      renderJobPagination();
     }
   }
 
@@ -1680,9 +1816,40 @@
           <strong>${escapeHtml(item.action)}</strong>
           <span>${escapeHtml(item.actorType || "-")} · ${escapeHtml(item.actorId || "-")} · ${escapeHtml(item.targetType || "-")} · ${escapeHtml(item.targetId || "-")} · ${escapeHtml(formatAuditDetail(item.detail))}</span>
         </div>
+        <button class="btn btn-outline btn-compact" type="button" data-audit-detail-id="${escapeHtml(item.id)}">Detail</button>
       </article>
     `).join("") : '<div class="admin-empty">Tidak ada aktivitas sesuai filter.</div>';
     renderAuditPagination();
+  }
+
+  function formatAuditJson(detail) {
+    try {
+      return JSON.stringify(detail || {}, null, 2);
+    } catch {
+      return "{}";
+    }
+  }
+
+  function openAuditDetail(auditId) {
+    const item = adminAuditRows.find(row => String(row.id) === String(auditId));
+    if (!item) return;
+    adminAuditDetailTitle.textContent = `Detail Audit · ${item.action}`;
+    adminAuditDetailBody.innerHTML = `
+      <section class="admin-detail-card">
+        <h3>Metadata</h3>
+        ${renderKeyValueList([
+          ["Waktu", formatDateTime(item.createdAt)],
+          ["Action", item.action],
+          ["Actor", String(item.actorType || "-") + " - " + String(item.actorId || "-")],
+          ["Target", String(item.targetType || "-") + " - " + String(item.targetId || "-")]
+        ])}
+      </section>
+      <section class="admin-detail-card admin-detail-card-wide">
+        <h3>Payload</h3>
+        <pre class="admin-json-block">${escapeHtml(formatAuditJson(item.detail))}</pre>
+      </section>
+    `;
+    openModal(adminAuditDetailModalBackdrop);
   }
 
   async function loadAdminAudit({ silent = false } = {}) {
@@ -1717,6 +1884,11 @@
       adminAuditLoading = false;
       renderAuditPagination();
     }
+  }
+
+  function setRemotePage(state, totalPages, page, loader) {
+    state.page = Math.min(Math.max(Number(page) || 1, 1), Math.max(1, Number(totalPages || 1)));
+    loader();
   }
 
   function setAuditPage(page) {
@@ -1884,6 +2056,12 @@
     const jobDetail = event.target.closest("[data-job-detail-id]");
     if (jobDetail) {
       openJobDetail(jobDetail.dataset.jobDetailId);
+      return;
+    }
+
+    const auditDetail = event.target.closest("[data-audit-detail-id]");
+    if (auditDetail) {
+      openAuditDetail(auditDetail.dataset.auditDetailId);
     }
   });
 
@@ -1910,12 +2088,14 @@
   resetAdminPaymentFilterModalBtn.addEventListener("click", resetPaymentFilters);
   applyAdminPaymentFilterBtn.addEventListener("click", () => {
     readPaymentFilterInputs();
-    renderPayments();
+    paymentFilterState.page = 1;
+    loadAdminPayments();
     closeModal(adminPaymentFilterModalBackdrop);
   });
   adminPaymentSearchInput.addEventListener("input", () => {
     paymentFilterState.search = adminPaymentSearchInput.value || "";
-    renderPayments();
+    paymentFilterState.page = 1;
+    loadAdminPayments();
   });
   document.querySelectorAll('input[name="adminPaymentDateMode"]').forEach(input => {
     input.addEventListener("change", syncPaymentDateInputs);
@@ -1927,6 +2107,15 @@
   });
   adminApprovePaymentBtn.addEventListener("click", () => submitPaymentReview("approve"));
   adminRejectPaymentBtn.addEventListener("click", () => submitPaymentReview("reject"));
+  adminPaymentPageSizeSelect.addEventListener("change", () => {
+    paymentFilterState.perPage = adminPaymentPageSizeSelect.value || "20";
+    paymentFilterState.page = 1;
+    loadAdminPayments();
+  });
+  adminPaymentFirstPageBtn.addEventListener("click", () => setRemotePage(paymentFilterState, adminPaymentTotalPages, 1, loadAdminPayments));
+  adminPaymentPrevPageBtn.addEventListener("click", () => setRemotePage(paymentFilterState, adminPaymentTotalPages, Number(paymentFilterState.page || 1) - 1, loadAdminPayments));
+  adminPaymentNextPageBtn.addEventListener("click", () => setRemotePage(paymentFilterState, adminPaymentTotalPages, Number(paymentFilterState.page || 1) + 1, loadAdminPayments));
+  adminPaymentLastPageBtn.addEventListener("click", () => setRemotePage(paymentFilterState, adminPaymentTotalPages, adminPaymentTotalPages, loadAdminPayments));
 
   openPlanModalBtn.addEventListener("click", () => openPlanModal());
   openCouponModalBtn.addEventListener("click", () => openCouponModal());
@@ -1941,14 +2130,25 @@
   resetStoreFilterModalBtn.addEventListener("click", resetStoreFilters);
   applyStoreFilterBtn.addEventListener("click", () => {
     readStoreFilterInputs();
-    renderStores();
+    storeFilterState.page = 1;
+    loadAdminStores();
     closeModal(adminStoreFilterModalBackdrop);
   });
   refreshStoresBtn.addEventListener("click", () => loadAdminStores());
   adminStoreSearchInput.addEventListener("input", () => {
     storeFilterState.search = adminStoreSearchInput.value || "";
-    renderStores();
+    storeFilterState.page = 1;
+    loadAdminStores();
   });
+  adminStorePageSizeSelect.addEventListener("change", () => {
+    storeFilterState.perPage = adminStorePageSizeSelect.value || "20";
+    storeFilterState.page = 1;
+    loadAdminStores();
+  });
+  adminStoreFirstPageBtn.addEventListener("click", () => setRemotePage(storeFilterState, adminStoresTotalPages, 1, loadAdminStores));
+  adminStorePrevPageBtn.addEventListener("click", () => setRemotePage(storeFilterState, adminStoresTotalPages, Number(storeFilterState.page || 1) - 1, loadAdminStores));
+  adminStoreNextPageBtn.addEventListener("click", () => setRemotePage(storeFilterState, adminStoresTotalPages, Number(storeFilterState.page || 1) + 1, loadAdminStores));
+  adminStoreLastPageBtn.addEventListener("click", () => setRemotePage(storeFilterState, adminStoresTotalPages, adminStoresTotalPages, loadAdminStores));
   adminToggleStoreSuspendBtn.addEventListener("click", () => {
     if (activeStoreId) toggleStoreSuspend(activeStoreId);
   });
@@ -1961,13 +2161,15 @@
   resetJobFilterModalBtn.addEventListener("click", resetJobFilters);
   applyJobFilterBtn.addEventListener("click", () => {
     readJobFilterInputs();
-    renderJobs();
+    jobFilterState.page = 1;
+    loadAdminJobs();
     closeModal(adminJobFilterModalBackdrop);
   });
   refreshJobsBtn.addEventListener("click", () => loadAdminJobs());
   adminJobSearchInput.addEventListener("input", () => {
     jobFilterState.search = adminJobSearchInput.value || "";
-    renderJobs();
+    jobFilterState.page = 1;
+    loadAdminJobs();
   });
   document.querySelectorAll('input[name="adminJobDateMode"]').forEach(input => {
     input.addEventListener("change", () => {
@@ -1975,6 +2177,15 @@
       syncJobFilterInputs();
     });
   });
+  adminJobPageSizeSelect.addEventListener("change", () => {
+    jobFilterState.perPage = adminJobPageSizeSelect.value || "20";
+    jobFilterState.page = 1;
+    loadAdminJobs();
+  });
+  adminJobFirstPageBtn.addEventListener("click", () => setRemotePage(jobFilterState, adminJobsTotalPages, 1, loadAdminJobs));
+  adminJobPrevPageBtn.addEventListener("click", () => setRemotePage(jobFilterState, adminJobsTotalPages, Number(jobFilterState.page || 1) - 1, loadAdminJobs));
+  adminJobNextPageBtn.addEventListener("click", () => setRemotePage(jobFilterState, adminJobsTotalPages, Number(jobFilterState.page || 1) + 1, loadAdminJobs));
+  adminJobLastPageBtn.addEventListener("click", () => setRemotePage(jobFilterState, adminJobsTotalPages, adminJobsTotalPages, loadAdminJobs));
 
   adminAuditSearchInput.addEventListener("input", () => {
     auditFilterState.search = adminAuditSearchInput.value || "";
@@ -2011,6 +2222,7 @@
     adminStoreDetailModalBackdrop,
     adminJobFilterModalBackdrop,
     adminJobDetailModalBackdrop,
+    adminAuditDetailModalBackdrop,
     adminProfileModalBackdrop
   ].forEach(backdrop => {
     backdrop.addEventListener("click", event => {

@@ -244,8 +244,18 @@ router.patch("/admin/coupons/:id/active", asyncHandler(async (req, res) => {
 
 router.get("/admin/orders", asyncHandler(async (req, res) => {
   if (!requireAdminUser(req, res)) return;
-  const orders = await listOrdersForAdmin();
-  res.json({ orders });
+  const result = await listOrdersForAdmin({
+    paginated: true,
+    page: req.query.page,
+    perPage: req.query.perPage,
+    search: req.query.search,
+    status: req.query.status,
+    proof: req.query.proof,
+    date: req.query.date,
+    dateStart: req.query.dateStart,
+    dateEnd: req.query.dateEnd
+  });
+  res.json(result);
 }));
 
 router.get("/admin/orders/:id", asyncHandler(async (req, res) => {

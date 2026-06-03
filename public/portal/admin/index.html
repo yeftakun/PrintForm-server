@@ -117,6 +117,24 @@
                 <tbody id="adminPaymentsTable"></tbody>
               </table>
             </div>
+            <div class="admin-audit-footer">
+              <div class="jobs-page-size">
+                <span>Tampilkan</span>
+                <select id="adminPaymentPageSizeSelect">
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="all">Semua</option>
+                </select>
+              </div>
+              <div class="jobs-pagination-actions">
+                <button class="btn btn-ghost btn-compact" id="adminPaymentFirstPageBtn" type="button">First</button>
+                <button class="btn btn-ghost btn-compact" id="adminPaymentPrevPageBtn" type="button">Prev</button>
+                <span class="admin-page-indicator" id="adminPaymentPageText">Page 1 / 1</span>
+                <button class="btn btn-ghost btn-compact" id="adminPaymentNextPageBtn" type="button">Next</button>
+                <button class="btn btn-ghost btn-compact" id="adminPaymentLastPageBtn" type="button">Last</button>
+              </div>
+            </div>
           </section>
 
           <section class="admin-panel hidden" id="adminBilling" data-admin-panel>
@@ -223,6 +241,24 @@
                 <tbody id="adminStoresTable"></tbody>
               </table>
             </div>
+            <div class="admin-audit-footer">
+              <div class="jobs-page-size">
+                <span>Tampilkan</span>
+                <select id="adminStorePageSizeSelect">
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="all">Semua</option>
+                </select>
+              </div>
+              <div class="jobs-pagination-actions">
+                <button class="btn btn-ghost btn-compact" id="adminStoreFirstPageBtn" type="button">First</button>
+                <button class="btn btn-ghost btn-compact" id="adminStorePrevPageBtn" type="button">Prev</button>
+                <span class="admin-page-indicator" id="adminStorePageText">Page 1 / 1</span>
+                <button class="btn btn-ghost btn-compact" id="adminStoreNextPageBtn" type="button">Next</button>
+                <button class="btn btn-ghost btn-compact" id="adminStoreLastPageBtn" type="button">Last</button>
+              </div>
+            </div>
           </section>
 
           <section class="admin-panel hidden" id="adminJobs" data-admin-panel>
@@ -262,6 +298,24 @@
                 </thead>
                 <tbody id="adminJobsTable"></tbody>
               </table>
+            </div>
+            <div class="admin-audit-footer">
+              <div class="jobs-page-size">
+                <span>Tampilkan</span>
+                <select id="adminJobPageSizeSelect">
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="all">Semua</option>
+                </select>
+              </div>
+              <div class="jobs-pagination-actions">
+                <button class="btn btn-ghost btn-compact" id="adminJobFirstPageBtn" type="button">First</button>
+                <button class="btn btn-ghost btn-compact" id="adminJobPrevPageBtn" type="button">Prev</button>
+                <span class="admin-page-indicator" id="adminJobPageText">Page 1 / 1</span>
+                <button class="btn btn-ghost btn-compact" id="adminJobNextPageBtn" type="button">Next</button>
+                <button class="btn btn-ghost btn-compact" id="adminJobLastPageBtn" type="button">Last</button>
+              </div>
             </div>
           </section>
 
@@ -556,6 +610,22 @@
         <div class="admin-detail-grid" id="adminJobDetailBody"></div>
         <div class="form-footer account-modal-footer">
           <button class="btn btn-ghost" type="button" data-admin-close="adminJobDetailModalBackdrop">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminAuditDetailModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide admin-detail-modal" role="dialog" aria-modal="true" aria-labelledby="adminAuditDetailTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="adminAuditDetailTitle">Detail Audit</h2>
+            <p>Payload lengkap aktivitas admin dan sistem.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminAuditDetailModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="admin-detail-grid" id="adminAuditDetailBody"></div>
+        <div class="form-footer account-modal-footer">
+          <button class="btn btn-ghost" type="button" data-admin-close="adminAuditDetailModalBackdrop">Tutup</button>
         </div>
       </div>
     </div>

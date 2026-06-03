@@ -57,6 +57,28 @@ function toTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function normalizeListParam(value) {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .flatMap(item => String(item || "").split(","))
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeDateParam(value) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function normalizePaginationParams({ page = 1, perPage = 20 } = {}) {
+  const all = String(perPage || "").toLowerCase() === "all";
+  return {
+    all,
+    page: Math.max(1, Number.parseInt(page, 10) || 1),
+    perPage: all ? "all" : Math.min(Math.max(Number.parseInt(perPage, 10) || 20, 1), 100)
+  };
+}
+
 function createClientError(message, statusCode = 400, code = "BILLING_INVALID_INPUT") {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -1184,11 +1206,114 @@ function getAdminOrderFromSql() {
      ) pp ON true`;
 }
 
-async function listOrdersForAdmin() {
+function buildAdminOrderFilters(options = {}) {
+  const clauses = [];
+  const values = [];
+  const statuses = normalizeListParam(options.status)
+    .map(item => item.toLowerCase())
+    .filter(item => ORDER_STATUSES.has(item));
+  if (statuses.length) {
+    values.push(statuses);
+    clauses.push(`o.status = ANY($${values.length}::text[])`);
+  }
+
+  const proofFilters = normalizeListParam(options.proof)
+    .map(item => item.toLowerCase())
+    .filter(item => item === "available" || item === "not-available");
+  if (proofFilters.length === 1) {
+    clauses.push(proofFilters[0] === "available" ? "pp.id IS NOT NULL" : "pp.id IS NULL");
+  }
+
+  const search = String(options.search || "").trim().toLowerCase();
+  if (search) {
+    values.push(`%${search}%`);
+    clauses.push(`(
+      lower(COALESCE(o.id, '')) LIKE $${values.length}
+      OR lower(COALESCE(o.coupon_code, '')) LIKE $${values.length}
+      OR lower(COALESCE(p.name, '')) LIKE $${values.length}
+      OR lower(COALESCE(p.code, '')) LIKE $${values.length}
+      OR lower(COALESCE(u.username, '')) LIKE $${values.length}
+      OR lower(COALESCE(u.email, '')) LIKE $${values.length}
+      OR lower(COALESCE(mp.kode_toko, '')) LIKE $${values.length}
+      OR lower(COALESCE(mp.konfigurasi_toko->>'namaToko', '')) LIKE $${values.length}
+    )`);
+  }
+
+  const date = normalizeDateParam(options.date);
+  const dateStart = normalizeDateParam(options.dateStart);
+  const dateEnd = normalizeDateParam(options.dateEnd);
+  if (date) {
+    values.push(date);
+    clauses.push(`o.created_at >= $${values.length}::date`);
+    clauses.push(`o.created_at < ($${values.length}::date + interval '1 day')`);
+  } else {
+    if (dateStart) {
+      values.push(dateStart);
+      clauses.push(`o.created_at >= $${values.length}::date`);
+    }
+    if (dateEnd) {
+      values.push(dateEnd);
+      clauses.push(`o.created_at < ($${values.length}::date + interval '1 day')`);
+    }
+  }
+
+  return {
+    whereSql: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "",
+    values
+  };
+}
+
+async function listOrdersForAdmin(options = {}) {
   ensureDbBilling();
+  const paginated = Boolean(options.paginated);
+  const filters = buildAdminOrderFilters(options);
+  const orderSql = `ORDER BY
+       CASE o.status
+         WHEN 'waiting_verification' THEN 1
+         WHEN 'pending_payment' THEN 2
+         WHEN 'paid' THEN 3
+         WHEN 'rejected' THEN 4
+         WHEN 'cancelled' THEN 5
+         WHEN 'expired' THEN 6
+         ELSE 9
+       END ASC,
+       o.created_at DESC`;
+
+  if (!paginated) {
+    const res = await query(
+      `${getAdminOrderSelectSql()}
+       ${getAdminOrderFromSql()}
+       ${filters.whereSql}
+       ${orderSql}`,
+      filters.values
+    );
+    return res.rows.map(mapOrder);
+  }
+
+  const { all, page, perPage } = normalizePaginationParams(options);
+  const countRes = await query(
+    `SELECT COUNT(*)::int AS total
+       ${getAdminOrderFromSql()}
+       ${filters.whereSql}`,
+    filters.values
+  );
+  const total = Number(countRes.rows[0]?.total || 0);
+  const totalPages = all ? 1 : Math.max(1, Math.ceil(total / perPage));
+  const currentPage = all ? 1 : Math.min(page, totalPages);
+  const values = [...filters.values];
+  let limitSql = "";
+  if (!all) {
+    values.push(perPage);
+    const limitIndex = values.length;
+    values.push((currentPage - 1) * perPage);
+    const offsetIndex = values.length;
+    limitSql = `LIMIT $${limitIndex} OFFSET $${offsetIndex}`;
+  }
+
   const res = await query(
     `${getAdminOrderSelectSql()}
      ${getAdminOrderFromSql()}
+     ${filters.whereSql}
      ORDER BY
        CASE o.status
          WHEN 'waiting_verification' THEN 1
@@ -1200,8 +1325,17 @@ async function listOrdersForAdmin() {
          ELSE 9
        END ASC,
        o.created_at DESC`
+      + ` ${limitSql}`,
+    values
   );
-  return res.rows.map(mapOrder);
+  return {
+    orders: res.rows.map(mapOrder),
+    total,
+    page: currentPage,
+    perPage,
+    totalPages,
+    all
+  };
 }
 
 async function getOrderByIdForAdmin(orderId, client = null) {

@@ -17,7 +17,7 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const router = express.Router();
 
 const PROBLEM_JOB_STATUSES = new Set(["canceled", "cancelled", "rejected", "failed", "error"]);
-const ACTIVE_JOB_STATUSES = new Set(["pending", "queued", "sent", "claimed", "processing", "printing"]);
+const ACTIVE_JOB_STATUSES = new Set(["pending", "queued", "send", "sent", "claimed", "processing", "printing"]);
 
 function requireAdmin(req, res, next) {
   if (String(req.user?.role || "").toLowerCase() !== "admin") {
@@ -346,6 +346,51 @@ function groupBy(items, keyGetter) {
   return map;
 }
 
+function normalizeListParam(value) {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .flatMap(item => String(item || "").split(","))
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeDateParam(value) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function dateInputValue(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizePaginationParams(query = {}) {
+  const all = String(query.perPage || "").toLowerCase() === "all";
+  return {
+    all,
+    page: Math.max(1, Number.parseInt(query.page, 10) || 1),
+    perPage: all ? "all" : Math.min(Math.max(Number.parseInt(query.perPage, 10) || 20, 1), 100)
+  };
+}
+
+function paginateRows(rows, query = {}) {
+  const { all, page, perPage } = normalizePaginationParams(query);
+  const total = rows.length;
+  const totalPages = all ? 1 : Math.max(1, Math.ceil(total / perPage));
+  const currentPage = all ? 1 : Math.min(page, totalPages);
+  const startIndex = all ? 0 : (currentPage - 1) * perPage;
+  const endIndex = all ? total : startIndex + perPage;
+  return {
+    items: all ? rows : rows.slice(startIndex, endIndex),
+    total,
+    page: currentPage,
+    perPage,
+    totalPages,
+    all
+  };
+}
+
 function getStoreReadiness(clients) {
   const readyCount = clients.filter(client => client.readiness === "ready").length;
   const onlineCount = clients.filter(client => client.status === "online").length;
@@ -455,6 +500,74 @@ function toAdminJob(job, { ownerUserMap = new Map(), clientMap = new Map() } = {
     notes: job.notes || "",
     timeline: timeline.length ? timeline : ["Belum ada timeline"]
   };
+}
+
+function getStoreSearchText(store) {
+  return [
+    store.id,
+    store.name,
+    store.username,
+    store.email,
+    store.code,
+    store.address,
+    store.status
+  ].join(" ").toLowerCase();
+}
+
+function filterAdminStores(stores, query = {}) {
+  const search = String(query.search || "").trim().toLowerCase();
+  const suspend = String(query.suspend || "all").trim().toLowerCase();
+  const signals = new Set(normalizeListParam(query.signals || query.signal).map(item => item.toLowerCase()));
+
+  return stores
+    .filter(store => !search || getStoreSearchText(store).includes(search))
+    .filter(store => {
+      if (suspend === "suspended") return Boolean(store.is_suspend);
+      if (suspend === "active") return !store.is_suspend;
+      return true;
+    })
+    .filter(store => {
+      if (!signals.size) return true;
+      const clients = Array.isArray(store.clients) ? store.clients : [];
+      const hasOnline = clients.some(client => client.status === "online");
+      const hasOffline = clients.some(client => client.status !== "online");
+      const noCredit = Number(store.credit || 0) <= 0;
+      if (signals.has("client_online") && !hasOnline) return false;
+      if (signals.has("client_offline") && !hasOffline) return false;
+      if (signals.has("no_credit") && !noCredit) return false;
+      return true;
+    });
+}
+
+function getJobSearchText(job) {
+  return [
+    job.id,
+    job.store,
+    job.username,
+    job.code,
+    job.session,
+    job.file,
+    job.targetClient,
+    job.status
+  ].join(" ").toLowerCase();
+}
+
+function filterAdminJobs(jobs, query = {}) {
+  const search = String(query.search || "").trim().toLowerCase();
+  const statuses = new Set(normalizeListParam(query.status).map(item => {
+    const normalized = item.toLowerCase();
+    return normalized === "sent" ? "send" : normalized;
+  }));
+  const date = normalizeDateParam(query.date);
+
+  return jobs
+    .filter(job => !search || getJobSearchText(job).includes(search))
+    .filter(job => {
+      const status = String(job.status || "").toLowerCase();
+      const normalizedStatus = status === "sent" ? "send" : status;
+      return !statuses.size || statuses.has(normalizedStatus);
+    })
+    .filter(job => !date || dateInputValue(job.createdAt) === date);
 }
 
 async function safeListOrdersForAdmin() {
@@ -573,8 +686,19 @@ router.get("/summary", asyncHandler(async (req, res) => {
 
 router.get("/stores", asyncHandler(async (req, res) => {
   const context = await buildAdminDataContext();
-  const stores = context.users.map(user => toAdminStoreFromContext(user, context));
-  res.json({ stores });
+  const filteredStores = filterAdminStores(
+    context.users.map(user => toAdminStoreFromContext(user, context)),
+    req.query
+  );
+  const page = paginateRows(filteredStores, req.query);
+  res.json({
+    stores: page.items,
+    total: page.total,
+    page: page.page,
+    perPage: page.perPage,
+    totalPages: page.totalPages,
+    all: page.all
+  });
 }));
 
 router.get("/stores/:id", asyncHandler(async (req, res) => {
@@ -630,13 +754,21 @@ router.patch("/stores/:id/suspend", asyncHandler(async (req, res) => {
 
 router.get("/jobs", asyncHandler(async (req, res) => {
   const context = await buildAdminDataContext();
-  const jobs = context.jobs
+  const rows = context.jobs
     .map(job => toAdminJob(job, {
       ownerUserMap: context.userMap,
       clientMap: context.clientMap
     }))
     .sort(sortByCreatedDesc);
-  res.json({ jobs });
+  const page = paginateRows(filterAdminJobs(rows, req.query), req.query);
+  res.json({
+    jobs: page.items,
+    total: page.total,
+    page: page.page,
+    perPage: page.perPage,
+    totalPages: page.totalPages,
+    all: page.all
+  });
 }));
 
 router.get("/jobs/:id", asyncHandler(async (req, res) => {
