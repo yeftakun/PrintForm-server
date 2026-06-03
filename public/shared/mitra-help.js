@@ -1,17 +1,17 @@
 (() => {
-  const CUSTOMER_HINT = `1. Masukkan nama anda & Temukan percetakan dengan memasukkan kode toko atau scan barcode pada percetakan.
-2. Konfirmasi percetakan yang ditemukan, dan anda akan membuat sesi cetak.
-3. Di dalam sesi cetak, anda bisa mengunggah file untuk dicetak dan mengatur atribut cetak seperti jumlah salinan, warna, dan lainnya.
-4. Submit tugas cetak anda dan percetakan akan menerima tugas tersebut untuk langsung dicetak.
-5. Anda bisa memantau status tugas cetak di dalam sesi tugas cetak.
-6. Bukti cetak tersedia setelah tugas berhasil dicetak dan dapat diunduh untuk keperluan pengambilan dokumen anda di percetakan.
-
+  const MITRA_HINT = `1. Buat akun dan masuk di portal PrintOrder.
+2. Sesuaikan pengaturan toko dan layanan anda.
+3. Pilih rencana paket yang sesuai. Anda mendapatkan paket gratis 10 token setiap seminggu sekali.
+4. Setelah mendapatkan token anda bisa mulai menerima dan mencetak dokumen dari pelanggan.
+5. Download dan install aplikasi PrintOrder di komputer percetakan anda, lalu masuk dengan akun yang sudah dibuat.
+6. Di aplikasi PrintOrder, anda bisa melihat dan mengelola tugas cetak yang dikirim pelanggan.
 
 Jika anda memiliki pertanyaan atau masalah terkait proses cetak, jangan ragu untuk menghubungi layanan pelanggan percetakan untuk bantuan lebih lanjut.
 
 whatsapp: link ke whatsapp +6285775471308
 email: ke yeftakun34@gmail.com`;
 
+  let button = null;
   let backdrop = null;
   let contentEl = null;
   let lastFocus = null;
@@ -81,48 +81,70 @@ email: ke yeftakun34@gmail.com`;
       : '<p class="customer-help-loading">Panduan belum tersedia.</p>';
   }
 
-  function closeHelp() {
+  function getUserRole() {
+    const user = window.PortalAuth?.getState?.()?.user;
+    return String(user?.role || "").trim().toLowerCase();
+  }
+
+  function shouldShowHelp() {
+    return getUserRole() === "mitra"
+      && document.body.classList.contains("portal-dashboard-active");
+  }
+
+  function closeHelp({ restoreFocus = true } = {}) {
     if (!backdrop) {
       return;
     }
     backdrop.classList.remove("open");
     backdrop.setAttribute("aria-hidden", "true");
-    if (lastFocus && typeof lastFocus.focus === "function") {
+    if (restoreFocus && lastFocus && typeof lastFocus.focus === "function") {
       lastFocus.focus();
     }
   }
 
   function openHelp() {
-    if (!backdrop || !contentEl) {
+    if (!backdrop || !contentEl || !shouldShowHelp()) {
       return;
     }
     lastFocus = document.activeElement;
+    contentEl.innerHTML = renderHint(MITRA_HINT);
     backdrop.classList.add("open");
     backdrop.setAttribute("aria-hidden", "false");
-    contentEl.innerHTML = renderHint(CUSTOMER_HINT);
     backdrop.querySelector(".customer-help-close")?.focus();
   }
 
+  function syncVisibility() {
+    if (!button) {
+      return;
+    }
+    const visible = shouldShowHelp();
+    button.hidden = !visible;
+    if (!visible) {
+      closeHelp({ restoreFocus: false });
+    }
+  }
+
   function buildHelp() {
-    if (document.querySelector(".customer-help-fab")) {
+    if (document.querySelector(".mitra-help-fab")) {
       return;
     }
 
-    const button = document.createElement("button");
-    button.className = "customer-help-fab";
+    button = document.createElement("button");
+    button.className = "customer-help-fab mitra-help-fab";
     button.type = "button";
-    button.setAttribute("aria-label", "Buka panduan cetak");
+    button.hidden = true;
+    button.setAttribute("aria-label", "Buka panduan mitra");
     button.textContent = "?";
 
     backdrop = document.createElement("div");
-    backdrop.className = "customer-help-backdrop";
+    backdrop.className = "customer-help-backdrop mitra-help-backdrop";
     backdrop.setAttribute("aria-hidden", "true");
     backdrop.innerHTML = `
-      <section class="customer-help-modal" role="dialog" aria-modal="true" aria-labelledby="customerHelpTitle">
+      <section class="customer-help-modal" role="dialog" aria-modal="true" aria-labelledby="mitraHelpTitle">
         <div class="customer-help-head">
           <div>
-            <h2 id="customerHelpTitle">Panduan Cetak</h2>
-            <p>Ikuti alur singkat ini untuk menggunakan PrintOrder.</p>
+            <h2 id="mitraHelpTitle">Panduan Mitra</h2>
+            <p>Ikuti alur singkat ini untuk mulai menerima layanan cetak.</p>
           </div>
           <button class="customer-help-close" type="button" aria-label="Tutup panduan">x</button>
         </div>
@@ -147,6 +169,12 @@ email: ke yeftakun34@gmail.com`;
 
     document.body.appendChild(button);
     document.body.appendChild(backdrop);
+
+    const observer = new MutationObserver(syncVisibility);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    window.addEventListener("storage", syncVisibility);
+    window.setInterval(syncVisibility, 1000);
+    syncVisibility();
   }
 
   if (document.readyState === "loading") {

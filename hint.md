@@ -7,3 +7,6 @@
 
 
 Jika anda memiliki pertanyaan atau masalah terkait proses cetak, jangan ragu untuk menghubungi layanan pelanggan percetakan untuk bantuan lebih lanjut.
+
+whatsapp: link ke whatsapp +6285775471308
+email: ke yeftakun34@gmail.com

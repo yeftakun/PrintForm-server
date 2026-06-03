@@ -164,6 +164,44 @@
   line-height: 1.48;
 }
 
+.customer-help-contact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.customer-help-contact a {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(207, 84, 45, 0.24);
+  border-radius: 12px;
+  background: #fff0e8;
+  color: #17130f;
+  text-decoration: none;
+}
+
+.customer-help-contact a:hover {
+  border-color: rgba(207, 84, 45, 0.42);
+  background: #ffe6d7;
+}
+
+.customer-help-contact span {
+  color: #9c4a2c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customer-help-contact strong {
+  overflow: hidden;
+  color: #17130f;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .customer-help-loading {
   color: #5f5750;
   font-size: 0.9rem;
@@ -188,5 +226,9 @@
     max-height: min(82svh, 680px);
     padding: 20px;
     border-radius: 18px;
+  }
+
+  .customer-help-contact {
+    grid-template-columns: 1fr;
   }
 }
