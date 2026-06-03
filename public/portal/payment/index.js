@@ -56,12 +56,18 @@
     }).format(Number(value || 0));
   }
 
-  function getPlanDurationText(plan) {
+  function getPlanDurationText(plan, quantity = 1, pricing = null) {
     const months = Number(plan?.durationMonths || 0);
+    const planType = String(plan?.planType || "").toLowerCase();
+    const periodCount = Number(pricing?.validity?.periodCount || quantity || 1);
+    if (planType === "subscription" && periodCount > 1) {
+      const perPeriod = months > 0 ? `${months} bulan` : "masa berlaku plan";
+      return `${periodCount} periode x ${perPeriod}`;
+    }
     if (months > 0) {
       return `${months} bulan`;
     }
-    if (String(plan?.planType || "").toLowerCase() === "free") {
+    if (planType === "free") {
       return "1 minggu";
     }
     return "-";
@@ -92,7 +98,7 @@
     paymentSubtotal.textContent = formatCurrency(pricing?.subtotalIdr || 0);
     paymentQuantity.textContent = formatInteger(pricing?.quantity || selectedQuantity);
     paymentCredits.textContent = formatInteger(pricing?.totalCredits || 0);
-    paymentDuration.textContent = getPlanDurationText(plan);
+    paymentDuration.textContent = getPlanDurationText(plan, pricing?.quantity || selectedQuantity, pricing);
     paymentDiscount.textContent = formatCurrency(pricing?.discountIdr || 0);
     paymentTotal.textContent = formatCurrency(pricing?.totalIdr || 0);
   }

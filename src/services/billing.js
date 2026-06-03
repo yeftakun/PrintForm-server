@@ -52,6 +52,11 @@ function toIso(value) {
   return value?.toISOString?.() || value || null;
 }
 
+function toTimestamp(value) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function createClientError(message, statusCode = 400, code = "BILLING_INVALID_INPUT") {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -165,6 +170,37 @@ function getCreditSourceType(plan) {
   if (type === "subscription") return "subscription";
   if (type === "credit_pack" || type === "topup" || type === "buy_credit") return "topup";
   return "topup";
+}
+
+function isSubscriptionPlan(plan) {
+  return String(plan?.plan_type || "").toLowerCase() === "subscription";
+}
+
+function summarizeCreditRows(rows = []) {
+  if (!rows.length) {
+    return null;
+  }
+
+  const sortedRows = [...rows].sort((a, b) => toTimestamp(a.starts_at) - toTimestamp(b.starts_at));
+  const firstRow = sortedRows[0];
+  const lastRow = sortedRows[sortedRows.length - 1];
+  return {
+    id: firstRow.id,
+    ids: sortedRows.map(row => row.id),
+    creditCount: sortedRows.length,
+    source_type: firstRow.source_type,
+    total_credits: sortedRows.reduce((sum, row) => sum + toInt(row.total_credits), 0),
+    used_credits: sortedRows.reduce((sum, row) => sum + toInt(row.used_credits), 0),
+    starts_at: firstRow.starts_at,
+    expires_at: lastRow.expires_at,
+    periods: sortedRows.map(row => ({
+      id: row.id,
+      totalCredits: toInt(row.total_credits),
+      usedCredits: toInt(row.used_credits),
+      startsAt: toIso(row.starts_at),
+      expiresAt: toIso(row.expires_at)
+    }))
+  };
 }
 
 function mapPlan(row) {
@@ -748,6 +784,7 @@ async function calculateOrderPricing({ userId, planId, quantity = 1, couponCode 
   const safeQuantity = normalizePlanQuantity(plan, quantity);
   const subtotalIdr = toInt(plan.price_idr) * safeQuantity;
   const totalCredits = toInt(plan.credits_per_unit) * safeQuantity;
+  const subscriptionPlan = isSubscriptionPlan(plan);
   let coupon = null;
   let discountIdr = 0;
   const normalizedCouponCode = normalizeCouponCode(couponCode);
@@ -815,6 +852,12 @@ async function calculateOrderPricing({ userId, planId, quantity = 1, couponCode 
     discountIdr,
     totalIdr,
     totalCredits,
+    validity: {
+      mode: subscriptionPlan ? "sequential_periods" : "single_period",
+      periodCount: subscriptionPlan ? safeQuantity : 1,
+      durationMonths: Number(plan.duration_months || 0),
+      totalDurationMonths: subscriptionPlan ? Number(plan.duration_months || 0) * safeQuantity : Number(plan.duration_months || 0)
+    },
     coupon: coupon ? {
       id: coupon.id,
       code: coupon.code,
@@ -826,14 +869,14 @@ async function calculateOrderPricing({ userId, planId, quantity = 1, couponCode 
 }
 
 async function createCreditBatchForOrder({ client, orderId, userId, plan, quantity }) {
-  const credits = toInt(plan.credits_per_unit) * quantity;
-  if (credits <= 0) {
+  const creditsPerUnit = toInt(plan.credits_per_unit);
+  const safeQuantity = normalizePlanQuantity(plan, quantity);
+  const sourceType = getCreditSourceType(plan);
+  if (creditsPerUnit <= 0 || safeQuantity <= 0) {
     return null;
   }
 
   const now = new Date();
-  const id = createOpaqueId("cr");
-  const sourceType = getCreditSourceType(plan);
   if (sourceType !== "free") {
     await client.query(
       `UPDATE credits
@@ -847,25 +890,68 @@ async function createCreditBatchForOrder({ client, orderId, userId, plan, quanti
       [userId, now]
     );
   }
-  const res = await client.query(
-    `INSERT INTO credits (
-      id, user_id, plan_id, order_id, source_type,
-      total_credits, used_credits, starts_at, expires_at, status
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, 'active')
-    RETURNING id, user_id, plan_id, order_id, source_type, total_credits, used_credits, starts_at, expires_at, status, created_at`,
-    [
-      id,
-      userId,
-      plan.id,
-      orderId,
-      sourceType,
-      credits,
-      now,
-      getCreditExpiresAt(plan, now)
-    ]
+
+  let periodStart = now;
+  if (isSubscriptionPlan(plan)) {
+    const latestSubscriptionRes = await client.query(
+      `SELECT MAX(expires_at) AS latest_expires_at
+         FROM credits
+        WHERE user_id = $1
+          AND plan_id = $2
+          AND source_type = 'subscription'
+          AND status = 'active'
+          AND expires_at > $3`,
+      [userId, plan.id, now]
+    );
+    const latestExpiresAt = latestSubscriptionRes.rows[0]?.latest_expires_at;
+    if (latestExpiresAt && toTimestamp(latestExpiresAt) > toTimestamp(now)) {
+      periodStart = new Date(latestExpiresAt);
+    }
+  }
+
+  const rows = [];
+  const periodCount = isSubscriptionPlan(plan) ? safeQuantity : 1;
+  for (let index = 0; index < periodCount; index += 1) {
+    const id = createOpaqueId("cr");
+    const startsAt = isSubscriptionPlan(plan) ? periodStart : now;
+    const expiresAt = getCreditExpiresAt(plan, startsAt);
+    const totalCredits = isSubscriptionPlan(plan) ? creditsPerUnit : creditsPerUnit * safeQuantity;
+    const res = await client.query(
+      `INSERT INTO credits (
+        id, user_id, plan_id, order_id, source_type,
+        total_credits, used_credits, starts_at, expires_at, status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, 'active')
+      RETURNING id, user_id, plan_id, order_id, source_type, total_credits, used_credits, starts_at, expires_at, status, created_at`,
+      [
+        id,
+        userId,
+        plan.id,
+        orderId,
+        sourceType,
+        totalCredits,
+        startsAt,
+        expiresAt
+      ]
+    );
+    rows.push(res.rows[0]);
+    periodStart = expiresAt;
+  }
+
+  return summarizeCreditRows(rows);
+}
+
+async function getCreditSummaryForOrder(orderId, client) {
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT id, user_id, plan_id, order_id, source_type, total_credits, used_credits,
+            starts_at, expires_at, status, created_at
+       FROM credits
+      WHERE order_id = $1
+      ORDER BY starts_at ASC, created_at ASC`,
+    [orderId]
   );
-  return res.rows[0];
+  return summarizeCreditRows(res.rows);
 }
 
 async function createOrder({ userId, planId, quantity = 1, couponCode = null }) {
@@ -938,9 +1024,13 @@ async function createOrder({ userId, planId, quantity = 1, couponCode = null }) 
       pricing,
       credit: credit ? {
         id: credit.id,
+        ids: credit.ids || [credit.id],
+        creditCount: Number(credit.creditCount || 1),
         totalCredits: Number(credit.total_credits || 0),
         sourceType: credit.source_type,
-        expiresAt: toIso(credit.expires_at)
+        startsAt: toIso(credit.starts_at),
+        expiresAt: toIso(credit.expires_at),
+        periods: credit.periods || []
       } : null
     };
   });
@@ -1155,11 +1245,7 @@ async function reviewOrderPaymentByAdmin({ orderId, action, rejectedReason = nul
       };
     }
 
-    const existingCredit = await client.query(
-      "SELECT id, total_credits, source_type, expires_at FROM credits WHERE order_id = $1 LIMIT 1",
-      [orderId]
-    );
-    let credit = existingCredit.rows[0] || null;
+    let credit = await getCreditSummaryForOrder(orderId, client);
     if (!credit) {
       credit = await createCreditBatchForOrder({
         client,
@@ -1206,9 +1292,13 @@ async function reviewOrderPaymentByAdmin({ orderId, action, rejectedReason = nul
       order: await getOrderByIdForAdmin(orderId, client),
       credit: credit ? {
         id: credit.id,
+        ids: credit.ids || [credit.id],
+        creditCount: Number(credit.creditCount || 1),
         totalCredits: Number(credit.total_credits || 0),
         sourceType: credit.source_type,
-        expiresAt: toIso(credit.expires_at)
+        startsAt: toIso(credit.starts_at),
+        expiresAt: toIso(credit.expires_at),
+        periods: credit.periods || []
       } : null
     };
   });
