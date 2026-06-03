@@ -267,6 +267,10 @@ function mapCoupon(row) {
 
 function mapOrder(row) {
   if (!row) return null;
+  const hasAdminUserMeta = Boolean(row.username || row.email || row.kode_toko || row.store_name);
+  const proofBaseUrl = hasAdminUserMeta
+    ? `/api/billing/admin/orders/${encodeURIComponent(row.id)}/payment-proof`
+    : `/api/billing/orders/${encodeURIComponent(row.id)}/payment-proof`;
   return {
     id: row.id,
     userId: row.user_id,
@@ -302,10 +306,10 @@ function mapOrder(row) {
       sizeBytes: Number(row.proof_size_bytes || 0),
       status: row.proof_status || null,
       submittedAt: toIso(row.proof_submitted_at),
-      previewUrl: row.proof_id ? `/api/billing/admin/orders/${encodeURIComponent(row.id)}/payment-proof/preview` : null,
-      downloadUrl: row.proof_id ? `/api/billing/admin/orders/${encodeURIComponent(row.id)}/payment-proof/download` : null
+      previewUrl: row.proof_id ? `${proofBaseUrl}/preview` : null,
+      downloadUrl: row.proof_id ? `${proofBaseUrl}/download` : null
     } : null,
-    user: row.username || row.email || row.kode_toko || row.store_name ? {
+    user: hasAdminUserMeta ? {
       id: row.user_id,
       username: row.username || null,
       email: row.email || null,
@@ -1365,6 +1369,21 @@ async function getPaymentProofForAdmin(orderId) {
   return mapPaymentProof(res.rows[0]);
 }
 
+async function getPaymentProofForUser(orderId, userId) {
+  ensureDbBilling();
+  const res = await query(
+    `SELECT pp.*
+     FROM payment_proofs pp
+     JOIN orders o ON o.id = pp.order_id
+     WHERE pp.order_id = $1
+       AND o.user_id = $2
+     ORDER BY pp.submitted_at DESC
+     LIMIT 1`,
+    [orderId, userId]
+  );
+  return mapPaymentProof(res.rows[0]);
+}
+
 async function reviewOrderPaymentByAdmin({ orderId, action, rejectedReason = null }) {
   ensureDbBilling();
   const normalizedAction = String(action || "").trim().toLowerCase();
@@ -1795,6 +1814,7 @@ module.exports = {
   listOrdersForAdmin,
   getOrderByIdForAdmin,
   getPaymentProofForAdmin,
+  getPaymentProofForUser,
   reviewOrderPaymentByAdmin,
   attachPaymentProof,
   getCreditBalance,

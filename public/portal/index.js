@@ -67,17 +67,34 @@
   const creditRemaining = document.getElementById("creditRemaining");
   const creditNearestExpiry = document.getElementById("creditNearestExpiry");
   const creditBreakdown = document.getElementById("creditBreakdown");
+  const creditServiceBanner = document.getElementById("creditServiceBanner");
+  const creditServiceBannerText = document.getElementById("creditServiceBannerText");
+  const creditServiceBillingBtn = document.getElementById("creditServiceBillingBtn");
   const billingStatus = document.getElementById("billingStatus");
   const plansGrid = document.getElementById("plansGrid");
   const openOrdersModalBtn = document.getElementById("openOrdersModalBtn");
   const ordersModalBackdrop = document.getElementById("ordersModalBackdrop");
   const refreshOrdersBtn = document.getElementById("refreshOrdersBtn");
+  const ordersStatusFilter = document.getElementById("ordersStatusFilter");
+  const ordersSearchInput = document.getElementById("ordersSearchInput");
+  const ordersPageSizeSelect = document.getElementById("ordersPageSizeSelect");
+  const ordersPageInfo = document.getElementById("ordersPageInfo");
+  const ordersFirstPageBtn = document.getElementById("ordersFirstPageBtn");
+  const ordersPrevPageBtn = document.getElementById("ordersPrevPageBtn");
+  const ordersNextPageBtn = document.getElementById("ordersNextPageBtn");
+  const ordersLastPageBtn = document.getElementById("ordersLastPageBtn");
   const ordersTableBody = document.getElementById("ordersTableBody");
+  const orderDetailModalBackdrop = document.getElementById("orderDetailModalBackdrop");
+  const orderDetailBody = document.getElementById("orderDetailBody");
+  const orderProofPreview = document.getElementById("orderProofPreview");
+  const orderDetailStatus = document.getElementById("orderDetailStatus");
   const paymentProofModalBackdrop = document.getElementById("paymentProofModalBackdrop");
   const paymentProofForm = document.getElementById("paymentProofForm");
   const paymentProofOrderMeta = document.getElementById("paymentProofOrderMeta");
   const paymentProofAccountText = document.getElementById("paymentProofAccountText");
   const paymentProofInstructionText = document.getElementById("paymentProofInstructionText");
+  const paymentProofUploadSummary = document.getElementById("paymentProofUploadSummary");
+  const paymentProofUploadFields = document.getElementById("paymentProofUploadFields");
   const paymentProofStatus = document.getElementById("paymentProofStatus");
 
   const storeSettingsForm = document.getElementById("storeSettingsForm");
@@ -204,6 +221,7 @@
   let latestPaymentInstructions = null;
   let paymentInstructionsPromise = null;
   let activePaymentProofOrderId = null;
+  let activeOrderProofObjectUrl = "";
   let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
   let manualStoreStatus = "open";
   let forceOpenOutsideOperationalHours = false;
@@ -234,6 +252,12 @@
     search: "",
     sortKey: "createdAt",
     sortDirection: "desc",
+    pageSize: 20,
+    currentPage: 1
+  };
+  const orderTableState = {
+    status: "all",
+    search: "",
     pageSize: 20,
     currentPage: 1
   };
@@ -290,6 +314,9 @@
     }
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
+    if (modal === orderDetailModalBackdrop) {
+      clearOrderProofPreview();
+    }
   }
 
   function getDashboardTargetIds() {
@@ -1659,8 +1686,31 @@
     renderFundEstimate();
   }
 
+  function renderCreditServiceBanner(balance) {
+    if (!creditServiceBanner) {
+      return;
+    }
+    if (!latestCreditBalance || Number(balance.remainingCredits || 0) > 0) {
+      creditServiceBanner.classList.add("hidden");
+      return;
+    }
+
+    const pieces = ["Toko belum menerima layanan karena kredit habis."];
+    if (balance.hasActiveFreePeriod && balance.activeFreePeriodExpiresAt) {
+      pieces.push(`Free masih aktif sampai ${formatDate(balance.activeFreePeriodExpiresAt)}.`);
+    }
+    if (balance.nextScheduledStart && Number(balance.nextScheduledCredits || 0) > 0) {
+      pieces.push(`Kredit terjadwal berikutnya mulai ${formatDate(balance.nextScheduledStart)}.`);
+    }
+    if (creditServiceBannerText) {
+      creditServiceBannerText.textContent = pieces.join(" ");
+    }
+    creditServiceBanner.classList.remove("hidden");
+  }
+
   function renderCreditBalance() {
     const balance = latestCreditBalance || {};
+    renderCreditServiceBanner(balance);
     creditTotalActive.textContent = formatInteger(balance.remainingCredits || 0);
     creditUsed.textContent = formatInteger(balance.scheduledRemainingCredits || 0);
     creditRemaining.textContent = formatInteger(balance.totalEntitledRemainingCredits ?? balance.remainingCredits ?? 0);
@@ -1672,12 +1722,53 @@
 
     const items = Object.values(balance.breakdown || {});
     const scheduledItems = Object.values(balance.scheduledBreakdown || {});
+    const operationItems = [
+      `
+        <span class="credit-operational-item">
+          <strong>Bisa dipakai sekarang</strong>
+          <small>${escapeHtml(formatInteger(balance.remainingCredits || 0))} kredit siap digunakan untuk print.</small>
+        </span>
+      `
+    ];
+
+    if (balance.nextScheduledStart && Number(balance.nextScheduledCredits || 0) > 0) {
+      operationItems.push(`
+        <span class="credit-operational-item">
+          <strong>Terjadwal mulai tanggal ${escapeHtml(formatDate(balance.nextScheduledStart))}</strong>
+          <small>${escapeHtml(formatInteger(balance.nextScheduledCredits || 0))} kredit aktif setelah periode sebelumnya habis.</small>
+        </span>
+      `);
+    } else if (Number(balance.scheduledRemainingCredits || 0) > 0) {
+      operationItems.push(`
+        <span class="credit-operational-item">
+          <strong>Terjadwal</strong>
+          <small>${escapeHtml(formatInteger(balance.scheduledRemainingCredits || 0))} kredit akan aktif sesuai jadwal masa berlaku.</small>
+        </span>
+      `);
+    }
+
+    if (balance.hasActiveFreePeriod) {
+      const freeUntil = balance.activeFreePeriodExpiresAt
+        ? ` sampai ${formatDate(balance.activeFreePeriodExpiresAt)}`
+        : "";
+      operationItems.push(`
+        <span class="credit-operational-item">
+          <strong>Free masih aktif${escapeHtml(freeUntil)}</strong>
+          <small>Sisa free: ${escapeHtml(formatInteger(balance.activeFreePeriodRemainingCredits || 0))} kredit.</small>
+        </span>
+      `);
+    }
+
     if (items.length === 0 && scheduledItems.length === 0) {
-      creditBreakdown.innerHTML = '<p class="muted-cell">Belum ada kredit aktif atau terjadwal.</p>';
+      creditBreakdown.innerHTML = [
+        ...operationItems,
+        '<p class="muted-cell">Belum ada kredit aktif atau terjadwal.</p>'
+      ].join("");
       return;
     }
 
     creditBreakdown.innerHTML = [
+      ...operationItems,
       ...items.map(item => `
       <span class="credit-breakdown-item">
         ${escapeHtml(getSourceTypeLabel(item.sourceType))} aktif: ${escapeHtml(formatInteger(item.remainingCredits || 0))}
@@ -1736,33 +1827,70 @@
     }).join("");
   }
 
+  function getFilteredOrders() {
+    const statusFilter = String(orderTableState.status || "all").toLowerCase();
+    const searchText = String(orderTableState.search || "").trim().toLowerCase();
+    return latestOrders
+      .filter(order => statusFilter === "all" || String(order.status || "").toLowerCase() === statusFilter)
+      .filter(order => {
+        if (!searchText) {
+          return true;
+        }
+        const haystack = [
+          order.id,
+          order.planId,
+          order.plan?.name,
+          order.couponCode,
+          getOrderStatusLabel(order.status),
+          order.paymentProof?.originalName
+        ].join(" ").toLowerCase();
+        return haystack.includes(searchText);
+      });
+  }
+
+  function getOrderTablePage(filteredOrders) {
+    const totalItems = filteredOrders.length;
+    const pageSize = orderTableState.pageSize === "all" ? totalItems || 1 : Number(orderTableState.pageSize || 20);
+    const totalPages = orderTableState.pageSize === "all" ? 1 : Math.max(1, Math.ceil(totalItems / pageSize));
+    orderTableState.currentPage = Math.min(Math.max(1, orderTableState.currentPage), totalPages);
+    const startIndex = orderTableState.pageSize === "all" ? 0 : (orderTableState.currentPage - 1) * pageSize;
+    const endIndex = orderTableState.pageSize === "all" ? totalItems : startIndex + pageSize;
+    return {
+      items: filteredOrders.slice(startIndex, endIndex),
+      totalItems,
+      totalPages,
+      startIndex,
+      endIndex: Math.min(endIndex, totalItems)
+    };
+  }
+
   function renderOrders() {
     if (!ordersTableBody) {
       return;
     }
-    if (!latestOrders.length) {
-      ordersTableBody.innerHTML = '<tr><td colspan="6" class="muted-cell">Belum ada order.</td></tr>';
-      return;
-    }
-
-    ordersTableBody.innerHTML = latestOrders.map(order => {
+    const filteredOrders = getFilteredOrders();
+    const page = getOrderTablePage(filteredOrders);
+    if (page.totalItems === 0) {
+      ordersTableBody.innerHTML = '<tr><td colspan="6" class="muted-cell">Tidak ada order yang sesuai filter.</td></tr>';
+    } else {
+      ordersTableBody.innerHTML = page.items.map(order => {
       const statusClass = getOrderStatusClass(order.status);
       const planName = order.plan?.name || order.planId || "-";
       const canUpload = order.status === "pending_payment";
-      let action = "";
+      let action = `<button class="btn btn-outline btn-compact" type="button" data-order-detail="${escapeHtml(order.id)}">Detail</button>`;
       if (canUpload) {
-        action = `
+        action += `
           <button class="btn btn-outline btn-compact" type="button" data-upload-proof-order="${escapeHtml(order.id)}">Upload Bukti Pembayaran</button>
           <button class="btn btn-ghost btn-compact" type="button" data-cancel-order="${escapeHtml(order.id)}">Batalkan Order</button>
         `;
       } else if (order.status === "waiting_verification") {
-        action = "<small>Pembayaran sedang menunggu verifikasi.</small>";
+        action += "<small>Pembayaran sedang menunggu verifikasi.</small>";
       } else if (order.status === "paid") {
-        action = "<small>Order berhasil/aktif.</small>";
+        action += "<small>Order berhasil/aktif.</small>";
       } else if (order.status === "rejected") {
-        action = `<small>${escapeHtml(order.rejectedReason || "Order ditolak.")}</small>`;
+        action += `<small>${escapeHtml(order.rejectedReason || "Order ditolak.")}</small>`;
       } else {
-        action = `<small>${escapeHtml(getOrderStatusLabel(order.status))}</small>`;
+        action += `<small>${escapeHtml(getOrderStatusLabel(order.status))}</small>`;
       }
       const proofText = order.paymentProof
         ? `<small>Bukti: ${escapeHtml(order.paymentProof.originalName || order.paymentProof.id)}</small>`
@@ -1777,7 +1905,20 @@
           <td><div class="order-action-stack">${action}${proofText}</div></td>
         </tr>
       `;
-    }).join("");
+      }).join("");
+    }
+
+    if (ordersPageInfo) {
+      ordersPageInfo.textContent = page.totalItems === 0
+        ? "0 order"
+        : `${page.startIndex + 1}-${page.endIndex} dari ${page.totalItems} order`;
+    }
+    [ordersFirstPageBtn, ordersPrevPageBtn].forEach(button => {
+      if (button) button.disabled = orderTableState.currentPage <= 1;
+    });
+    [ordersNextPageBtn, ordersLastPageBtn].forEach(button => {
+      if (button) button.disabled = orderTableState.currentPage >= page.totalPages;
+    });
   }
 
   function renderBillingData() {
@@ -2013,12 +2154,242 @@
     }
   }
 
+  function getPaymentAccountText(instructions = latestPaymentInstructions) {
+    const accountNumber = String(instructions?.accountNumber || "no_rek").trim();
+    const bankName = String(instructions?.bankName || "bank xxx").trim();
+    const accountName = String(instructions?.accountName || "").trim();
+    const accountLabel = instructions?.accountLabel || `${accountNumber} (${bankName})`;
+    return accountName ? `${accountLabel} a.n. ${accountName}` : accountLabel;
+  }
+
+  function getOrderById(orderId) {
+    const safeOrderId = String(orderId || "").trim();
+    return latestOrders.find(item => String(item.id || "") === safeOrderId) || null;
+  }
+
+  function clearOrderProofPreview() {
+    if (activeOrderProofObjectUrl) {
+      URL.revokeObjectURL(activeOrderProofObjectUrl);
+      activeOrderProofObjectUrl = "";
+    }
+    if (orderProofPreview) {
+      orderProofPreview.innerHTML = "";
+    }
+    setStatus(orderDetailStatus, "");
+  }
+
+  function renderOrderDetailBody(order) {
+    if (!orderDetailBody) {
+      return;
+    }
+    if (!order) {
+      orderDetailBody.innerHTML = '<p class="muted-cell">Order tidak ditemukan.</p>';
+      return;
+    }
+
+    const statusClass = getOrderStatusClass(order.status);
+    const planName = order.plan?.name || order.planId || "-";
+    const proof = order.paymentProof;
+    const canUpload = order.status === "pending_payment";
+    const proofText = proof
+      ? `${proof.originalName || proof.id || "Bukti pembayaran"} · ${formatDateTime(proof.submittedAt)}`
+      : "Belum ada bukti pembayaran.";
+    const instruction = order.paymentInstruction
+      || latestPaymentInstructions?.paymentInstruction
+      || "Transfer sesuai nominal order, lalu upload bukti pembayaran.";
+
+    orderDetailBody.innerHTML = `
+      <dl class="order-detail-grid">
+        <div>
+          <dt>Order</dt>
+          <dd><code>${escapeHtml(order.id || "-")}</code></dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd><span class="status-pill ${statusClass}">${escapeHtml(getOrderStatusLabel(order.status))}</span></dd>
+        </div>
+        <div>
+          <dt>Plan</dt>
+          <dd>${escapeHtml(planName)}</dd>
+        </div>
+        <div>
+          <dt>Quantity</dt>
+          <dd>${escapeHtml(formatInteger(order.quantity || 1))}</dd>
+        </div>
+        <div>
+          <dt>Total</dt>
+          <dd>${escapeHtml(formatCurrency(order.totalIdr || 0))}</dd>
+        </div>
+        <div>
+          <dt>Dibuat</dt>
+          <dd>${escapeHtml(formatDateTime(order.createdAt))}</dd>
+        </div>
+        <div>
+          <dt>Kedaluwarsa Order</dt>
+          <dd>${escapeHtml(order.paymentExpiresAt ? formatDateTime(order.paymentExpiresAt) : "-")}</dd>
+        </div>
+        <div>
+          <dt>Kupon</dt>
+          <dd>${escapeHtml(order.couponCode || "-")}</dd>
+        </div>
+        <div class="order-detail-wide">
+          <dt>Instruksi Pembayaran</dt>
+          <dd>${escapeHtml(instruction)}</dd>
+        </div>
+        <div class="order-detail-wide">
+          <dt>Bukti Pembayaran</dt>
+          <dd>${escapeHtml(proofText)}</dd>
+        </div>
+        ${order.rejectedReason ? `
+          <div class="order-detail-wide">
+            <dt>Alasan Ditolak</dt>
+            <dd>${escapeHtml(order.rejectedReason)}</dd>
+          </div>
+        ` : ""}
+      </dl>
+      <div class="order-detail-actions">
+        ${canUpload ? `<button class="btn btn-primary btn-compact" type="button" data-upload-proof-order="${escapeHtml(order.id)}">Upload Bukti</button>` : ""}
+        ${proof ? `<button class="btn btn-outline btn-compact" type="button" data-download-order-proof="${escapeHtml(order.id)}">Download Bukti</button>` : ""}
+      </div>
+    `;
+  }
+
+  async function renderOrderProofPreview(order) {
+    if (!orderProofPreview) {
+      return;
+    }
+    const proof = order?.paymentProof;
+    if (!proof) {
+      orderProofPreview.innerHTML = `
+        <div class="order-proof-card">
+          <span>Bukti pembayaran</span>
+          <p>Belum ada bukti pembayaran yang diupload untuk order ini.</p>
+        </div>
+      `;
+      return;
+    }
+    if (!proof.previewUrl) {
+      orderProofPreview.innerHTML = `
+        <div class="order-proof-card">
+          <span>Bukti pembayaran</span>
+          <p>Preview bukti pembayaran belum tersedia.</p>
+        </div>
+      `;
+      return;
+    }
+
+    orderProofPreview.innerHTML = `
+      <div class="order-proof-card">
+        <div class="order-proof-head">
+          <div>
+            <span>Bukti pembayaran</span>
+            <p>${escapeHtml(proof.originalName || proof.id || "Bukti pembayaran")}</p>
+          </div>
+          <button class="btn btn-outline btn-compact" type="button" data-download-order-proof="${escapeHtml(order.id)}">Download</button>
+        </div>
+        <div class="order-proof-frame" id="orderProofPreviewFrame">Memuat preview bukti...</div>
+      </div>
+    `;
+
+    const frame = document.getElementById("orderProofPreviewFrame");
+    try {
+      const response = await window.PortalAuth.apiFetch(proof.previewUrl, { method: "GET" });
+      if (!response.ok) {
+        throw new Error(`Gagal memuat preview (${response.status})`);
+      }
+      const blob = await response.blob();
+      const mimeType = blob.type || proof.mimeType || "";
+      activeOrderProofObjectUrl = URL.createObjectURL(blob);
+      if (mimeType.startsWith("image/")) {
+        frame.innerHTML = `<img src="${activeOrderProofObjectUrl}" alt="Preview bukti pembayaran">`;
+      } else if (mimeType === "application/pdf") {
+        frame.innerHTML = `<iframe src="${activeOrderProofObjectUrl}" title="Preview bukti pembayaran"></iframe>`;
+      } else {
+        frame.innerHTML = '<p>Preview file ini tidak tersedia. Gunakan tombol download.</p>';
+      }
+    } catch (err) {
+      if (frame) {
+        frame.innerHTML = `<p>${escapeHtml(err.message || "Gagal memuat preview bukti pembayaran.")}</p>`;
+      }
+    }
+  }
+
+  async function openOrderDetailModal(orderId) {
+    const order = getOrderById(orderId);
+    clearOrderProofPreview();
+    renderOrderDetailBody(order);
+    openModal(orderDetailModalBackdrop);
+    if (order) {
+      renderOrderProofPreview(order);
+    }
+  }
+
+  async function downloadOrderProof(orderId) {
+    const order = getOrderById(orderId);
+    const proof = order?.paymentProof;
+    if (!proof?.downloadUrl && !proof?.previewUrl) {
+      setStatus(orderDetailStatus, "Bukti pembayaran belum tersedia.", "error");
+      return;
+    }
+    setStatus(orderDetailStatus, "Mengunduh bukti pembayaran...");
+    try {
+      const response = await window.PortalAuth.apiFetch(proof.downloadUrl || proof.previewUrl, { method: "GET" });
+      if (!response.ok) {
+        throw new Error(`Download gagal (${response.status})`);
+      }
+      const blob = await response.blob();
+      downloadBlob(blob, proof.originalName || "payment-proof");
+      setStatus(orderDetailStatus, "Bukti pembayaran berhasil diunduh.", "success");
+    } catch (err) {
+      setStatus(orderDetailStatus, err.message || "Gagal download bukti pembayaran.", "error");
+    }
+  }
+
+  function renderPaymentProofUploadSummary(order, proof, instructions = latestPaymentInstructions) {
+    if (!paymentProofUploadSummary) {
+      return;
+    }
+    if (!order && !proof) {
+      paymentProofUploadSummary.classList.add("hidden");
+      paymentProofUploadSummary.innerHTML = "";
+      return;
+    }
+    const instruction = order?.paymentInstruction
+      || instructions?.paymentInstruction
+      || "Transfer sesuai nominal order, lalu upload bukti pembayaran.";
+    paymentProofUploadSummary.innerHTML = `
+      <strong>Bukti sudah terkirim</strong>
+      <p>Status order: ${escapeHtml(getOrderStatusLabel(order?.status || "waiting_verification"))}. Admin akan memverifikasi pembayaran.</p>
+      <dl>
+        <div>
+          <dt>Rekening</dt>
+          <dd>${escapeHtml(getPaymentAccountText(instructions))}</dd>
+        </div>
+        <div>
+          <dt>Instruksi</dt>
+          <dd>${escapeHtml(instruction)}</dd>
+        </div>
+        <div>
+          <dt>Kedaluwarsa Order</dt>
+          <dd>${escapeHtml(order?.paymentExpiresAt ? formatDateTime(order.paymentExpiresAt) : "-")}</dd>
+        </div>
+        <div>
+          <dt>File Bukti</dt>
+          <dd>${escapeHtml(proof?.originalName || order?.paymentProof?.originalName || "-")}</dd>
+        </div>
+      </dl>
+    `;
+    paymentProofUploadSummary.classList.remove("hidden");
+  }
+
   function openPaymentProofModal(orderId) {
     const safeOrderId = String(orderId || "").trim();
-    const order = latestOrders.find(item => item.id === safeOrderId);
+    const order = getOrderById(safeOrderId);
     activePaymentProofOrderId = safeOrderId;
     paymentProofForm.reset();
     setStatus(paymentProofStatus, "");
+    renderPaymentProofUploadSummary(null, null);
+    paymentProofUploadFields?.classList.remove("hidden");
     if (paymentProofOrderMeta) {
       const pieces = order
         ? [
@@ -2109,8 +2480,12 @@
       if (!response.ok) {
         throw new Error(body?.error || `Upload gagal (${response.status})`);
       }
-      closeModal(paymentProofModalBackdrop);
+      const updatedOrder = body?.order || getOrderById(activePaymentProofOrderId);
+      const instructions = await loadPaymentInstructions().catch(() => latestPaymentInstructions);
+      renderPaymentProofUploadSummary(updatedOrder, body?.proof, instructions);
+      paymentProofUploadFields?.classList.add("hidden");
       activePaymentProofOrderId = null;
+      setStatus(paymentProofStatus, "Bukti sudah terkirim. Status order menunggu verifikasi admin.", "success");
       notify({
         title: "Bukti pembayaran diupload",
         message: "Order sekarang menunggu verifikasi admin.",
@@ -2727,7 +3102,7 @@
       });
     });
 
-    [registerModalBackdrop, forgotPasswordModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, forgotPasswordModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, orderDetailModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -2848,9 +3223,44 @@
     refreshLinkedClientsBtn.addEventListener("click", loadDashboardData);
     refreshBillingBtn.addEventListener("click", loadDashboardData);
     refreshOrdersBtn.addEventListener("click", loadDashboardData);
+    creditServiceBillingBtn?.addEventListener("click", () => {
+      activateDashboardPanel("creditSection", { closeSidebar: true, resetScroll: false });
+      plansGrid?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     openOrdersModalBtn.addEventListener("click", () => {
       renderOrders();
       openModal(ordersModalBackdrop);
+    });
+    ordersStatusFilter?.addEventListener("change", () => {
+      orderTableState.status = ordersStatusFilter.value || "all";
+      orderTableState.currentPage = 1;
+      renderOrders();
+    });
+    ordersSearchInput?.addEventListener("input", () => {
+      orderTableState.search = ordersSearchInput.value || "";
+      orderTableState.currentPage = 1;
+      renderOrders();
+    });
+    ordersPageSizeSelect?.addEventListener("change", () => {
+      orderTableState.pageSize = ordersPageSizeSelect.value === "all" ? "all" : Number(ordersPageSizeSelect.value || 20);
+      orderTableState.currentPage = 1;
+      renderOrders();
+    });
+    ordersFirstPageBtn?.addEventListener("click", () => {
+      orderTableState.currentPage = 1;
+      renderOrders();
+    });
+    ordersPrevPageBtn?.addEventListener("click", () => {
+      orderTableState.currentPage -= 1;
+      renderOrders();
+    });
+    ordersNextPageBtn?.addEventListener("click", () => {
+      orderTableState.currentPage += 1;
+      renderOrders();
+    });
+    ordersLastPageBtn?.addEventListener("click", () => {
+      orderTableState.currentPage = Number.MAX_SAFE_INTEGER;
+      renderOrders();
     });
     paymentProofForm.addEventListener("submit", submitPaymentProof);
     plansGrid.addEventListener("click", event => {
@@ -2861,6 +3271,11 @@
       selectPlan(button.getAttribute("data-select-plan"));
     });
     ordersTableBody.addEventListener("click", event => {
+      const detailButton = event.target instanceof Element ? event.target.closest("[data-order-detail]") : null;
+      if (detailButton) {
+        openOrderDetailModal(detailButton.getAttribute("data-order-detail"));
+        return;
+      }
       const button = event.target instanceof Element ? event.target.closest("[data-upload-proof-order]") : null;
       if (button) {
         openPaymentProofModal(button.getAttribute("data-upload-proof-order"));
@@ -2869,6 +3284,24 @@
       const cancelButton = event.target instanceof Element ? event.target.closest("[data-cancel-order]") : null;
       if (cancelButton) {
         cancelOrder(cancelButton.getAttribute("data-cancel-order"));
+      }
+    });
+    orderDetailBody?.addEventListener("click", event => {
+      const uploadButton = event.target instanceof Element ? event.target.closest("[data-upload-proof-order]") : null;
+      if (uploadButton) {
+        closeModal(orderDetailModalBackdrop);
+        openPaymentProofModal(uploadButton.getAttribute("data-upload-proof-order"));
+        return;
+      }
+      const downloadButton = event.target instanceof Element ? event.target.closest("[data-download-order-proof]") : null;
+      if (downloadButton) {
+        downloadOrderProof(downloadButton.getAttribute("data-download-order-proof"));
+      }
+    });
+    orderProofPreview?.addEventListener("click", event => {
+      const downloadButton = event.target instanceof Element ? event.target.closest("[data-download-order-proof]") : null;
+      if (downloadButton) {
+        downloadOrderProof(downloadButton.getAttribute("data-download-order-proof"));
       }
     });
     openFundEstimateModalBtn.addEventListener("click", () => {

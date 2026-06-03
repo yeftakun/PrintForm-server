@@ -32,6 +32,7 @@ const {
   listOrdersForAdmin,
   getOrderByIdForAdmin,
   getPaymentProofForAdmin,
+  getPaymentProofForUser,
   reviewOrderPaymentByAdmin,
   attachPaymentProof,
   getCreditBalance
@@ -373,6 +374,38 @@ router.post("/orders", asyncHandler(async (req, res) => {
 router.get("/orders", asyncHandler(async (req, res) => {
   const orders = await listOrdersForUser(req.user.id);
   res.json({ orders });
+}));
+
+router.get("/orders/:id/payment-proof/preview", asyncHandler(async (req, res) => {
+  const proof = await getPaymentProofForUser(req.params.id, req.user.id);
+  if (!proof?.storedPath) {
+    res.status(404).json({ error: "Bukti pembayaran tidak ditemukan." });
+    return;
+  }
+  try {
+    await fs.promises.access(proof.storedPath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "File bukti pembayaran tidak tersedia." });
+    return;
+  }
+  res.setHeader("Content-Type", proof.mimeType || "application/octet-stream");
+  res.setHeader("Content-Disposition", `inline; filename="${path.basename(proof.originalName || "payment-proof")}"`);
+  res.sendFile(path.resolve(proof.storedPath));
+}));
+
+router.get("/orders/:id/payment-proof/download", asyncHandler(async (req, res) => {
+  const proof = await getPaymentProofForUser(req.params.id, req.user.id);
+  if (!proof?.storedPath) {
+    res.status(404).json({ error: "Bukti pembayaran tidak ditemukan." });
+    return;
+  }
+  try {
+    await fs.promises.access(proof.storedPath, fs.constants.F_OK);
+  } catch {
+    res.status(404).json({ error: "File bukti pembayaran tidak tersedia." });
+    return;
+  }
+  res.download(proof.storedPath, proof.originalName || "payment-proof");
 }));
 
 router.get("/orders/:id", asyncHandler(async (req, res) => {

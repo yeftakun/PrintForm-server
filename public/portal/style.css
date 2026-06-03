@@ -2003,6 +2003,35 @@ body.portal-dashboard-active .page {
   gap: 12px;
 }
 
+.credit-service-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid #fedf89;
+  border-radius: 12px;
+  background: #fffaeb;
+}
+
+.credit-service-banner.hidden {
+  display: none;
+}
+
+.credit-service-banner strong {
+  display: block;
+  color: #93370d;
+  font-size: 0.92rem;
+}
+
+.credit-service-banner p {
+  margin: 4px 0 0;
+  color: #7a2e0e;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .plans-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(218px, 1fr));
@@ -2041,6 +2070,27 @@ body.portal-dashboard-active .page {
   color: #505866;
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.credit-operational-item {
+  display: grid;
+  gap: 3px;
+  min-height: 48px;
+  padding: 9px 11px;
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.credit-operational-item strong {
+  color: #15171c;
+  font-size: 0.8rem;
+}
+
+.credit-operational-item small {
+  color: #667085;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .plan-card {
@@ -2244,6 +2294,57 @@ body.portal-dashboard-active .page {
   font-weight: 800;
 }
 
+.payment-proof-upload-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #abefc6;
+  border-radius: 12px;
+  background: #ecfdf3;
+}
+
+.payment-proof-upload-summary strong {
+  color: #067647;
+  font-size: 0.92rem;
+}
+
+.payment-proof-upload-summary p {
+  margin: 0;
+  color: #075e45;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.payment-proof-upload-summary dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.payment-proof-upload-summary dl div {
+  display: grid;
+  gap: 3px;
+}
+
+.payment-proof-upload-summary dt {
+  color: #067647;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.payment-proof-upload-summary dd {
+  margin: 0;
+  color: #15171c;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.payment-proof-upload-fields {
+  display: grid;
+  gap: 12px;
+}
+
 .store-clients-panel {
   margin-top: 14px;
   padding: 14px;
@@ -2287,6 +2388,17 @@ body.portal-dashboard-active .page {
   min-width: 860px;
 }
 
+.orders-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(220px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.orders-modal-footer {
+  margin-top: 12px;
+}
+
 .order-action-stack {
   display: grid;
   gap: 7px;
@@ -2295,6 +2407,116 @@ body.portal-dashboard-active .page {
 .order-action-stack small {
   color: #667085;
   line-height: 1.35;
+}
+
+.order-detail-body {
+  display: grid;
+  gap: 12px;
+}
+
+.order-detail-modal {
+  width: min(900px, calc(100vw - 32px));
+}
+
+.order-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.order-detail-grid div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #ebedf1;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+
+.order-detail-grid dt {
+  color: #667085;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.order-detail-grid dd {
+  min-width: 0;
+  margin: 0;
+  color: #15171c;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.order-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.order-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-proof-preview {
+  margin-top: 12px;
+}
+
+.order-proof-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ebedf1;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+
+.order-proof-card > span,
+.order-proof-head span {
+  color: #667085;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.order-proof-card p,
+.order-proof-head p {
+  margin: 0;
+  color: #303a48;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.order-proof-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.order-proof-frame {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  overflow: hidden;
+  border: 1px solid #e6e9ee;
+  border-radius: 10px;
+  background: #fff;
+  color: #667085;
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.order-proof-frame img,
+.order-proof-frame iframe {
+  display: block;
+  width: 100%;
+  height: min(520px, 60vh);
+  border: 0;
+  object-fit: contain;
 }
 
 .dashboard-form {
@@ -3242,10 +3464,28 @@ body.portal-dashboard-active .page {
     margin-top: 9px;
   }
 
+  .credit-service-banner {
+    display: grid;
+    gap: 10px;
+  }
+
+  .credit-service-banner .btn {
+    width: 100%;
+  }
+
   .credit-breakdown-item {
     min-height: 29px;
     padding: 0 9px;
     font-size: 0.72rem;
+  }
+
+  .orders-filter-grid,
+  .order-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-proof-head {
+    display: grid;
   }
 
   .billing-pricing-block {

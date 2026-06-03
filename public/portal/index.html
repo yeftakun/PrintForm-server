@@ -217,6 +217,13 @@
                   <button class="btn btn-outline btn-compact" id="openAllJobsModalBtn" type="button">Lihat Semua Job</button>
                 </div>
               </div>
+              <div class="credit-service-banner hidden" id="creditServiceBanner">
+                <div>
+                  <strong>Toko belum menerima layanan</strong>
+                  <p id="creditServiceBannerText">Toko belum menerima layanan karena kredit habis.</p>
+                </div>
+                <button class="btn btn-primary btn-compact" id="creditServiceBillingBtn" type="button">Buka Billing</button>
+              </div>
               <div class="stat-grid">
                 <article class="stat-card">
                   <span>Client Online</span>
@@ -663,7 +670,24 @@
           <button type="button" class="modal-close" data-close="ordersModalBackdrop" aria-label="Tutup">×</button>
         </div>
         <div class="jobs-filter-bar">
-          <div></div>
+          <div class="orders-filter-grid">
+            <label class="field">
+              <span>Status</span>
+              <select id="ordersStatusFilter">
+                <option value="all">Semua status</option>
+                <option value="pending_payment">Menunggu bayar</option>
+                <option value="waiting_verification">Menunggu verifikasi</option>
+                <option value="paid">Paid</option>
+                <option value="rejected">Ditolak</option>
+                <option value="cancelled">Batal</option>
+                <option value="expired">Kedaluwarsa</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Cari</span>
+              <input id="ordersSearchInput" type="search" placeholder="Cari plan, order, kupon...">
+            </label>
+          </div>
           <div class="jobs-filter-actions">
             <button class="btn btn-ghost btn-compact" id="refreshOrdersBtn" type="button">Refresh Order</button>
           </div>
@@ -687,6 +711,44 @@
             </tbody>
           </table>
         </div>
+        <div class="jobs-modal-footer orders-modal-footer">
+          <label class="jobs-page-size">
+            Tampilkan
+            <select id="ordersPageSizeSelect">
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="all">Semua</option>
+            </select>
+          </label>
+          <span class="jobs-page-info" id="ordersPageInfo">0 order</span>
+          <div class="jobs-pagination-actions">
+            <button class="btn btn-ghost btn-compact" id="ordersFirstPageBtn" type="button">First</button>
+            <button class="btn btn-ghost btn-compact" id="ordersPrevPageBtn" type="button">Prev</button>
+            <button class="btn btn-ghost btn-compact" id="ordersNextPageBtn" type="button">Next</button>
+            <button class="btn btn-ghost btn-compact" id="ordersLastPageBtn" type="button">Last</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="orderDetailModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide order-detail-modal" role="dialog" aria-modal="true" aria-labelledby="orderDetailModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="orderDetailModalTitle">Detail Order</h2>
+            <p>Ringkasan order billing dan bukti pembayaran.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="orderDetailModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="order-detail-body" id="orderDetailBody">
+          <p class="muted-cell">Pilih order untuk melihat detail.</p>
+        </div>
+        <div class="order-proof-preview" id="orderProofPreview"></div>
+        <div class="status" id="orderDetailStatus" role="status"></div>
+        <div class="form-footer account-modal-footer">
+          <button class="btn btn-ghost" type="button" data-close="orderDetailModalBackdrop">Tutup</button>
+        </div>
       </div>
     </div>
 
@@ -709,17 +771,20 @@
             <span>Instruksi pembayaran</span>
             <p id="paymentProofInstructionText">Transfer sesuai nominal order, lalu upload bukti pembayaran.</p>
           </div>
-          <label class="field">
-            <span>File Bukti</span>
-            <input type="file" name="proof" accept="image/*,application/pdf" required>
-          </label>
-          <label class="field">
-            <span>Catatan</span>
-            <textarea name="userNote" rows="3" maxlength="500" placeholder="Opsional"></textarea>
-          </label>
-          <div class="form-footer account-modal-footer">
-            <button class="btn btn-primary" type="submit">Upload Bukti</button>
-            <button class="btn btn-ghost" type="button" data-close="paymentProofModalBackdrop">Batal</button>
+          <div class="payment-proof-upload-summary hidden" id="paymentProofUploadSummary"></div>
+          <div class="payment-proof-upload-fields" id="paymentProofUploadFields">
+            <label class="field">
+              <span>File Bukti</span>
+              <input type="file" name="proof" accept="image/*,application/pdf" required>
+            </label>
+            <label class="field">
+              <span>Catatan</span>
+              <textarea name="userNote" rows="3" maxlength="500" placeholder="Opsional"></textarea>
+            </label>
+            <div class="form-footer account-modal-footer">
+              <button class="btn btn-primary" type="submit">Upload Bukti</button>
+              <button class="btn btn-ghost" type="button" data-close="paymentProofModalBackdrop">Batal</button>
+            </div>
           </div>
           <div class="status" id="paymentProofStatus" role="status"></div>
         </form>
