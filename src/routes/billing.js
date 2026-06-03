@@ -5,6 +5,9 @@ const multer = require("multer");
 const {
   paymentProofsDir,
   PAYMENT_PROOF_MAX_BYTES,
+  PAYMENT_BANK_NAME,
+  PAYMENT_ACCOUNT_NUMBER,
+  PAYMENT_ACCOUNT_NAME,
   PAYMENT_MANUAL_INSTRUCTIONS
 } = require("../config");
 const { requireAuth } = require("../middleware/auth");
@@ -429,7 +432,13 @@ router.get("/credits/balance", asyncHandler(async (req, res) => {
 }));
 
 router.get("/payment-instructions", asyncHandler(async (req, res) => {
-  res.json({ paymentInstruction: PAYMENT_MANUAL_INSTRUCTIONS });
+  res.json({
+    paymentInstruction: PAYMENT_MANUAL_INSTRUCTIONS,
+    bankName: PAYMENT_BANK_NAME,
+    accountNumber: PAYMENT_ACCOUNT_NUMBER,
+    accountName: PAYMENT_ACCOUNT_NAME,
+    accountLabel: `${PAYMENT_ACCOUNT_NUMBER} (${PAYMENT_BANK_NAME})`
+  });
 }));
 
 module.exports = router;

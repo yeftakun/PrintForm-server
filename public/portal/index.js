@@ -76,6 +76,7 @@
   const paymentProofModalBackdrop = document.getElementById("paymentProofModalBackdrop");
   const paymentProofForm = document.getElementById("paymentProofForm");
   const paymentProofOrderMeta = document.getElementById("paymentProofOrderMeta");
+  const paymentProofAccountText = document.getElementById("paymentProofAccountText");
   const paymentProofInstructionText = document.getElementById("paymentProofInstructionText");
   const paymentProofStatus = document.getElementById("paymentProofStatus");
 
@@ -200,6 +201,8 @@
   let latestPlans = [];
   let latestOrders = [];
   let latestCreditBalance = null;
+  let latestPaymentInstructions = null;
+  let paymentInstructionsPromise = null;
   let activePaymentProofOrderId = null;
   let currentOperationalSchedule = DEFAULT_OPERATIONAL_SCHEDULE.map(day => ({ ...day }));
   let manualStoreStatus = "open";
@@ -1975,6 +1978,41 @@
     window.location.href = `${PORTAL_PAYMENT_PATH}?${params.toString()}`;
   }
 
+  async function loadPaymentInstructions() {
+    if (latestPaymentInstructions) {
+      return latestPaymentInstructions;
+    }
+    if (!paymentInstructionsPromise) {
+      paymentInstructionsPromise = window.PortalAuth.apiJson("/api/billing/payment-instructions", { method: "GET" })
+        .then(body => {
+          latestPaymentInstructions = body || {};
+          return latestPaymentInstructions;
+        })
+        .finally(() => {
+          paymentInstructionsPromise = null;
+        });
+    }
+    return paymentInstructionsPromise;
+  }
+
+  function renderPaymentProofPaymentInfo(order, instructions = latestPaymentInstructions) {
+    const accountNumber = String(instructions?.accountNumber || "no_rek").trim();
+    const bankName = String(instructions?.bankName || "bank xxx").trim();
+    const accountName = String(instructions?.accountName || "").trim();
+    const accountLabel = instructions?.accountLabel
+      || `${accountNumber} (${bankName})`;
+    if (paymentProofAccountText) {
+      paymentProofAccountText.textContent = accountName
+        ? `${accountLabel} a.n. ${accountName}`
+        : accountLabel;
+    }
+    if (paymentProofInstructionText) {
+      paymentProofInstructionText.textContent = order?.paymentInstruction
+        || instructions?.paymentInstruction
+        || "Transfer sesuai nominal order, lalu upload bukti pembayaran.";
+    }
+  }
+
   function openPaymentProofModal(orderId) {
     const safeOrderId = String(orderId || "").trim();
     const order = latestOrders.find(item => item.id === safeOrderId);
@@ -1991,11 +2029,17 @@
         : [`Order ${safeOrderId || "-"}`];
       paymentProofOrderMeta.textContent = pieces.filter(Boolean).join(" - ");
     }
-    if (paymentProofInstructionText) {
-      paymentProofInstructionText.textContent = order?.paymentInstruction
-        || "Transfer sesuai nominal order, lalu upload bukti pembayaran.";
-    }
+    renderPaymentProofPaymentInfo(order);
     openModal(paymentProofModalBackdrop);
+    loadPaymentInstructions()
+      .then(instructions => {
+        if (activePaymentProofOrderId === safeOrderId) {
+          renderPaymentProofPaymentInfo(order, instructions);
+        }
+      })
+      .catch(err => {
+        setStatus(paymentProofStatus, err.message || "Instruksi pembayaran belum termuat.", "error");
+      });
   }
 
   function openPaymentProofModalFromUrl() {

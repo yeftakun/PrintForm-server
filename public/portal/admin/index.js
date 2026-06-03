@@ -115,6 +115,7 @@
   let adminAuditTotal = 0;
   let adminAuditTotalPages = 1;
   let activeReviewOrderId = null;
+  let activeProofObjectUrl = "";
   let activeStoreId = null;
   const paymentFilterState = {
     search: "",
@@ -349,8 +350,19 @@
   }
 
   function closeModal(backdrop) {
+    if (backdrop === adminPaymentReviewModalBackdrop) {
+      clearActiveProofObjectUrl();
+    }
     backdrop?.classList.remove("open");
     backdrop?.setAttribute("aria-hidden", "true");
+  }
+
+  function clearActiveProofObjectUrl() {
+    if (activeProofObjectUrl) {
+      URL.revokeObjectURL(activeProofObjectUrl);
+      activeProofObjectUrl = "";
+    }
+    adminProofDownloadLink?.removeAttribute("download");
   }
 
   function setCurrentAdminUser(user) {
@@ -844,8 +856,29 @@
     adminPaymentReviewStatus.className = kind ? `status ${kind}` : "status";
   }
 
-  function renderProofPreview(order) {
+  async function fetchProofBlob(url) {
+    const response = await window.PortalAuth.apiFetch(url, { method: "GET" });
+    if (!response.ok) {
+      let message = `Gagal memuat bukti pembayaran (${response.status}).`;
+      try {
+        const body = await response.json();
+        message = body?.error || message;
+      } catch {
+        const text = await response.text().catch(() => "");
+        message = text || message;
+      }
+      throw new Error(message);
+    }
+    const blob = await response.blob();
+    return {
+      blob,
+      objectUrl: URL.createObjectURL(blob)
+    };
+  }
+
+  async function renderProofPreview(order) {
     const proof = order.paymentProof;
+    clearActiveProofObjectUrl();
     adminProofName.textContent = proof?.originalName || "Belum ada bukti";
     if (!proof?.previewUrl) {
       adminProofDownloadLink.classList.add("hidden");
@@ -854,18 +887,37 @@
       return;
     }
 
-    adminProofDownloadLink.classList.remove("hidden");
-    adminProofDownloadLink.href = proof.downloadUrl || proof.previewUrl;
-    const mime = String(proof.mimeType || "").toLowerCase();
-    if (mime.startsWith("image/")) {
-      adminProofPreview.innerHTML = `<img src="${escapeHtml(proof.previewUrl)}" alt="Preview bukti pembayaran">`;
-      return;
+    adminProofDownloadLink.classList.add("hidden");
+    adminProofDownloadLink.href = "#";
+    adminProofPreview.innerHTML = '<div class="admin-proof-empty">Memuat bukti pembayaran...</div>';
+    const renderOrderId = order.id;
+
+    try {
+      const { blob, objectUrl } = await fetchProofBlob(proof.previewUrl);
+      if (activeReviewOrderId !== renderOrderId) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      activeProofObjectUrl = objectUrl;
+      adminProofDownloadLink.classList.remove("hidden");
+      adminProofDownloadLink.href = objectUrl;
+      adminProofDownloadLink.download = proof.originalName || "payment-proof";
+      adminProofDownloadLink.removeAttribute("target");
+
+      const mime = String(proof.mimeType || blob.type || "").toLowerCase();
+      if (mime.startsWith("image/")) {
+        adminProofPreview.innerHTML = `<img src="${escapeHtml(objectUrl)}" alt="Preview bukti pembayaran">`;
+        return;
+      }
+      if (mime === "application/pdf") {
+        adminProofPreview.innerHTML = `<iframe src="${escapeHtml(objectUrl)}" title="Preview bukti pembayaran"></iframe>`;
+        return;
+      }
+      adminProofPreview.innerHTML = '<div class="admin-proof-empty">Preview tidak tersedia untuk tipe file ini. Gunakan tombol download.</div>';
+    } catch (err) {
+      adminProofPreview.innerHTML = `<div class="admin-proof-empty">${escapeHtml(err.message || "Gagal memuat bukti pembayaran.")}</div>`;
     }
-    if (mime === "application/pdf") {
-      adminProofPreview.innerHTML = `<iframe src="${escapeHtml(proof.previewUrl)}" title="Preview bukti pembayaran"></iframe>`;
-      return;
-    }
-    adminProofPreview.innerHTML = '<div class="admin-proof-empty">Preview tidak tersedia untuk tipe file ini. Gunakan tombol download.</div>';
   }
 
   function renderPaymentReviewDetail(order) {
@@ -903,12 +955,12 @@
       const body = await window.PortalAuth.apiJson(`/api/billing/admin/orders/${encodeURIComponent(orderId)}`, { method: "GET" });
       const order = body.order;
       renderPaymentReviewDetail(order);
-      renderProofPreview(order);
+      await renderProofPreview(order);
       setReviewStatus("");
     } catch (err) {
       if (fallbackOrder) {
         renderPaymentReviewDetail(fallbackOrder);
-        renderProofPreview(fallbackOrder);
+        await renderProofPreview(fallbackOrder);
         setReviewStatus("Detail contoh UI ditampilkan karena backend order belum tersedia.", "error");
         return;
       }
