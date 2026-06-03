@@ -1401,11 +1401,31 @@ async function getCreditBalance(userId) {
      LIMIT 1`,
     [userId]
   );
+  const scheduledRes = await query(
+    `SELECT source_type,
+            SUM(total_credits)::int AS total_credits,
+            SUM(used_credits)::int AS used_credits,
+            SUM(GREATEST(total_credits - used_credits, 0))::int AS remaining_credits,
+            MIN(starts_at) FILTER (WHERE total_credits > used_credits) AS nearest_starts_at,
+            MIN(expires_at) FILTER (WHERE total_credits > used_credits) AS nearest_expires_at
+     FROM credits
+     WHERE user_id = $1
+       AND status = 'active'
+       AND starts_at > now()
+       AND expires_at > now()
+     GROUP BY source_type
+     ORDER BY source_type ASC`,
+    [userId]
+  );
 
   const breakdown = {};
+  const scheduledBreakdown = {};
   let totalCredits = 0;
   let usedCredits = 0;
   let remainingCredits = 0;
+  let scheduledTotalCredits = 0;
+  let scheduledUsedCredits = 0;
+  let scheduledRemainingCredits = 0;
 
   for (const row of activeRes.rows) {
     const source = row.source_type || "unknown";
@@ -1422,15 +1442,47 @@ async function getCreditBalance(userId) {
     remainingCredits += item.remainingCredits;
   }
 
+  for (const row of scheduledRes.rows) {
+    const source = row.source_type || "unknown";
+    const item = {
+      sourceType: source,
+      totalCredits: toInt(row.total_credits),
+      usedCredits: toInt(row.used_credits),
+      remainingCredits: toInt(row.remaining_credits),
+      nearestStartsAt: toIso(row.nearest_starts_at),
+      nearestExpiresAt: toIso(row.nearest_expires_at)
+    };
+    scheduledBreakdown[source] = item;
+    scheduledTotalCredits += item.totalCredits;
+    scheduledUsedCredits += item.usedCredits;
+    scheduledRemainingCredits += item.remainingCredits;
+  }
+
   const nearestRow = nearestRes.rows[0] || null;
+  const scheduledItems = Object.values(scheduledBreakdown)
+    .filter(item => item.remainingCredits > 0)
+    .sort((a, b) => toTimestamp(a.nearestStartsAt) - toTimestamp(b.nearestStartsAt));
+  const nearestScheduled = scheduledItems[0] || null;
 
   return {
     totalCredits,
     usedCredits,
     remainingCredits,
     breakdown,
+    usableTotalCredits: totalCredits,
+    usableUsedCredits: usedCredits,
+    usableRemainingCredits: remainingCredits,
+    scheduledTotalCredits,
+    scheduledUsedCredits,
+    scheduledRemainingCredits,
+    scheduledBreakdown,
+    totalEntitledCredits: totalCredits + scheduledTotalCredits,
+    totalEntitledRemainingCredits: remainingCredits + scheduledRemainingCredits,
     nearestExpiration: toIso(nearestRow?.expires_at),
-    nearestExpirationCredits: toInt(nearestRow?.remaining_credits)
+    nearestExpirationCredits: toInt(nearestRow?.remaining_credits),
+    nextScheduledStart: nearestScheduled?.nearestStartsAt || null,
+    nextScheduledExpiration: nearestScheduled?.nearestExpiresAt || null,
+    nextScheduledCredits: nearestScheduled?.remainingCredits || 0
   };
 }
 

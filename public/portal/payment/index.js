@@ -150,7 +150,7 @@
       window.PortalAuth.apiJson("/api/billing/plans", { method: "GET" }),
       window.PortalAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
     ]);
-    hasActiveCredits = Number(balanceBody.balance?.totalCredits || 0) > 0;
+    hasActiveCredits = Number(balanceBody.balance?.totalEntitledRemainingCredits ?? balanceBody.balance?.remainingCredits ?? 0) > 0;
     selectedPlan = (plansBody.plans || []).find(plan => plan.id === planId || plan.code === planId);
     if (!selectedPlan) {
       setStatus("Plan tidak ditemukan atau tidak aktif.", "error");

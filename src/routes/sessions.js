@@ -9,13 +9,15 @@ const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const {
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
   SESSION_CREATE_CONFIRM_POLL_INTERVAL_MS,
-  ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE
+  ACCOUNT_QUEUE_ALLOW_LEGACY_CLIENT_SESSION_CREATE,
+  useDb
 } = require("../config");
 const { normalizeAlias } = require("../utils/normalize");
 const { isClientOnline, withClientStatus, getClientReadiness } = require("../services/status");
 const { toPublicClient } = require("../utils/publicMapper");
 const { cleanupExpiredSessions, cleanupPreviewFilesBySessionIds } = require("../services/cleanup");
 const { refreshStorageUsageSnapshot } = require("../services/storageUsage");
+const { getCreditBalance } = require("../services/billing");
 const {
   notifyClientUpserted,
   publishRealtimeEvent,
@@ -62,6 +64,54 @@ function normalizeRequestString(value) {
     return "";
   }
   return value.trim();
+}
+
+async function getStoreCreditAvailability(userId) {
+  if (!useDb) {
+    return {
+      ok: true,
+      remainingCredits: null,
+      status: "not_enforced"
+    };
+  }
+
+  const balance = await getCreditBalance(userId);
+  const remainingCredits = Number(balance?.remainingCredits || 0);
+  return {
+    ok: remainingCredits > 0,
+    remainingCredits,
+    status: remainingCredits > 0 ? "available" : "empty"
+  };
+}
+
+async function rejectIfStoreCreditEmpty(req, res, storeUser, extra = {}) {
+  if (!storeUser?.id) {
+    return false;
+  }
+
+  let credit;
+  try {
+    credit = await getStoreCreditAvailability(storeUser.id);
+  } catch (err) {
+    res.status(503).json({
+      error: "Status layanan toko belum dapat diverifikasi.",
+      code: "STORE_CREDIT_UNAVAILABLE",
+      ...extra
+    });
+    return true;
+  }
+
+  if (credit.ok) {
+    return false;
+  }
+
+  res.status(409).json({
+    error: "Toko belum menerima layanan karena kredit layanan habis.",
+    code: "STORE_CREDIT_EMPTY",
+    remainingCredits: credit.remainingCredits,
+    ...extra
+  });
+  return true;
 }
 
 function toEffectiveSessionTargetClient(client) {
@@ -176,6 +226,9 @@ router.post("/", asyncHandler(async (req, res) => {
       });
       return;
     }
+    if (await rejectIfStoreCreditEmpty(req, res, storeUser, { kodeToko })) {
+      return;
+    }
     const config = storeUser.konfigurasiToko && typeof storeUser.konfigurasiToko === "object"
       ? storeUser.konfigurasiToko
       : {};
@@ -224,6 +277,9 @@ router.post("/", asyncHandler(async (req, res) => {
         code: "STORE_SUSPENDED",
         kioskId
       });
+      return;
+    }
+    if (!kodeToko && await rejectIfStoreCreditEmpty(req, res, kioskUser, { kioskId })) {
       return;
     }
   }

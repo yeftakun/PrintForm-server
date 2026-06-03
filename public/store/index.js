@@ -82,6 +82,19 @@ function renderStoreProfilePhoto(photoUrl, displayName) {
   storeProfilePhoto.classList.toggle("has-photo", Boolean(normalizedUrl));
 }
 
+function isStoreNotAcceptingService(store) {
+  return store?.status === "no_credit"
+    || store?.readiness === "no_credit"
+    || store?.creditStatus === "empty"
+    || store?.creditStatus === "unavailable"
+    || store?.hasActiveCredit === false;
+}
+
+function canStartStoreSession(store) {
+  const isClosed = store?.operationalStatus === "closed" || store?.status === "closed";
+  return Boolean(store && !isClosed && !isStoreNotAcceptingService(store) && store.status === "online" && store.canStartSession);
+}
+
 function renderStore(store) {
   currentStore = store;
   storeLayout?.classList.remove("hidden");
@@ -89,9 +102,12 @@ function renderStore(store) {
   document.body.classList.remove("store-not-found-mode");
   const displayName = store.displayName || "Toko Percetakan";
   const isClosed = store.operationalStatus === "closed" || store.status === "closed";
-  const isReady = !isClosed && store.status === "online" && store.canStartSession;
+  const isNoCredit = isStoreNotAcceptingService(store);
+  const isReady = canStartStoreSession(store);
   const statusText = isClosed
     ? "Toko sedang tutup"
+    : isNoCredit
+      ? "Belum menerima layanan"
     : isReady
       ? "Siap menerima tugas"
       : "Belum siap menerima tugas";
@@ -107,6 +123,8 @@ function renderStore(store) {
   renderServiceChips(store.layanan);
   storeStatusBadge.textContent = isClosed
     ? "Tutup"
+    : isNoCredit
+      ? "Belum menerima layanan"
     : isReady
       ? "Tersedia / Siap menerima tugas"
       : "Offline / Belum siap";
@@ -120,6 +138,8 @@ function renderStore(store) {
   setPageStatus(
     isClosed
       ? "Toko sedang tutup. Halaman tetap dapat dilihat, tetapi sesi belum bisa dibuat."
+      : isNoCredit
+        ? "Toko belum menerima layanan karena kredit layanan habis. Sesi belum bisa dibuat."
       : confirmStoreBtn.disabled
         ? "Toko sedang offline. Halaman tetap dapat dilihat, tetapi sesi belum bisa dibuat."
       : ""
@@ -185,8 +205,20 @@ confirmStoreBtn.addEventListener("click", async () => {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (body.code === "STORE_CREDIT_EMPTY" || body.code === "STORE_CREDIT_UNAVAILABLE") {
+        currentStore = {
+          ...currentStore,
+          status: "no_credit",
+          readiness: "no_credit",
+          canStartSession: false,
+          hasActiveCredit: false,
+          creditStatus: body.code === "STORE_CREDIT_EMPTY" ? "empty" : "unavailable",
+          remainingCredits: body.remainingCredits ?? 0
+        };
+        renderStore(currentStore);
+      }
       setPageStatus(body.error || "Session belum bisa dibuat untuk toko ini.", "error");
-      confirmStoreBtn.disabled = currentStore.status !== "online" || !currentStore.canStartSession;
+      confirmStoreBtn.disabled = !canStartStoreSession(currentStore);
       return;
     }
 
@@ -200,7 +232,7 @@ confirmStoreBtn.addEventListener("click", async () => {
     window.location.href = "/session/";
   } catch {
     setPageStatus("Gagal terhubung ke server.", "error");
-    confirmStoreBtn.disabled = currentStore.status !== "online" || !currentStore.canStartSession;
+    confirmStoreBtn.disabled = !canStartStoreSession(currentStore);
   }
 });
 

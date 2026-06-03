@@ -18,6 +18,7 @@ const {
 } = require("../config");
 const { getUserByIdentifier, getUserById, getUserByStoreCode } = require("../repositories/usersRepository");
 const { createRefreshTokenRecord } = require("../repositories/refreshTokensRepository");
+const { getCreditBalance } = require("../services/billing");
 const {
   normalizeName,
   normalizePrinters,
@@ -166,6 +167,36 @@ function getStoreProfilePhotoUrl(user) {
   return String(config.fotoProfilUrl || config.profilePhotoUrl || "").trim() || null;
 }
 
+async function getStoreCreditState(userId) {
+  if (!useDb) {
+    return {
+      hasActiveCredit: true,
+      remainingCredits: null,
+      balance: null,
+      status: "not_enforced"
+    };
+  }
+
+  try {
+    const balance = await getCreditBalance(userId);
+    const remainingCredits = Number(balance?.remainingCredits || 0);
+    return {
+      hasActiveCredit: remainingCredits > 0,
+      remainingCredits,
+      balance,
+      status: remainingCredits > 0 ? "available" : "empty"
+    };
+  } catch (err) {
+    console.warn("Store credit lookup failed:", err?.message || err);
+    return {
+      hasActiveCredit: false,
+      remainingCredits: 0,
+      balance: null,
+      status: "unavailable"
+    };
+  }
+}
+
 function summarizeStoreClients(storeClients) {
   const effectiveClients = (storeClients || [])
     .map(toEffectivePublicClient)
@@ -197,7 +228,7 @@ function summarizeStoreClients(storeClients) {
   };
 }
 
-function toPublicStore(user, storeClients = []) {
+function toPublicStore(user, storeClients = [], creditState = null) {
   const summary = summarizeStoreClients(storeClients);
   const config = user?.konfigurasiToko && typeof user.konfigurasiToko === "object"
     ? user.konfigurasiToko
@@ -206,6 +237,21 @@ function toPublicStore(user, storeClients = []) {
   const operationalStatus = operationalState.status;
   const isSuspended = isUserSuspended(user);
   const isClosed = operationalStatus === "closed";
+  const hasActiveCredit = creditState?.hasActiveCredit !== false;
+  const effectiveStatus = isSuspended
+    ? "suspended"
+    : isClosed
+      ? "closed"
+      : !hasActiveCredit
+        ? "no_credit"
+        : summary.status;
+  const effectiveReadiness = isSuspended
+    ? "suspended"
+    : isClosed
+      ? "closed"
+      : !hasActiveCredit
+        ? "no_credit"
+        : summary.readiness;
   return {
     id: user.id,
     ownerUserId: user.id,
@@ -214,11 +260,15 @@ function toPublicStore(user, storeClients = []) {
     profilePhotoUrl: getStoreProfilePhotoUrl(user),
     alamat: user.alamat || "Alamat belum diatur",
     jamOperasional: getStoreHours(user),
-    status: isSuspended ? "suspended" : isClosed ? "closed" : summary.status,
-    readiness: isSuspended ? "suspended" : isClosed ? "closed" : summary.readiness,
-    canStartSession: !isSuspended && !isClosed && summary.canStartSession,
+    status: effectiveStatus,
+    readiness: effectiveReadiness,
+    canStartSession: !isSuspended && !isClosed && hasActiveCredit && summary.canStartSession,
     isSuspend: isSuspended,
     is_suspend: isSuspended,
+    hasActiveCredit,
+    creditStatus: creditState?.status || "unknown",
+    remainingCredits: creditState?.remainingCredits ?? null,
+    creditBalance: creditState?.balance || null,
     targetClientId: summary.targetClientId,
     targetClientName: summary.targetClientName,
     clientCount: summary.clientCount,
@@ -491,7 +541,8 @@ router.get("/stores/:kodeToko", asyncHandler(async (req, res) => {
 
   const clients = await getClients();
   const storeClients = clients.filter(client => client.ownerUserId === storeUser.id);
-  res.json(toPublicStore(storeUser, storeClients));
+  const creditState = await getStoreCreditState(storeUser.id);
+  res.json(toPublicStore(storeUser, storeClients, creditState));
 }));
 
 router.post("/register", registerRateLimiter, asyncHandler(async (req, res) => {

@@ -1263,7 +1263,7 @@
           <td><strong>${escapeHtml(store.name)}</strong><span>${escapeHtml(store.code)} · ${escapeHtml(store.address)}</span></td>
           <td>${escapeHtml(store.username)}<span>${escapeHtml(store.email)}</span></td>
           <td>${escapeHtml(online)} online<span>${escapeHtml(store.clientCount ?? store.clients.length)} total client</span></td>
-          <td>${escapeHtml(formatNumber(store.credit))} kredit</td>
+          <td>${escapeHtml(formatNumber(store.credit))} kredit<span>${escapeHtml(formatNumber(store.scheduledCredit || 0))} terjadwal</span></td>
           <td>${escapeHtml(store.lastOrder)}</td>
           <td><span class="status-pill ${statusClass(store.status)}">${escapeHtml(store.status)}</span></td>
           <td><span class="status-pill ${store.is_suspend ? "offline" : "online"}">${store.is_suspend ? "Ya" : "Tidak"}</span></td>
@@ -1379,7 +1379,8 @@
       <section class="admin-detail-card">
         <h3>Billing Ringkas</h3>
         <div class="admin-mini-list">
-          <div><strong>${escapeHtml(formatNumber(store.credit))} kredit aktif</strong><span>${escapeHtml(store.lastOrder)}</span></div>
+          <div><strong>${escapeHtml(formatNumber(store.credit))} kredit bisa dipakai</strong><span>${escapeHtml(formatNumber(store.scheduledCredit || 0))} kredit terjadwal · total hak ${escapeHtml(formatNumber(store.totalEntitledCredit ?? store.credit ?? 0))}</span></div>
+          <div><strong>Order terakhir</strong><span>${escapeHtml(store.lastOrder)}</span></div>
           ${store.payments.length ? store.payments.map(item => `<div><strong>${escapeHtml(item.label || item.id)}</strong><span>${escapeHtml(item.planName || "-")} · ${escapeHtml(formatCurrency(item.totalIdr))} · ${escapeHtml(formatDateTime(item.createdAt))}</span></div>`).join("") : '<div><strong>Belum ada pembayaran</strong><span>Riwayat pembayaran kosong.</span></div>'}
         </div>
       </section>

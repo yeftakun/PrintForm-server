@@ -1644,24 +1644,34 @@
 
   function renderCreditBalance() {
     const balance = latestCreditBalance || {};
-    creditTotalActive.textContent = formatInteger(balance.totalCredits || 0);
-    creditUsed.textContent = formatInteger(balance.usedCredits || 0);
-    creditRemaining.textContent = formatInteger(balance.remainingCredits || 0);
+    creditTotalActive.textContent = formatInteger(balance.remainingCredits || 0);
+    creditUsed.textContent = formatInteger(balance.scheduledRemainingCredits || 0);
+    creditRemaining.textContent = formatInteger(balance.totalEntitledRemainingCredits ?? balance.remainingCredits ?? 0);
     creditNearestExpiry.textContent = balance.nearestExpiration
       ? `${formatDate(balance.nearestExpiration)} · ${formatInteger(balance.nearestExpirationCredits || 0)} kredit`
+      : balance.nextScheduledStart
+        ? `Mulai ${formatDate(balance.nextScheduledStart)} · ${formatInteger(balance.nextScheduledCredits || 0)} kredit`
       : "-";
 
     const items = Object.values(balance.breakdown || {});
-    if (items.length === 0) {
-      creditBreakdown.innerHTML = '<p class="muted-cell">Belum ada kredit aktif.</p>';
+    const scheduledItems = Object.values(balance.scheduledBreakdown || {});
+    if (items.length === 0 && scheduledItems.length === 0) {
+      creditBreakdown.innerHTML = '<p class="muted-cell">Belum ada kredit aktif atau terjadwal.</p>';
       return;
     }
 
-    creditBreakdown.innerHTML = items.map(item => `
+    creditBreakdown.innerHTML = [
+      ...items.map(item => `
       <span class="credit-breakdown-item">
-        ${escapeHtml(getSourceTypeLabel(item.sourceType))}: ${escapeHtml(formatInteger(item.remainingCredits || 0))}
+        ${escapeHtml(getSourceTypeLabel(item.sourceType))} aktif: ${escapeHtml(formatInteger(item.remainingCredits || 0))}
       </span>
-    `).join("");
+    `),
+      ...scheduledItems.map(item => `
+      <span class="credit-breakdown-item">
+        ${escapeHtml(getSourceTypeLabel(item.sourceType))} terjadwal: ${escapeHtml(formatInteger(item.remainingCredits || 0))}
+      </span>
+    `)
+    ].join("");
   }
 
   function renderPlans() {
@@ -1675,7 +1685,7 @@
 
     plansGrid.innerHTML = latestPlans.map(plan => {
       const isFree = String(plan.planType || "").toLowerCase() === "free";
-      const freeDisabled = isFree && Number(latestCreditBalance?.totalCredits || 0) > 0;
+      const freeDisabled = isFree && Number(latestCreditBalance?.totalEntitledRemainingCredits ?? latestCreditBalance?.remainingCredits ?? 0) > 0;
       const unitPrice = getPlanUnitPriceText(plan);
       return `
         <article class="plan-card">

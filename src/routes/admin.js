@@ -369,6 +369,8 @@ function toAdminStore(user, { clients = [], jobs = [], orders = [], credit = nul
   const readiness = getStoreReadiness(adminClients);
   const isSuspended = isStoreSuspended(user);
   const remainingCredits = Number(credit?.remainingCredits || 0);
+  const scheduledCredits = Number(credit?.scheduledRemainingCredits || 0);
+  const totalEntitledCredits = Number(credit?.totalEntitledRemainingCredits ?? remainingCredits + scheduledCredits);
   const lastOrder = sortedOrders[0]
     ? `${sortedOrders[0].plan?.name || "Order"} - ${sortedOrders[0].status}`
     : "Belum ada order";
@@ -388,6 +390,8 @@ function toAdminStore(user, { clients = [], jobs = [], orders = [], credit = nul
     readiness,
     is_suspend: isSuspended,
     credit: remainingCredits,
+    scheduledCredit: scheduledCredits,
+    totalEntitledCredit: totalEntitledCredits,
     creditBalance: credit,
     lastOrder,
     clients: adminClients,
