@@ -564,7 +564,9 @@ th {
 .store-confirm-head {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 22px;
+  text-align: center;
 }
 
 .store-confirm-head h2 {
@@ -575,6 +577,7 @@ th {
 .store-confirm-card > p {
   font-size: 1rem;
   line-height: 1.55;
+  text-align: center;
 }
 
 .store-summary-card {
@@ -582,6 +585,11 @@ th {
   border: 1px solid rgba(224, 214, 200, 0.9);
   border-radius: 14px;
   background: rgba(255, 250, 244, 0.42);
+  text-align: left;
+}
+
+.store-page-status {
+  text-align: center;
 }
 
 .store-summary-item {
@@ -1809,9 +1817,15 @@ th {
 
 .home-benefits {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  max-width: 560px;
+  grid-template-columns: 1fr;
+  gap: 0;
+  max-width: 360px;
+  cursor: pointer;
+}
+
+.home-benefits:focus-visible {
+  outline: 3px solid rgba(207, 84, 45, 0.24);
+  outline-offset: 4px;
 }
 
 .home-benefit,
@@ -1823,13 +1837,21 @@ th {
 }
 
 .home-benefit {
-  min-height: 82px;
+  min-height: 74px;
   border-radius: 13px;
   padding: 13px 12px;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+.home-benefit[hidden] {
+  display: none;
+}
+
+.home-benefit.is-sliding-in {
+  animation: home-benefit-slide-in 340ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .home-benefit-icon,

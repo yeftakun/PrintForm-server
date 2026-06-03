@@ -6,6 +6,7 @@
     <title>PrintOrder Server</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="/shared/alerts.css">
+    <link rel="stylesheet" href="/shared/customer-help.css">
   </head>
   <body class="home-body">
     <main class="home-shell">
@@ -17,13 +18,13 @@
           <h1>PrintOrder</h1>
         </div>
 
-        <h2>Upload dokumen dan atur konfigurasi cetak dengan <span>lebih mudah</span></h2>
-        <p class="home-copy">Simpan alias pengirim Anda, masukkan kode kios, atau scan kode di toko untuk melanjutkan sesi cetak.</p>
+        <h2>Upload dokumen dan atur konfigurasi cetak dengan <span>lebih privat</span></h2>
+        <p class="home-copy">Temukan percetakan tujuan dan buat sesi cetak untuk terhubung!</p>
 
         <div class="home-portal-cta">
           <div>
-            <strong>Punya toko print?</strong>
-            <p>Masuk ke portal mitra untuk mengelola toko, billing, dan client desktop.</p>
+            <strong>Punya percetakan?</strong>
+            <p>Masuk ke portal mitra untuk mengelola toko anda.</p>
           </div>
           <a class="home-portal-btn" href="/portal/">Buka Portal Mitra</a>
         </div>
@@ -35,7 +36,7 @@
             </div>
             <div>
               <strong>Cepat</strong>
-              <p>Dalam hitungan detik</p>
+              <p>Tugas cetak terpusat</p>
             </div>
           </div>
           <div class="home-benefit">
@@ -53,7 +54,7 @@
             </div>
             <div>
               <strong>Aman</strong>
-              <p>Data tetap aman</p>
+              <p>Dokumen tersembunyi</p>
             </div>
           </div>
         </div>
@@ -65,7 +66,7 @@
             </div>
             <div>
               <h2>Mulai sesi cetak dengan <span>lebih mudah</span></h2>
-              <p>Simpan alias Anda, lalu scan kode kios di toko untuk melanjutkan sesi cetak.</p>
+              <p>Simpan alias Anda, lalu scan kode toko untuk melanjutkan sesi cetak.</p>
             </div>
           </div>
 
@@ -76,7 +77,7 @@
               </div>
               <div>
                 <strong>Cepat</strong>
-                <p>Proses dalam hitungan detik</p>
+                <p>Tugas cetak terpusat</p>
               </div>
             </div>
             <div class="home-mobile-benefit">
@@ -94,23 +95,23 @@
               </div>
               <div>
                 <strong>Aman</strong>
-                <p>Data diproses dengan aman</p>
+                <p>Dokumen tersembunyi</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="home-hint">
+        <!-- <div class="home-hint">
           <div class="home-hint-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4z"></path><path d="M14 4h6v6h-6z"></path><path d="M4 14h6v6H4z"></path><path d="M14 14h2v2h-2z"></path><path d="M18 14h2v6h-2z"></path><path d="M14 18h2v2h-2z"></path></svg>
           </div>
           <div>
-            <strong>Belum tahu kode kios?</strong>
+            <strong>Belum tahu kode toko?</strong>
             <p>Scan QR yang tersedia di toko.</p>
           </div>
-        </div>
-
-        <p class="home-privacy"><span>⌂</span> Data diproses sementara untuk keperluan pencetakan. Kami tidak menyimpan dokumen Anda setelah sesi selesai.</p>
+        </div> -->
+        
+        <!-- <p class="home-privacy"><span>⌂</span> Data diproses sementara untuk keperluan pencetakan. Kami tidak menyimpan dokumen Anda setelah sesi selesai.</p> -->
       </section>
 
       <section class="home-card" id="storeSearchCard">
@@ -129,7 +130,7 @@
             <label class="home-field">
               <span>Alias Pengirim</span>
               <div class="home-input-wrap">
-                <input type="text" id="aliasInput" placeholder="Jane Doe">
+                <input type="text" id="aliasInput" placeholder="Nama Alias">
                 <button id="clearAliasBtn" class="home-input-action" type="button" aria-label="Hapus alias">×</button>
               </div>
             </label>
@@ -140,14 +141,14 @@
 
           <div class="home-form-section">
             <label class="home-field">
-              <span>Kode Kios</span>
+              <span>Kode Toko</span>
               <button id="mobileScanQrBtn" class="home-mobile-scan-card" type="button">
                 <span class="home-mobile-scan-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M10 12h4"></path></svg>
                 </span>
                 <span>
                   <strong>Gunakan Scanner</strong>
-                  <small>Arahkan kamera ke kode kios di toko</small>
+                  <small>Arahkan kamera ke kode toko</small>
                 </span>
                 <span class="home-mobile-scan-arrow" aria-hidden="true">›</span>
               </button>
@@ -156,13 +157,13 @@
                 <span class="home-search-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16.5 16.5 4 4"></path></svg>
                 </span>
-                <input type="text" id="storeCodeInput" placeholder="Masukkan kode kios..." autocomplete="off" required>
+                <input type="text" id="storeCodeInput" placeholder="Masukkan kode toko..." autocomplete="off" required>
                 <button id="scanQrBtn" class="home-scan-btn" type="button" aria-label="Scan QR">
                   <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M8 8h8v8H8z"></path></svg>
                 </button>
               </div>
             </label>
-            <p class="home-field-note">Masukkan kode kios atau gunakan scanner di lokasi.</p>
+            <p class="home-field-note">Masukkan kode toko atau gunakan scanner di lokasi.</p>
             <button id="searchStoreBtn" class="home-submit-btn" type="submit">
               <span class="home-submit-label">Lihat</span>
               <span class="home-submit-arrow" aria-hidden="true">→</span>
@@ -200,6 +201,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script src="/shared/alerts.js"></script>
+    <script src="/shared/customer-help.js"></script>
     <script type="module" src="/home/index.js"></script>
   </body>
 </html>

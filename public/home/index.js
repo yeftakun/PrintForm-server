@@ -11,6 +11,8 @@ const qrVideo = document.getElementById("qrVideo");
 const closeQrBtn = document.getElementById("closeQrBtn");
 const qrStatus = document.getElementById("qrStatus");
 const toastStack = document.getElementById("toastStack");
+const desktopBenefitsCarousel = document.querySelector(".home-benefits");
+const desktopBenefitItems = Array.from(document.querySelectorAll(".home-benefit"));
 const mobileIntroCarousel = document.querySelector(".home-mobile-intro-card");
 const mobileIntroItems = Array.from(document.querySelectorAll(".home-mobile-intro-main, .home-mobile-benefit"));
 const aliasStorageKey = "printorderAlias";
@@ -23,6 +25,9 @@ let qrScanning = false;
 let qrLookupPending = false;
 let lastInvalidQrText = "";
 let toastId = 0;
+let desktopBenefitIndex = 0;
+let desktopBenefitTimer = null;
+let desktopBenefitAnimationTimer = null;
 let mobileIntroIndex = 0;
 let mobileIntroTimer = null;
 let mobileIntroAnimationTimer = null;
@@ -123,6 +128,43 @@ function showMobileIntroItem(index) {
   mobileIntroAnimationTimer = window.setTimeout(() => {
     activeItem.classList.remove("is-sliding-in");
   }, 360);
+}
+
+function showDesktopBenefitItem(index) {
+  if (!desktopBenefitItems.length) {
+    return;
+  }
+
+  desktopBenefitIndex = (index + desktopBenefitItems.length) % desktopBenefitItems.length;
+  desktopBenefitItems.forEach((item, itemIndex) => {
+    item.classList.remove("is-sliding-in");
+    item.hidden = itemIndex !== desktopBenefitIndex;
+  });
+  const activeItem = desktopBenefitItems[desktopBenefitIndex];
+  activeItem.classList.add("is-sliding-in");
+  if (desktopBenefitAnimationTimer) {
+    window.clearTimeout(desktopBenefitAnimationTimer);
+  }
+  desktopBenefitAnimationTimer = window.setTimeout(() => {
+    activeItem.classList.remove("is-sliding-in");
+  }, 360);
+}
+
+function scheduleDesktopBenefitRotation() {
+  if (desktopBenefitTimer) {
+    window.clearInterval(desktopBenefitTimer);
+  }
+  if (desktopBenefitItems.length <= 1) {
+    return;
+  }
+  desktopBenefitTimer = window.setInterval(() => {
+    showDesktopBenefitItem(desktopBenefitIndex + 1);
+  }, 4000);
+}
+
+function advanceDesktopBenefit() {
+  showDesktopBenefitItem(desktopBenefitIndex + 1);
+  scheduleDesktopBenefitRotation();
 }
 
 function scheduleMobileIntroRotation() {
@@ -283,7 +325,7 @@ saveAliasBtn.addEventListener("click", () => {
   window.PrintOrderAlert?.notify({
     variant: "success",
     title: alias ? "Alias Disimpan" : "Alias Dikosongkan",
-    message: alias ? `Alias "${alias}" tersimpan di browser ini.` : "Alias pengirim berhasil dikosongkan."
+    message: alias ? `Alias "${alias}" tersimpan.` : "Alias dikosongkan."
   });
 });
 
@@ -304,6 +346,21 @@ if (mobileScanQrBtn) {
 }
 
 closeQrBtn.addEventListener("click", stopQrScanner);
+
+if (desktopBenefitsCarousel && desktopBenefitItems.length) {
+  desktopBenefitsCarousel.setAttribute("role", "button");
+  desktopBenefitsCarousel.setAttribute("tabindex", "0");
+  desktopBenefitsCarousel.setAttribute("aria-label", "Keunggulan PrintOrder. Klik untuk melihat keunggulan berikutnya.");
+  desktopBenefitsCarousel.addEventListener("click", advanceDesktopBenefit);
+  desktopBenefitsCarousel.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      advanceDesktopBenefit();
+    }
+  });
+  showDesktopBenefitItem(0);
+  scheduleDesktopBenefitRotation();
+}
 
 if (mobileIntroCarousel && mobileIntroItems.length) {
   mobileIntroCarousel.setAttribute("role", "button");

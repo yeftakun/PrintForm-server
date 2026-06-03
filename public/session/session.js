@@ -53,7 +53,7 @@ function setSessionUi(active) {
     section.classList.toggle("hidden", !active);
   });
   if (active) {
-    sessionClientName.textContent = sessionClient || "kios";
+    sessionClientName.textContent = sessionClient || "toko";
     sessionIdText.textContent = sessionId || "-";
     sessionAliasText.textContent = sessionAlias || "-";
   } else {

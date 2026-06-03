@@ -590,7 +590,7 @@
         label: "Toko Ready",
         value: `${formatNumber(stats.stores?.ready)}/${formatNumber(stats.stores?.total)}`,
         tone: Number(stats.stores?.ready || 0) ? "success" : "warning",
-        caption: "Kios siap menerima job"
+        caption: "Toko siap menerima job"
       },
       {
         label: "Client Online",

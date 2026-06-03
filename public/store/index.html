@@ -6,6 +6,7 @@
     <title>PrintOrder Store</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/shared/alerts.css">
+    <link rel="stylesheet" href="/shared/customer-help.css">
   </head>
   <body class="store-body">
     <main class="store-shell">
@@ -15,7 +16,7 @@
         </div>
         <div>
           <h1>PrintOrder</h1>
-          <p>Upload dokumen dan atur konfigurasi cetak!</p>
+          <p>Temukan percetakan tujuan dan buat sesi cetak untuk terhubung!</p>
         </div>
       </header>
 
@@ -29,7 +30,7 @@
           </svg>
         </div>
         <h2>Toko tidak ditemukan</h2>
-        <p>Kode toko <strong id="notFoundStoreCode">-</strong> tidak terdaftar atau belum aktif di PrintOrder.</p>
+        <p>Kode toko <strong id="notFoundStoreCode">-</strong> tidak terdaftar.</p>
         <div class="store-not-found-actions">
           <a href="/" class="store-primary-btn">Cari Kode Toko</a>
         </div>
@@ -39,7 +40,7 @@
         <div class="store-main">
           <section class="store-hero">
             <h2>Konfirmasi Toko Tujuan</h2>
-            <p>Kami menemukan toko dari kode kios atau QR yang Anda gunakan. Pastikan informasi toko di bawah sudah benar sebelum melanjutkan.</p>
+            <p>Pastikan informasi toko di bawah sudah benar sebelum melanjutkan.</p>
           </section>
 
           <section class="store-card store-info-card">
@@ -188,17 +189,18 @@
           <a href="/" class="store-secondary-btn">Kembali</a>
           <div id="storePageStatus" class="status store-page-status"></div>
 
-          <div class="store-safe-note">
+          <!-- <div class="store-safe-note">
             <span aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.3 7 10 4.2-1.7 7-5.5 7-10V6l-7-3Z"></path><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
             </span>
             <p>Data diproses sementara dan hanya digunakan untuk keperluan pencetakan.</p>
-          </div>
+          </div> -->
         </aside>
       </section>
     </main>
 
     <script src="/shared/alerts.js"></script>
+    <script src="/shared/customer-help.js"></script>
     <script type="module" src="/store/index.js"></script>
   </body>
 </html>
