@@ -91,6 +91,12 @@
   let adminOverviewSummary = null;
   let adminOverviewLoading = false;
   let adminOverviewError = "";
+  let adminStoresLoaded = false;
+  let adminStoresLoading = false;
+  let adminStoresError = "";
+  let adminJobsLoaded = false;
+  let adminJobsLoading = false;
+  let adminJobsError = "";
   let activeReviewOrderId = null;
   let activeStoreId = null;
   const paymentFilterState = {
@@ -216,7 +222,7 @@
     }
   ];
 
-  const jobs = [
+  let jobs = [
     {
       id: "JOB-8F21",
       storeId: "store_printaja",
@@ -420,8 +426,8 @@
 
   function statusClass(status) {
     const normalized = String(status || "").toLowerCase();
-    if (["paid", "done", "sent", "aktif", "normal", "active", "online"].includes(normalized)) return "online";
-    if (["waiting_verification", "pending", "dipantau", "pending_payment"].includes(normalized)) return "warning";
+    if (["paid", "done", "sent", "aktif", "normal", "active", "online", "ready"].includes(normalized)) return "online";
+    if (["waiting_verification", "pending", "dipantau", "pending_payment", "printing", "claimed", "client belum siap"].includes(normalized)) return "warning";
     if (["canceled", "cancelled", "rejected", "perlu kredit", "perlu cek", "perlu tindak", "suspended", "offline"].includes(normalized)) return "offline";
     return "";
   }
@@ -432,6 +438,9 @@
       pending_payment: "Menunggu bayar",
       pending: "Menunggu",
       paid: "Paid",
+      ready: "Ready",
+      printing: "Printing",
+      claimed: "Claimed",
       done: "Selesai",
       sent: "Terkirim",
       canceled: "Batal",
@@ -958,11 +967,12 @@
   }
 
   function getStoreText(store) {
-    return [store.name, store.username, store.email, store.code, store.address].join(" ").toLowerCase();
+    return [store.name, store.username, store.email, store.code, store.address, store.status].join(" ").toLowerCase();
   }
 
   function getFilteredStores() {
     const search = storeFilterState.search.trim().toLowerCase();
+    if (!adminStoresLoaded) return [];
     return stores
       .filter(store => !search || getStoreText(store).includes(search))
       .filter(store => {
@@ -991,6 +1001,16 @@
   }
 
   function renderStores() {
+    if (adminStoresLoading && !adminStoresLoaded) {
+      adminStoresTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Memuat data toko...</td></tr>';
+      updateStoreFilterSummary(0);
+      return;
+    }
+    if (adminStoresError) {
+      adminStoresTable.innerHTML = `<tr><td colspan="8" class="muted-cell">${escapeHtml(adminStoresError)}</td></tr>`;
+      updateStoreFilterSummary(0);
+      return;
+    }
     const rows = getFilteredStores();
     updateStoreFilterSummary(rows.length);
     if (!rows.length) {
@@ -998,12 +1018,12 @@
       return;
     }
     adminStoresTable.innerHTML = rows.map(store => {
-      const online = store.clients.filter(client => client.status === "online").length;
+      const online = store.onlineClientCount ?? store.clients.filter(client => client.status === "online").length;
       return `
         <tr>
           <td><strong>${escapeHtml(store.name)}</strong><span>${escapeHtml(store.code)} · ${escapeHtml(store.address)}</span></td>
           <td>${escapeHtml(store.username)}<span>${escapeHtml(store.email)}</span></td>
-          <td>${escapeHtml(online)} online<span>${escapeHtml(store.clients.length)} total client</span></td>
+          <td>${escapeHtml(online)} online<span>${escapeHtml(store.clientCount ?? store.clients.length)} total client</span></td>
           <td>${escapeHtml(formatNumber(store.credit))} kredit</td>
           <td>${escapeHtml(store.lastOrder)}</td>
           <td><span class="status-pill ${statusClass(store.status)}">${escapeHtml(store.status)}</span></td>
@@ -1042,16 +1062,53 @@
     renderStores();
   }
 
+  async function loadAdminStores({ silent = false } = {}) {
+    adminStoresLoading = true;
+    adminStoresError = "";
+    if (!silent) setStatus("Memuat data toko...");
+    renderStores();
+    try {
+      const body = await window.PortalAuth.apiJson("/api/admin/stores", { method: "GET" });
+      stores = Array.isArray(body.stores) ? body.stores : [];
+      adminStoresLoaded = true;
+      adminStoresError = "";
+      renderStores();
+      if (!silent) setStatus("");
+    } catch (err) {
+      stores = [];
+      adminStoresLoaded = true;
+      adminStoresError = err.message || "Gagal memuat data toko.";
+      renderStores();
+      if (!silent) setStatus(adminStoresError, "error");
+    } finally {
+      adminStoresLoading = false;
+    }
+  }
+
   function renderKeyValueList(items) {
     return `<dl class="admin-review-list">${items.map(item => `
       <div><dt>${escapeHtml(item[0])}</dt><dd>${escapeHtml(item[1])}</dd></div>
     `).join("")}</dl>`;
   }
 
-  function openStoreDetail(storeId) {
-    const store = stores.find(item => item.id === storeId);
+  async function openStoreDetail(storeId) {
+    let store = stores.find(item => item.id === storeId);
     if (!store) return;
     activeStoreId = store.id;
+    adminStoreDetailTitle.textContent = "Memuat detail toko...";
+    adminStoreDetailBody.innerHTML = '<div class="admin-empty">Memuat detail toko...</div>';
+    openModal(adminStoreDetailModalBackdrop);
+    try {
+      const body = await window.PortalAuth.apiJson(`/api/admin/stores/${encodeURIComponent(storeId)}`, { method: "GET" });
+      if (body.store) {
+        store = body.store;
+        stores = stores.map(item => item.id === store.id ? store : item);
+        renderStores();
+      }
+    } catch (err) {
+      adminStoreDetailBody.innerHTML = `<div class="admin-empty">${escapeHtml(err.message || "Gagal memuat detail toko.")}</div>`;
+      return;
+    }
     adminStoreDetailTitle.textContent = `Detail Toko · ${store.name}`;
     adminToggleStoreSuspendBtn.textContent = store.is_suspend ? "Unsuspend Toko" : "Suspend Toko";
     adminStoreDetailBody.innerHTML = `
@@ -1076,42 +1133,57 @@
       </section>
       <section class="admin-detail-card">
         <h3>Client</h3>
-        <div class="admin-mini-list">${store.clients.map(client => `
-          <div><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.status)} · ${escapeHtml(client.lastSeen)} · ${escapeHtml(client.printer)}</span></div>
-        `).join("")}</div>
+        <div class="admin-mini-list">${store.clients.length ? store.clients.map(client => `
+          <div><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.status)} · ${escapeHtml(formatDateTime(client.lastSeen))} · ${escapeHtml(client.printer)}</span></div>
+        `).join("") : '<div><strong>Belum ada client</strong><span>Client print belum terhubung.</span></div>'}</div>
       </section>
       <section class="admin-detail-card">
         <h3>Billing Ringkas</h3>
         <div class="admin-mini-list">
           <div><strong>${escapeHtml(formatNumber(store.credit))} kredit aktif</strong><span>${escapeHtml(store.lastOrder)}</span></div>
-          ${store.payments.map(item => `<div><strong>${escapeHtml(item)}</strong><span>Riwayat pembayaran terbaru</span></div>`).join("")}
+          ${store.payments.length ? store.payments.map(item => `<div><strong>${escapeHtml(item.label || item.id)}</strong><span>${escapeHtml(item.planName || "-")} · ${escapeHtml(formatCurrency(item.totalIdr))} · ${escapeHtml(formatDateTime(item.createdAt))}</span></div>`).join("") : '<div><strong>Belum ada pembayaran</strong><span>Riwayat pembayaran kosong.</span></div>'}
         </div>
       </section>
       <section class="admin-detail-card admin-detail-card-wide">
         <h3>Job Terbaru</h3>
-        <div class="admin-mini-list">${store.recentJobs.map(item => `<div><strong>${escapeHtml(item)}</strong><span>Read-only monitoring</span></div>`).join("")}</div>
+        <div class="admin-mini-list">${store.recentJobs.length ? store.recentJobs.map(item => `<div><strong>${escapeHtml(item.label || item.id)}</strong><span>${escapeHtml(item.originalName || "-")} · ${escapeHtml(formatDateTime(item.createdAt))}</span></div>`).join("") : '<div><strong>Belum ada job</strong><span>Job terbaru kosong.</span></div>'}</div>
       </section>
     `;
-    openModal(adminStoreDetailModalBackdrop);
   }
 
-  function toggleStoreSuspend(storeId) {
+  async function toggleStoreSuspend(storeId) {
     const store = stores.find(item => item.id === storeId);
     if (!store) return;
-    store.is_suspend = !store.is_suspend;
-    renderStores();
-    refreshOverview();
+    setStatus(store.is_suspend ? "Mengaktifkan toko..." : "Men-suspend toko...");
+    try {
+      const body = await window.PortalAuth.apiJson(`/api/admin/stores/${encodeURIComponent(storeId)}/suspend`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_suspend: !store.is_suspend })
+      });
+      const updatedStore = body.store;
+      if (updatedStore) {
+        stores = stores.map(item => item.id === updatedStore.id ? updatedStore : item);
+      }
+      renderStores();
+      await loadOverviewSummary({ silent: true });
+      setStatus(updatedStore?.is_suspend ? "Toko disuspend." : "Toko diaktifkan kembali.", "success");
+    } catch (err) {
+      setStatus(err.message || "Gagal mengubah status suspend toko.", "error");
+      return;
+    }
     if (activeStoreId === storeId) {
-      openStoreDetail(storeId);
+      await openStoreDetail(storeId);
     }
   }
 
   function getJobText(job) {
-    return [job.id, job.store, job.session, job.file, job.targetClient, job.status].join(" ").toLowerCase();
+    return [job.id, job.store, job.username, job.code, job.session, job.file, job.targetClient, job.status].join(" ").toLowerCase();
   }
 
   function getFilteredJobs() {
     const search = jobFilterState.search.trim().toLowerCase();
+    if (!adminJobsLoaded) return [];
     return jobs
       .filter(job => !search || getJobText(job).includes(search))
       .filter(job => jobFilterState.statusFilters.size === 0 || jobFilterState.statusFilters.has(job.status))
@@ -1130,6 +1202,16 @@
   }
 
   function renderJobs() {
+    if (adminJobsLoading && !adminJobsLoaded) {
+      adminJobsTable.innerHTML = '<tr><td colspan="8" class="muted-cell">Memuat data job...</td></tr>';
+      updateJobFilterSummary(0);
+      return;
+    }
+    if (adminJobsError) {
+      adminJobsTable.innerHTML = `<tr><td colspan="8" class="muted-cell">${escapeHtml(adminJobsError)}</td></tr>`;
+      updateJobFilterSummary(0);
+      return;
+    }
     const rows = getFilteredJobs();
     updateJobFilterSummary(rows.length);
     if (!rows.length) {
@@ -1179,9 +1261,46 @@
     renderJobs();
   }
 
-  function openJobDetail(jobId) {
-    const job = jobs.find(item => item.id === jobId);
+  async function loadAdminJobs({ silent = false } = {}) {
+    adminJobsLoading = true;
+    adminJobsError = "";
+    if (!silent) setStatus("Memuat data job...");
+    renderJobs();
+    try {
+      const body = await window.PortalAuth.apiJson("/api/admin/jobs", { method: "GET" });
+      jobs = Array.isArray(body.jobs) ? body.jobs : [];
+      adminJobsLoaded = true;
+      adminJobsError = "";
+      renderJobs();
+      if (!silent) setStatus("");
+    } catch (err) {
+      jobs = [];
+      adminJobsLoaded = true;
+      adminJobsError = err.message || "Gagal memuat data job.";
+      renderJobs();
+      if (!silent) setStatus(adminJobsError, "error");
+    } finally {
+      adminJobsLoading = false;
+    }
+  }
+
+  async function openJobDetail(jobId) {
+    let job = jobs.find(item => item.id === jobId);
     if (!job) return;
+    adminJobDetailTitle.textContent = "Memuat detail job...";
+    adminJobDetailBody.innerHTML = '<div class="admin-empty">Memuat detail job...</div>';
+    openModal(adminJobDetailModalBackdrop);
+    try {
+      const body = await window.PortalAuth.apiJson(`/api/admin/jobs/${encodeURIComponent(jobId)}`, { method: "GET" });
+      if (body.job) {
+        job = body.job;
+        jobs = jobs.map(item => item.id === job.id ? job : item);
+        renderJobs();
+      }
+    } catch (err) {
+      adminJobDetailBody.innerHTML = `<div class="admin-empty">${escapeHtml(err.message || "Gagal memuat detail job.")}</div>`;
+      return;
+    }
     adminJobDetailTitle.textContent = `Detail Job · ${job.id}`;
     adminJobDetailBody.innerHTML = `
       <section class="admin-detail-card">
@@ -1198,7 +1317,7 @@
         <h3>File</h3>
         ${renderKeyValueList([
           ["Nama File", job.file],
-          ["MIME", job.mimeType],
+          ["Status File", job.fileStatus || job.mimeType],
           ["Ukuran", job.size]
         ])}
       </section>
@@ -1222,7 +1341,6 @@
         <div class="admin-mini-list">${job.timeline.map(item => `<div><strong>${escapeHtml(item)}</strong><span>Read-only event</span></div>`).join("")}</div>
       </section>
     `;
-    openModal(adminJobDetailModalBackdrop);
   }
 
   function renderAudit() {
@@ -1269,7 +1387,11 @@
       renderAllUi();
       activatePanel("adminOverview");
       await loadOverviewSummary();
-      await loadAdminPayments({ silent: true });
+      await Promise.all([
+        loadAdminPayments({ silent: true }),
+        loadAdminStores({ silent: true }),
+        loadAdminJobs({ silent: true })
+      ]);
       setStatus("");
     } catch {
       window.PortalAuth.clearState();
@@ -1504,11 +1626,7 @@
     renderStores();
     closeModal(adminStoreFilterModalBackdrop);
   });
-  refreshStoresBtn.addEventListener("click", () => {
-    renderStores();
-    refreshOverview();
-    setStatus("Data toko UI disegarkan.");
-  });
+  refreshStoresBtn.addEventListener("click", () => loadAdminStores());
   adminStoreSearchInput.addEventListener("input", () => {
     storeFilterState.search = adminStoreSearchInput.value || "";
     renderStores();
@@ -1528,11 +1646,7 @@
     renderJobs();
     closeModal(adminJobFilterModalBackdrop);
   });
-  refreshJobsBtn.addEventListener("click", () => {
-    renderJobs();
-    refreshOverview();
-    setStatus("Data job UI disegarkan.");
-  });
+  refreshJobsBtn.addEventListener("click", () => loadAdminJobs());
   adminJobSearchInput.addEventListener("input", () => {
     jobFilterState.search = adminJobSearchInput.value || "";
     renderJobs();

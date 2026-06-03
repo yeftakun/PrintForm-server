@@ -148,6 +148,7 @@ async function getJobs() {
     storedPath: row.stored_path,
     size: Number(row.size_bytes),
     createdAt: row.created_at?.toISOString?.() || row.created_at,
+    updatedAt: row.updated_at?.toISOString?.() || row.updated_at,
     status: row.status,
     fileStatus: normalizeJobFileStatus(row.file_status),
     fileDeleted: Boolean(row.file_deleted),

@@ -208,6 +208,21 @@ async function getUserByStoreCode(kodeToko) {
   return getUserFromSql("lower(u.kode_toko) = lower($1)", [normalizedKodeToko]);
 }
 
+async function listMitraUsers() {
+  ensureDbEnabled();
+  const hasMitraProfiles = await hasMitraProfilesTable();
+  const selectColumns = await getUserSelectColumnsSql();
+  const res = await query(
+    `SELECT ${selectColumns}
+       FROM users u
+       ${hasMitraProfiles ? "LEFT JOIN mitra_profiles mp ON mp.user_id = u.id" : ""}
+      WHERE lower(COALESCE(u.role, 'mitra')) <> 'admin'
+      ORDER BY u.created_at DESC`
+  );
+
+  return res.rows.map(mapUserRow).filter(Boolean);
+}
+
 async function createUser({ id, username, email, passwordHash, role }) {
   ensureDbEnabled();
 
@@ -404,6 +419,7 @@ module.exports = {
   getUserByEmail,
   getUserByIdentifier,
   getUserByStoreCode,
+  listMitraUsers,
   createUser,
   updateUserProfile,
   updateUserStoreSettings,
