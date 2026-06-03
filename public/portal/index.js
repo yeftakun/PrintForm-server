@@ -1685,7 +1685,9 @@
 
     plansGrid.innerHTML = latestPlans.map(plan => {
       const isFree = String(plan.planType || "").toLowerCase() === "free";
-      const freeDisabled = isFree && Number(latestCreditBalance?.totalEntitledRemainingCredits ?? latestCreditBalance?.remainingCredits ?? 0) > 0;
+      const freeBlocked = Boolean(latestCreditBalance?.hasActiveFreePeriod)
+        || Number(latestCreditBalance?.totalEntitledRemainingCredits ?? latestCreditBalance?.remainingCredits ?? 0) > 0;
+      const freeDisabled = isFree && freeBlocked;
       const unitPrice = getPlanUnitPriceText(plan);
       return `
         <article class="plan-card">

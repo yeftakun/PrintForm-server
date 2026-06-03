@@ -23,7 +23,7 @@
   let selectedPlan = null;
   let selectedQuantity = 1;
   let selectedPricing = null;
-  let hasActiveCredits = false;
+  let hasBlockingFreePeriod = false;
 
   function setStatus(text, kind = "") {
     paymentStatus.textContent = text || "";
@@ -150,7 +150,8 @@
       window.PortalAuth.apiJson("/api/billing/plans", { method: "GET" }),
       window.PortalAuth.apiJson("/api/billing/credits/balance", { method: "GET" })
     ]);
-    hasActiveCredits = Number(balanceBody.balance?.totalEntitledRemainingCredits ?? balanceBody.balance?.remainingCredits ?? 0) > 0;
+    hasBlockingFreePeriod = Boolean(balanceBody.balance?.hasActiveFreePeriod)
+      || Number(balanceBody.balance?.totalEntitledRemainingCredits ?? balanceBody.balance?.remainingCredits ?? 0) > 0;
     selectedPlan = (plansBody.plans || []).find(plan => plan.id === planId || plan.code === planId);
     if (!selectedPlan) {
       setStatus("Plan tidak ditemukan atau tidak aktif.", "error");
@@ -164,8 +165,8 @@
       paymentQuantityInput.value = "1";
       paymentQuantityInput.disabled = true;
       paymentQuantityControl.classList.add("hidden");
-      if (hasActiveCredits) {
-        setStatus("Plan Free hanya bisa dipilih saat tidak ada plan atau kredit aktif.", "error");
+      if (hasBlockingFreePeriod) {
+        setStatus("Plan Free masih aktif atau masih ada kredit aktif. Tunggu masa berlaku sebelumnya berakhir sebelum mengambil Free lagi.", "error");
         createOrderBtn.disabled = true;
         checkCouponBtn.disabled = true;
         return;

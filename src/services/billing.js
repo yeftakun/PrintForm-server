@@ -334,6 +334,36 @@ async function userHasActiveCredits(userId, client = null) {
   return Boolean(res.rows[0]?.exists);
 }
 
+async function getActiveFreeCreditPeriod(userId, client = null) {
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT MIN(starts_at) AS starts_at,
+            MIN(expires_at) AS expires_at,
+            SUM(total_credits)::int AS total_credits,
+            SUM(used_credits)::int AS used_credits,
+            SUM(GREATEST(total_credits - used_credits, 0))::int AS remaining_credits
+       FROM credits
+      WHERE user_id = $1
+        AND source_type = 'free'
+        AND status = 'active'
+        AND starts_at <= now()
+        AND expires_at > now()`,
+    [userId]
+  );
+  const row = res.rows[0];
+  if (!row?.expires_at) {
+    return null;
+  }
+
+  return {
+    startsAt: toIso(row.starts_at),
+    expiresAt: toIso(row.expires_at),
+    totalCredits: toInt(row.total_credits),
+    usedCredits: toInt(row.used_credits),
+    remainingCredits: toInt(row.remaining_credits)
+  };
+}
+
 async function listActivePlans() {
   ensureDbBilling();
   const res = await query(
@@ -958,11 +988,21 @@ async function createOrder({ userId, planId, quantity = 1, couponCode = null }) 
   ensureDbBilling();
   return withTransaction(async client => {
     const pricing = await calculateOrderPricing({ userId, planId, quantity, couponCode }, client);
-    if (String(pricing.plan.planType || "").toLowerCase() === "free" && await userHasActiveCredits(userId, client)) {
-      const err = new Error("Plan Free hanya bisa dipilih saat tidak ada plan atau kredit aktif.");
-      err.statusCode = 409;
-      err.code = "FREE_PLAN_ALREADY_ACTIVE";
-      throw err;
+    if (String(pricing.plan.planType || "").toLowerCase() === "free") {
+      const activeFreePeriod = await getActiveFreeCreditPeriod(userId, client);
+      if (activeFreePeriod) {
+        const err = new Error("Plan Free masih aktif. Tunggu masa berlaku free sebelumnya berakhir sebelum mengambil Free lagi.");
+        err.statusCode = 409;
+        err.code = "FREE_PLAN_PERIOD_ACTIVE";
+        throw err;
+      }
+
+      if (await userHasActiveCredits(userId, client)) {
+        const err = new Error("Plan Free hanya bisa dipilih saat tidak ada plan atau kredit aktif.");
+        err.statusCode = 409;
+        err.code = "FREE_PLAN_ALREADY_ACTIVE";
+        throw err;
+      }
     }
     const orderId = createOpaqueId("ord");
     const isPaidImmediately = pricing.totalIdr === 0;
@@ -1377,6 +1417,8 @@ async function getCreditBalance(userId) {
             SUM(total_credits)::int AS total_credits,
             SUM(used_credits)::int AS used_credits,
             SUM(GREATEST(total_credits - used_credits, 0))::int AS remaining_credits,
+            MIN(starts_at) AS active_starts_at,
+            MIN(expires_at) AS active_expires_at,
             MIN(expires_at) FILTER (WHERE total_credits > used_credits) AS nearest_expires_at
      FROM credits
      WHERE user_id = $1
@@ -1434,6 +1476,8 @@ async function getCreditBalance(userId) {
       totalCredits: toInt(row.total_credits),
       usedCredits: toInt(row.used_credits),
       remainingCredits: toInt(row.remaining_credits),
+      activeStartsAt: toIso(row.active_starts_at),
+      activeExpiresAt: toIso(row.active_expires_at),
       nearestExpiresAt: toIso(row.nearest_expires_at)
     };
     breakdown[source] = item;
@@ -1469,6 +1513,10 @@ async function getCreditBalance(userId) {
     usedCredits,
     remainingCredits,
     breakdown,
+    hasActiveFreePeriod: Boolean(breakdown.free),
+    activeFreePeriodStartsAt: breakdown.free?.activeStartsAt || null,
+    activeFreePeriodExpiresAt: breakdown.free?.activeExpiresAt || null,
+    activeFreePeriodRemainingCredits: breakdown.free?.remainingCredits || 0,
     usableTotalCredits: totalCredits,
     usableUsedCredits: usedCredits,
     usableRemainingCredits: remainingCredits,

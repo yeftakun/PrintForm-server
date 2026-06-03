@@ -220,6 +220,96 @@ async function withPhysicalJobFileStatus(job) {
   };
 }
 
+async function rejectJobForInsufficientCredit({
+  req,
+  res,
+  jobs,
+  job,
+  previousStatus,
+  requestClientId,
+  effectiveClientId,
+  err
+}) {
+  const priorStatus = previousStatus || job.status;
+  job.status = "rejected";
+
+  await saveJobs(jobs);
+  await refreshStorageUsageSnapshot(jobs);
+
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "job.print.credit_rejected",
+    targetType: "job",
+    targetId: job.id,
+    detail: {
+      previousStatus: priorStatus,
+      nextStatus: "rejected",
+      errorCode: err?.code || "INSUFFICIENT_CREDIT",
+      ownerUserId: job.ownerUserId || null,
+      claimedByClientId: job.claimedByClientId || null,
+      requestClientId: requestClientId || null,
+      effectiveClientId: effectiveClientId || null,
+      sessionId: job.sessionId || null
+    }
+  });
+
+  const publicJob = toPublicJob(job);
+  notifyJobStatusChanged(publicJob, priorStatus);
+
+  res.status(402).json({
+    error: "Kredit akun tidak cukup untuk mencetak tugas ini.",
+    code: "INSUFFICIENT_CREDIT",
+    jobId: job.id,
+    job: publicJob
+  });
+}
+
+async function guardPrintCredit({
+  req,
+  res,
+  jobs,
+  job,
+  previousStatus,
+  requestClientId,
+  effectiveClientId
+}) {
+  if (!useDb) {
+    return false;
+  }
+
+  try {
+    await deductCreditForJobPrint(job);
+    return false;
+  } catch (err) {
+    if (err?.code === "INSUFFICIENT_CREDIT") {
+      await rejectJobForInsufficientCredit({
+        req,
+        res,
+        jobs,
+        job,
+        previousStatus,
+        requestClientId,
+        effectiveClientId,
+        err
+      });
+      return true;
+    }
+
+    if (err?.code) {
+      res.status(err.statusCode || 400).json({
+        error: err.message || "Gagal memotong kredit.",
+        code: err.code,
+        jobId: job.id
+      });
+      return true;
+    }
+
+    throw err;
+  }
+}
+
 async function removeUploadedDocument(req) {
   if (req?.file?.path) {
     await removeFileSafe(req.file.path);
@@ -870,6 +960,19 @@ router.post("/:id/claim", asyncHandler(async (req, res) => {
       return;
     }
 
+    const blockedByCredit = await guardPrintCredit({
+      req,
+      res,
+      jobs,
+      job,
+      previousStatus: job.status,
+      requestClientId: claimantClientId,
+      effectiveClientId: claimantClientId
+    });
+    if (blockedByCredit) {
+      return;
+    }
+
     const previousClaimedByClientId = job.claimedByClientId || null;
     job.claimedByClientId = claimantClientId;
     job.claimedAt = new Date().toISOString();
@@ -1122,26 +1225,17 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     }
 
     if (useDb && shouldDeductCreditForStatusTransition(previousStatus, normalizedStatus)) {
-      try {
-        await deductCreditForJobPrint(job);
-      } catch (err) {
-        if (err?.code === "INSUFFICIENT_CREDIT") {
-          res.status(402).json({
-            error: "Kredit akun tidak cukup untuk mencetak tugas ini.",
-            code: "INSUFFICIENT_CREDIT",
-            jobId: job.id
-          });
-          return;
-        }
-        if (err?.code) {
-          res.status(err.statusCode || 400).json({
-            error: err.message || "Gagal memotong kredit.",
-            code: err.code,
-            jobId: job.id
-          });
-          return;
-        }
-        throw err;
+      const blockedByCredit = await guardPrintCredit({
+        req,
+        res,
+        jobs,
+        job,
+        previousStatus,
+        requestClientId,
+        effectiveClientId: claimantClientId
+      });
+      if (blockedByCredit) {
+        return;
       }
     }
 
