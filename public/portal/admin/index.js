@@ -38,6 +38,7 @@
 
   const adminBillingTabButtons = Array.from(document.querySelectorAll("[data-admin-billing-tab]"));
   const adminBillingPanels = Array.from(document.querySelectorAll("[data-admin-billing-panel]"));
+  const refreshAdminBillingBtn = document.getElementById("refreshAdminBillingBtn");
   const adminPlansTable = document.getElementById("adminPlansTable");
   const adminCouponsTable = document.getElementById("adminCouponsTable");
   const openPlanModalBtn = document.getElementById("openPlanModalBtn");
@@ -46,6 +47,7 @@
   const adminCouponModalBackdrop = document.getElementById("adminCouponModalBackdrop");
   const adminPlanForm = document.getElementById("adminPlanForm");
   const adminCouponForm = document.getElementById("adminCouponForm");
+  const adminCouponPlanSelect = document.getElementById("adminCouponPlanSelect");
   const adminPlanStatus = document.getElementById("adminPlanStatus");
   const adminCouponStatus = document.getElementById("adminCouponStatus");
 
@@ -101,6 +103,9 @@
   let adminStoresLoaded = false;
   let adminStoresLoading = false;
   let adminStoresError = "";
+  let adminBillingLoaded = false;
+  let adminBillingLoading = false;
+  let adminBillingError = "";
   let adminJobsLoaded = false;
   let adminJobsLoading = false;
   let adminJobsError = "";
@@ -138,18 +143,8 @@
     perPage: "20"
   };
 
-  let plans = [
-    { id: "plan_free", name: "Free", description: "Trial akun mitra", price: 0, credits: 25, validDays: 14, active: true, updatedAt: "2026-05-29T08:10:00Z" },
-    { id: "plan_starter", name: "Starter", description: "Paket awal toko kecil", price: 13000, credits: 500, validDays: 30, active: true, updatedAt: "2026-05-30T09:20:00Z" },
-    { id: "plan_pro", name: "Pro", description: "Paket operasional harian", price: 20000, credits: 1000, validDays: 30, active: true, updatedAt: "2026-05-31T10:30:00Z" },
-    { id: "plan_topup", name: "Buy Credit", description: "Top up kredit fleksibel", price: 5000, credits: 250, validDays: 60, active: true, updatedAt: "2026-06-01T07:45:00Z" }
-  ];
-
-  let coupons = [
-    { id: "coupon_launch10", code: "LAUNCH10", type: "percent", value: 10, minOrder: 10000, usageLimit: 100, used: 18, startsAt: "2026-06-01", endsAt: "2026-06-30", active: true },
-    { id: "coupon_mitra5k", code: "MITRA5K", type: "amount", value: 5000, minOrder: 20000, usageLimit: 40, used: 7, startsAt: "2026-06-01", endsAt: "2026-06-15", active: true },
-    { id: "coupon_old", code: "TRIAL2026", type: "percent", value: 15, minOrder: 0, usageLimit: 25, used: 25, startsAt: "2026-05-01", endsAt: "2026-05-31", active: false }
-  ];
+  let plans = [];
+  let coupons = [];
 
   let stores = [
     {
@@ -427,6 +422,42 @@
     if (Number.isNaN(date.getTime())) return "";
     const offset = date.getTimezoneOffset() * 60000;
     return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+  }
+
+  function planTypeLabel(type) {
+    const labels = {
+      free: "Free",
+      subscription: "Subscription",
+      credit_pack: "Credit Pack"
+    };
+    return labels[String(type || "").toLowerCase()] || type || "-";
+  }
+
+  function discountTypeLabel(type) {
+    const labels = {
+      percent: "Persen",
+      fixed_amount: "Nominal",
+      free: "Gratis"
+    };
+    return labels[String(type || "").toLowerCase()] || type || "-";
+  }
+
+  function discountValueLabel(coupon) {
+    if (coupon.discountType === "free") return "Gratis";
+    if (coupon.discountType === "percent") {
+      const max = coupon.maxDiscountIdr ? ` maks ${formatCurrency(coupon.maxDiscountIdr)}` : "";
+      return `${formatNumber(coupon.discountValue)}%${max}`;
+    }
+    return formatCurrency(coupon.discountValue);
+  }
+
+  function nullableNumberFormValue(value) {
+    return value === null || value === undefined ? "" : String(value);
+  }
+
+  function getPlanName(planId) {
+    const plan = plans.find(item => item.id === planId);
+    return plan ? `${plan.name} (${plan.code})` : "Semua plan";
   }
 
   function getSelectedRadio(name, fallback) {
@@ -912,18 +943,30 @@
   }
 
   function renderPlans() {
+    if (adminBillingLoading && !adminBillingLoaded) {
+      adminPlansTable.innerHTML = '<tr><td colspan="7" class="muted-cell">Memuat data plan...</td></tr>';
+      return;
+    }
+    if (adminBillingError) {
+      adminPlansTable.innerHTML = `<tr><td colspan="7" class="muted-cell">${escapeHtml(adminBillingError)}</td></tr>`;
+      return;
+    }
+    if (!plans.length) {
+      adminPlansTable.innerHTML = '<tr><td colspan="7" class="muted-cell">Belum ada plan.</td></tr>';
+      return;
+    }
     adminPlansTable.innerHTML = plans.map(plan => `
       <tr>
-        <td><strong>${escapeHtml(plan.name)}</strong><span>${escapeHtml(plan.description)}</span></td>
-        <td>${escapeHtml(formatCurrency(plan.price))}</td>
-        <td>${escapeHtml(formatNumber(plan.credits))} kredit</td>
-        <td>${escapeHtml(plan.validDays)} hari</td>
-        <td><span class="status-pill ${plan.active ? "online" : "offline"}">${plan.active ? "Aktif" : "Nonaktif"}</span></td>
+        <td><strong>${escapeHtml(plan.name)}</strong><span>${escapeHtml(plan.code)} · ${escapeHtml(planTypeLabel(plan.planType))} · ${escapeHtml(plan.description || "-")}</span></td>
+        <td>${escapeHtml(formatCurrency(plan.priceIdr))}</td>
+        <td>${escapeHtml(formatNumber(plan.creditsPerUnit))} kredit</td>
+        <td>${escapeHtml(formatNumber(plan.durationMonths))} bulan</td>
+        <td><span class="status-pill ${plan.isActive ? "online" : "offline"}">${plan.isActive ? "Aktif" : "Nonaktif"}</span></td>
         <td>${escapeHtml(formatDateTime(plan.updatedAt))}</td>
         <td>
           <div class="admin-row-actions">
             <button class="btn btn-outline btn-compact" type="button" data-edit-plan-id="${escapeHtml(plan.id)}">Edit</button>
-            <button class="btn btn-ghost btn-compact" type="button" data-toggle-plan-id="${escapeHtml(plan.id)}">${plan.active ? "Nonaktifkan" : "Aktifkan"}</button>
+            <button class="btn btn-ghost btn-compact" type="button" data-toggle-plan-id="${escapeHtml(plan.id)}">${plan.isActive ? "Nonaktifkan" : "Aktifkan"}</button>
           </div>
         </td>
       </tr>
@@ -931,34 +974,63 @@
   }
 
   function renderCoupons() {
+    if (adminBillingLoading && !adminBillingLoaded) {
+      adminCouponsTable.innerHTML = '<tr><td colspan="7" class="muted-cell">Memuat data kupon...</td></tr>';
+      return;
+    }
+    if (adminBillingError) {
+      adminCouponsTable.innerHTML = `<tr><td colspan="7" class="muted-cell">${escapeHtml(adminBillingError)}</td></tr>`;
+      return;
+    }
+    if (!coupons.length) {
+      adminCouponsTable.innerHTML = '<tr><td colspan="7" class="muted-cell">Belum ada kupon.</td></tr>';
+      return;
+    }
     adminCouponsTable.innerHTML = coupons.map(coupon => `
       <tr>
-        <td><strong>${escapeHtml(coupon.code)}</strong></td>
-        <td>${coupon.type === "percent" ? `${escapeHtml(coupon.value)}%` : escapeHtml(formatCurrency(coupon.value))}</td>
-        <td>${escapeHtml(formatCurrency(coupon.minOrder))}</td>
-        <td>${escapeHtml(coupon.used)} / ${escapeHtml(coupon.usageLimit)}</td>
-        <td>${escapeHtml(coupon.startsAt)} - ${escapeHtml(coupon.endsAt)}</td>
-        <td><span class="status-pill ${coupon.active ? "online" : "offline"}">${coupon.active ? "Aktif" : "Nonaktif"}</span></td>
+        <td><strong>${escapeHtml(coupon.code)}</strong><span>${escapeHtml(coupon.name || getPlanName(coupon.appliesToPlanId))}</span></td>
+        <td>${escapeHtml(discountValueLabel(coupon))}<span>${escapeHtml(discountTypeLabel(coupon.discountType))}</span></td>
+        <td>${escapeHtml(formatCurrency(coupon.minOrderAmountIdr))}</td>
+        <td>${escapeHtml(formatNumber(coupon.used))} / ${escapeHtml(coupon.usageLimit ? formatNumber(coupon.usageLimit) : "Tidak dibatasi")}</td>
+        <td>${escapeHtml(dateInputValue(coupon.startsAt) || "-")} - ${escapeHtml(dateInputValue(coupon.expiresAt) || "-")}</td>
+        <td><span class="status-pill ${coupon.isActive ? "online" : "offline"}">${coupon.isActive ? "Aktif" : "Nonaktif"}</span></td>
         <td>
           <div class="admin-row-actions">
             <button class="btn btn-outline btn-compact" type="button" data-edit-coupon-id="${escapeHtml(coupon.id)}">Edit</button>
-            <button class="btn btn-ghost btn-compact" type="button" data-toggle-coupon-id="${escapeHtml(coupon.id)}">${coupon.active ? "Nonaktifkan" : "Aktifkan"}</button>
+            <button class="btn btn-ghost btn-compact" type="button" data-toggle-coupon-id="${escapeHtml(coupon.id)}">${coupon.isActive ? "Nonaktifkan" : "Aktifkan"}</button>
           </div>
         </td>
       </tr>
     `).join("");
   }
 
+  function renderBilling() {
+    renderPlans();
+    renderCoupons();
+  }
+
+  function syncCouponPlanOptions(selectedPlanId = "") {
+    if (!adminCouponPlanSelect) return;
+    adminCouponPlanSelect.innerHTML = [
+      '<option value="">Semua plan</option>',
+      ...plans.map(plan => `<option value="${escapeHtml(plan.id)}">${escapeHtml(plan.name)} (${escapeHtml(plan.code)})</option>`)
+    ].join("");
+    adminCouponPlanSelect.value = selectedPlanId || "";
+  }
+
   function openPlanModal(planId = "") {
     const plan = plans.find(item => item.id === planId);
     adminPlanForm.reset();
     adminPlanForm.elements.namedItem("id").value = plan?.id || "";
+    adminPlanForm.elements.namedItem("code").value = plan?.code || "";
+    adminPlanForm.elements.namedItem("planType").value = plan?.planType || "credit_pack";
     adminPlanForm.elements.namedItem("name").value = plan?.name || "";
     adminPlanForm.elements.namedItem("description").value = plan?.description || "";
-    adminPlanForm.elements.namedItem("price").value = plan?.price ?? "";
-    adminPlanForm.elements.namedItem("credits").value = plan?.credits ?? "";
-    adminPlanForm.elements.namedItem("validDays").value = plan?.validDays ?? 30;
-    adminPlanForm.elements.namedItem("active").checked = plan ? plan.active : true;
+    adminPlanForm.elements.namedItem("price").value = plan?.priceIdr ?? "";
+    adminPlanForm.elements.namedItem("credits").value = plan?.creditsPerUnit ?? "";
+    adminPlanForm.elements.namedItem("durationMonths").value = plan?.durationMonths ?? 1;
+    adminPlanForm.elements.namedItem("sortOrder").value = plan?.sortOrder ?? 0;
+    adminPlanForm.elements.namedItem("active").checked = plan ? plan.isActive : true;
     document.getElementById("adminPlanModalTitle").textContent = plan ? "Edit Plan" : "Tambah Plan";
     setInlineStatus(adminPlanStatus, "");
     openModal(adminPlanModalBackdrop);
@@ -967,18 +1039,170 @@
   function openCouponModal(couponId = "") {
     const coupon = coupons.find(item => item.id === couponId);
     adminCouponForm.reset();
+    syncCouponPlanOptions(coupon?.appliesToPlanId || "");
     adminCouponForm.elements.namedItem("id").value = coupon?.id || "";
     adminCouponForm.elements.namedItem("code").value = coupon?.code || "";
-    adminCouponForm.elements.namedItem("type").value = coupon?.type || "percent";
-    adminCouponForm.elements.namedItem("value").value = coupon?.value ?? "";
-    adminCouponForm.elements.namedItem("minOrder").value = coupon?.minOrder ?? 0;
-    adminCouponForm.elements.namedItem("usageLimit").value = coupon?.usageLimit ?? 1;
-    adminCouponForm.elements.namedItem("startsAt").value = coupon?.startsAt || todayInputValue();
-    adminCouponForm.elements.namedItem("endsAt").value = coupon?.endsAt || todayInputValue();
-    adminCouponForm.elements.namedItem("active").checked = coupon ? coupon.active : true;
+    adminCouponForm.elements.namedItem("name").value = coupon?.name || "";
+    adminCouponForm.elements.namedItem("type").value = coupon?.discountType || "percent";
+    adminCouponForm.elements.namedItem("value").value = coupon?.discountValue ?? "";
+    adminCouponForm.elements.namedItem("maxDiscountIdr").value = nullableNumberFormValue(coupon?.maxDiscountIdr);
+    adminCouponForm.elements.namedItem("minOrder").value = coupon?.minOrderAmountIdr ?? 0;
+    adminCouponForm.elements.namedItem("usageLimit").value = nullableNumberFormValue(coupon?.usageLimit);
+    adminCouponForm.elements.namedItem("usageLimitPerUser").value = nullableNumberFormValue(coupon?.usageLimitPerUser);
+    adminCouponForm.elements.namedItem("appliesToPlanId").value = coupon?.appliesToPlanId || "";
+    adminCouponForm.elements.namedItem("startsAt").value = dateInputValue(coupon?.startsAt) || todayInputValue();
+    adminCouponForm.elements.namedItem("endsAt").value = dateInputValue(coupon?.expiresAt) || todayInputValue();
+    adminCouponForm.elements.namedItem("active").checked = coupon ? coupon.isActive : true;
     document.getElementById("adminCouponModalTitle").textContent = coupon ? "Edit Kupon" : "Tambah Kupon";
     setInlineStatus(adminCouponStatus, "");
     openModal(adminCouponModalBackdrop);
+  }
+
+  async function loadAdminBilling({ silent = false } = {}) {
+    adminBillingLoading = true;
+    adminBillingError = "";
+    if (!silent) setStatus("Memuat konfigurasi billing...");
+    renderBilling();
+    try {
+      const [plansBody, couponsBody] = await Promise.all([
+        window.PortalAuth.apiJson("/api/billing/admin/plans", { method: "GET" }),
+        window.PortalAuth.apiJson("/api/billing/admin/coupons", { method: "GET" })
+      ]);
+      plans = Array.isArray(plansBody.plans) ? plansBody.plans : [];
+      coupons = Array.isArray(couponsBody.coupons) ? couponsBody.coupons : [];
+      adminBillingLoaded = true;
+      adminBillingError = "";
+      syncCouponPlanOptions();
+      renderBilling();
+      if (!silent) setStatus("");
+    } catch (err) {
+      plans = [];
+      coupons = [];
+      adminBillingLoaded = true;
+      adminBillingError = err.message || "Gagal memuat konfigurasi billing.";
+      renderBilling();
+      if (!silent) setStatus(adminBillingError, "error");
+    } finally {
+      adminBillingLoading = false;
+    }
+  }
+
+  function buildPlanPayload() {
+    return {
+      code: adminPlanForm.elements.namedItem("code").value.trim(),
+      planType: adminPlanForm.elements.namedItem("planType").value,
+      name: adminPlanForm.elements.namedItem("name").value.trim(),
+      description: adminPlanForm.elements.namedItem("description").value.trim(),
+      priceIdr: Number(adminPlanForm.elements.namedItem("price").value || 0),
+      creditsPerUnit: Number(adminPlanForm.elements.namedItem("credits").value || 0),
+      durationMonths: Number(adminPlanForm.elements.namedItem("durationMonths").value || 0),
+      sortOrder: Number(adminPlanForm.elements.namedItem("sortOrder").value || 0),
+      isActive: adminPlanForm.elements.namedItem("active").checked
+    };
+  }
+
+  function buildCouponPayload() {
+    const maxDiscountValue = adminCouponForm.elements.namedItem("maxDiscountIdr").value;
+    const usageLimitValue = adminCouponForm.elements.namedItem("usageLimit").value;
+    const usageLimitPerUserValue = adminCouponForm.elements.namedItem("usageLimitPerUser").value;
+    return {
+      code: adminCouponForm.elements.namedItem("code").value.trim().toUpperCase(),
+      name: adminCouponForm.elements.namedItem("name").value.trim(),
+      discountType: adminCouponForm.elements.namedItem("type").value,
+      discountValue: Number(adminCouponForm.elements.namedItem("value").value || 0),
+      maxDiscountIdr: String(maxDiscountValue || "").trim() ? Number(maxDiscountValue) : null,
+      minOrderAmountIdr: Number(adminCouponForm.elements.namedItem("minOrder").value || 0),
+      usageLimit: String(usageLimitValue || "").trim() ? Number(usageLimitValue) : null,
+      usageLimitPerUser: String(usageLimitPerUserValue || "").trim() ? Number(usageLimitPerUserValue) : null,
+      appliesToPlanId: adminCouponForm.elements.namedItem("appliesToPlanId").value || null,
+      startsAt: adminCouponForm.elements.namedItem("startsAt").value,
+      expiresAt: adminCouponForm.elements.namedItem("endsAt").value,
+      isActive: adminCouponForm.elements.namedItem("active").checked
+    };
+  }
+
+  async function submitPlanForm(event) {
+    event.preventDefault();
+    const submitButton = adminPlanForm.querySelector('button[type="submit"]');
+    const id = adminPlanForm.elements.namedItem("id").value;
+    submitButton.disabled = true;
+    setInlineStatus(adminPlanStatus, "Menyimpan plan...");
+    try {
+      await window.PortalAuth.apiJson(id ? `/api/billing/admin/plans/${encodeURIComponent(id)}` : "/api/billing/admin/plans", {
+        method: id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPlanPayload())
+      });
+      await loadAdminBilling({ silent: true });
+      setInlineStatus(adminPlanStatus, "Plan berhasil disimpan.", "success");
+      setTimeout(() => closeModal(adminPlanModalBackdrop), 450);
+    } catch (err) {
+      setInlineStatus(adminPlanStatus, err.message || "Gagal menyimpan plan.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  async function submitCouponForm(event) {
+    event.preventDefault();
+    const submitButton = adminCouponForm.querySelector('button[type="submit"]');
+    const id = adminCouponForm.elements.namedItem("id").value;
+    submitButton.disabled = true;
+    setInlineStatus(adminCouponStatus, "Menyimpan kupon...");
+    try {
+      await window.PortalAuth.apiJson(id ? `/api/billing/admin/coupons/${encodeURIComponent(id)}` : "/api/billing/admin/coupons", {
+        method: id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCouponPayload())
+      });
+      await loadAdminBilling({ silent: true });
+      setInlineStatus(adminCouponStatus, "Kupon berhasil disimpan.", "success");
+      setTimeout(() => closeModal(adminCouponModalBackdrop), 450);
+    } catch (err) {
+      setInlineStatus(adminCouponStatus, err.message || "Gagal menyimpan kupon.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  async function togglePlanActive(planId) {
+    const plan = plans.find(item => item.id === planId);
+    if (!plan) return;
+    setStatus(plan.isActive ? "Menonaktifkan plan..." : "Mengaktifkan plan...");
+    try {
+      const body = await window.PortalAuth.apiJson(`/api/billing/admin/plans/${encodeURIComponent(planId)}/active`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !plan.isActive })
+      });
+      if (body.plan) {
+        plans = plans.map(item => item.id === body.plan.id ? body.plan : item);
+      }
+      renderBilling();
+      setStatus(body.plan?.isActive ? "Plan diaktifkan." : "Plan dinonaktifkan.", "success");
+    } catch (err) {
+      setStatus(err.message || "Gagal mengubah status plan.", "error");
+    }
+  }
+
+  async function toggleCouponActive(couponId) {
+    const coupon = coupons.find(item => item.id === couponId);
+    if (!coupon) return;
+    setStatus(coupon.isActive ? "Menonaktifkan kupon..." : "Mengaktifkan kupon...");
+    try {
+      const body = await window.PortalAuth.apiJson(`/api/billing/admin/coupons/${encodeURIComponent(couponId)}/active`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !coupon.isActive })
+      });
+      if (body.coupon) {
+        coupons = coupons.map(item => item.id === body.coupon.id ? body.coupon : item);
+      }
+      renderBilling();
+      setStatus(body.coupon?.isActive ? "Kupon diaktifkan." : "Kupon dinonaktifkan.", "success");
+    } catch (err) {
+      setStatus(err.message || "Gagal mengubah status kupon.", "error");
+    }
   }
 
   function getStoreText(store) {
@@ -1451,8 +1675,7 @@
   function renderAllUi() {
     refreshOverview();
     renderPayments();
-    renderPlans();
-    renderCoupons();
+    renderBilling();
     renderStores();
     renderJobs();
     renderAudit();
@@ -1480,6 +1703,7 @@
       await loadOverviewSummary();
       await Promise.all([
         loadAdminPayments({ silent: true }),
+        loadAdminBilling({ silent: true }),
         loadAdminStores({ silent: true }),
         loadAdminJobs({ silent: true }),
         loadAdminAudit({ silent: true })
@@ -1578,13 +1802,7 @@
     }
     const planToggle = event.target.closest("[data-toggle-plan-id]");
     if (planToggle) {
-      const plan = plans.find(item => item.id === planToggle.dataset.togglePlanId);
-      if (plan) {
-        plan.active = !plan.active;
-        plan.updatedAt = new Date().toISOString();
-        renderPlans();
-        refreshOverview();
-      }
+      togglePlanActive(planToggle.dataset.togglePlanId);
       return;
     }
 
@@ -1595,11 +1813,7 @@
     }
     const couponToggle = event.target.closest("[data-toggle-coupon-id]");
     if (couponToggle) {
-      const coupon = coupons.find(item => item.id === couponToggle.dataset.toggleCouponId);
-      if (coupon) {
-        coupon.active = !coupon.active;
-        renderCoupons();
-      }
+      toggleCouponActive(couponToggle.dataset.toggleCouponId);
       return;
     }
 
@@ -1634,6 +1848,7 @@
 
   refreshOverviewBtn.addEventListener("click", () => loadOverviewSummary());
   refreshAdminPaymentsBtn.addEventListener("click", loadAdminPayments);
+  refreshAdminBillingBtn.addEventListener("click", () => loadAdminBilling());
   openAdminPaymentFilterBtn.addEventListener("click", () => {
     syncPaymentFilterInputs();
     openModal(adminPaymentFilterModalBackdrop);
@@ -1662,50 +1877,8 @@
 
   openPlanModalBtn.addEventListener("click", () => openPlanModal());
   openCouponModalBtn.addEventListener("click", () => openCouponModal());
-  adminPlanForm.addEventListener("submit", event => {
-    event.preventDefault();
-    const id = adminPlanForm.elements.namedItem("id").value || `plan_${Date.now()}`;
-    const nextPlan = {
-      id,
-      name: adminPlanForm.elements.namedItem("name").value.trim(),
-      description: adminPlanForm.elements.namedItem("description").value.trim(),
-      price: Number(adminPlanForm.elements.namedItem("price").value || 0),
-      credits: Number(adminPlanForm.elements.namedItem("credits").value || 0),
-      validDays: Number(adminPlanForm.elements.namedItem("validDays").value || 1),
-      active: adminPlanForm.elements.namedItem("active").checked,
-      updatedAt: new Date().toISOString()
-    };
-    plans = plans.some(plan => plan.id === id)
-      ? plans.map(plan => plan.id === id ? nextPlan : plan)
-      : [nextPlan, ...plans];
-    renderPlans();
-    refreshOverview();
-    setInlineStatus(adminPlanStatus, "Plan disimpan di UI konsep.", "success");
-    setTimeout(() => closeModal(adminPlanModalBackdrop), 450);
-  });
-  adminCouponForm.addEventListener("submit", event => {
-    event.preventDefault();
-    const id = adminCouponForm.elements.namedItem("id").value || `coupon_${Date.now()}`;
-    const existing = coupons.find(coupon => coupon.id === id);
-    const nextCoupon = {
-      id,
-      code: adminCouponForm.elements.namedItem("code").value.trim().toUpperCase(),
-      type: adminCouponForm.elements.namedItem("type").value,
-      value: Number(adminCouponForm.elements.namedItem("value").value || 0),
-      minOrder: Number(adminCouponForm.elements.namedItem("minOrder").value || 0),
-      usageLimit: Number(adminCouponForm.elements.namedItem("usageLimit").value || 1),
-      used: existing?.used || 0,
-      startsAt: adminCouponForm.elements.namedItem("startsAt").value,
-      endsAt: adminCouponForm.elements.namedItem("endsAt").value,
-      active: adminCouponForm.elements.namedItem("active").checked
-    };
-    coupons = coupons.some(coupon => coupon.id === id)
-      ? coupons.map(coupon => coupon.id === id ? nextCoupon : coupon)
-      : [nextCoupon, ...coupons];
-    renderCoupons();
-    setInlineStatus(adminCouponStatus, "Kupon disimpan di UI konsep.", "success");
-    setTimeout(() => closeModal(adminCouponModalBackdrop), 450);
-  });
+  adminPlanForm.addEventListener("submit", submitPlanForm);
+  adminCouponForm.addEventListener("submit", submitCouponForm);
 
   openStoreFilterBtn.addEventListener("click", () => {
     syncStoreFilterInputs();

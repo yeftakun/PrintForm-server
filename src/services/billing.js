@@ -18,6 +18,8 @@ const CREDIT_SOURCE_PRIORITY = new Map([
   ["bonus", 4],
   ["refund", 5]
 ]);
+const PLAN_TYPES = new Set(["free", "subscription", "credit_pack"]);
+const COUPON_DISCOUNT_TYPES = new Set(["fixed_amount", "percent", "free"]);
 
 function ensureDbBilling() {
   if (!useDb) {
@@ -48,6 +50,87 @@ function toInt(value) {
 
 function toIso(value) {
   return value?.toISOString?.() || value || null;
+}
+
+function createClientError(message, statusCode = 400, code = "BILLING_INVALID_INPUT") {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  err.code = code;
+  return err;
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) return true;
+    if (["0", "false", "no", "off"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function normalizeRequiredText(value, fieldName, maxLength) {
+  const text = String(value || "").trim();
+  if (!text) {
+    throw createClientError(`${fieldName} wajib diisi.`);
+  }
+  return text.slice(0, maxLength);
+}
+
+function normalizeOptionalText(value, maxLength) {
+  const text = String(value || "").trim();
+  return text ? text.slice(0, maxLength) : null;
+}
+
+function normalizeNonNegativeInteger(value, fallback = 0) {
+  const number = Number.parseInt(value, 10);
+  if (!Number.isInteger(number) || number < 0) {
+    return fallback;
+  }
+  return number;
+}
+
+function normalizePositiveLimit(value) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
+  const number = Number.parseInt(value, 10);
+  if (!Number.isInteger(number) || number < 1) {
+    throw createClientError("Limit penggunaan harus minimal 1 atau dikosongkan.");
+  }
+  return number;
+}
+
+function normalizePlanCode(value) {
+  const code = normalizeRequiredText(value, "Kode plan", 50).toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(code)) {
+    throw createClientError("Kode plan hanya boleh berisi huruf kecil, angka, underscore, dan dash.");
+  }
+  return code;
+}
+
+function normalizeCouponCodeForAdmin(value) {
+  const code = normalizeRequiredText(value, "Kode kupon", 64).toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9_-]*$/.test(code)) {
+    throw createClientError("Kode kupon hanya boleh berisi huruf, angka, underscore, dan dash.");
+  }
+  return code;
+}
+
+function normalizeDateTime(value, { endOfDay = false } = {}) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
+  const text = String(value).trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? `${text}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`
+    : text;
+  const date = new Date(normalized);
+  if (!Number.isFinite(date.getTime())) {
+    throw createClientError("Format tanggal kupon tidak valid.");
+  }
+  return date;
 }
 
 function addMonths(date, months) {
@@ -97,6 +180,28 @@ function mapPlan(row) {
     description: row.description || "",
     isActive: Boolean(row.is_active),
     sortOrder: Number(row.sort_order || 0),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at)
+  };
+}
+
+function mapCoupon(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name || "",
+    discountType: row.discount_type,
+    discountValue: toInt(row.discount_value),
+    maxDiscountIdr: row.max_discount_idr === null || row.max_discount_idr === undefined ? null : toInt(row.max_discount_idr),
+    minOrderAmountIdr: toInt(row.min_order_amount_idr),
+    appliesToPlanId: row.applies_to_plan_id || null,
+    usageLimit: row.usage_limit === null || row.usage_limit === undefined ? null : Number(row.usage_limit),
+    usageLimitPerUser: row.usage_limit_per_user === null || row.usage_limit_per_user === undefined ? null : Number(row.usage_limit_per_user),
+    startsAt: toIso(row.starts_at),
+    expiresAt: toIso(row.expires_at),
+    isActive: Boolean(row.is_active),
+    used: Number(row.used_count || 0),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at)
   };
@@ -205,6 +310,154 @@ async function listActivePlans() {
   return res.rows.map(mapPlan);
 }
 
+async function listPlansForAdmin() {
+  ensureDbBilling();
+  const res = await query(
+    `SELECT id, code, name, plan_type, price_idr, credits_per_unit, duration_months,
+            description, is_active, sort_order, created_at, updated_at
+       FROM plans
+      ORDER BY sort_order ASC, is_active DESC, price_idr ASC, name ASC`
+  );
+  return res.rows.map(mapPlan);
+}
+
+async function getPlanByIdForAdmin(planId, client = null) {
+  ensureDbBilling();
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT id, code, name, plan_type, price_idr, credits_per_unit, duration_months,
+            description, is_active, sort_order, created_at, updated_at
+       FROM plans
+      WHERE id = $1
+      LIMIT 1`,
+    [planId]
+  );
+  return mapPlan(res.rows[0]);
+}
+
+async function assertPlanCodeAvailable(code, excludeId = null, client = null) {
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT id
+       FROM plans
+      WHERE lower(code) = lower($1)
+        AND ($2::text IS NULL OR id <> $2)
+      LIMIT 1`,
+    [code, excludeId]
+  );
+  if (res.rows[0]) {
+    throw createClientError("Kode plan sudah digunakan.", 409, "PLAN_CODE_EXISTS");
+  }
+}
+
+function normalizePlanAdminPayload(payload = {}) {
+  const planType = String(payload.planType || payload.plan_type || "credit_pack").trim().toLowerCase();
+  if (!PLAN_TYPES.has(planType)) {
+    throw createClientError("Tipe plan tidak valid.");
+  }
+
+  return {
+    code: normalizePlanCode(payload.code),
+    name: normalizeRequiredText(payload.name, "Nama plan", 100),
+    planType,
+    priceIdr: normalizeNonNegativeInteger(payload.priceIdr ?? payload.price_idr ?? payload.price, 0),
+    creditsPerUnit: normalizeNonNegativeInteger(payload.creditsPerUnit ?? payload.credits_per_unit ?? payload.credits, 0),
+    durationMonths: normalizeNonNegativeInteger(payload.durationMonths ?? payload.duration_months ?? payload.validMonths, planType === "free" ? 0 : 1),
+    description: normalizeOptionalText(payload.description, 2000),
+    isActive: normalizeBoolean(payload.isActive ?? payload.is_active ?? payload.active, true),
+    sortOrder: normalizeNonNegativeInteger(payload.sortOrder ?? payload.sort_order, 0)
+  };
+}
+
+async function createPlanForAdmin(payload = {}) {
+  ensureDbBilling();
+  const next = normalizePlanAdminPayload(payload);
+  return withTransaction(async client => {
+    await assertPlanCodeAvailable(next.code, null, client);
+    const id = createOpaqueId("plan");
+    const res = await client.query(
+      `INSERT INTO plans (
+        id, code, name, plan_type, price_idr, credits_per_unit,
+        duration_months, description, is_active, sort_order
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, code, name, plan_type, price_idr, credits_per_unit, duration_months,
+                description, is_active, sort_order, created_at, updated_at`,
+      [
+        id,
+        next.code,
+        next.name,
+        next.planType,
+        next.priceIdr,
+        next.creditsPerUnit,
+        next.durationMonths,
+        next.description,
+        next.isActive,
+        next.sortOrder
+      ]
+    );
+    return mapPlan(res.rows[0]);
+  });
+}
+
+async function updatePlanForAdmin(planId, payload = {}) {
+  ensureDbBilling();
+  const next = normalizePlanAdminPayload(payload);
+  return withTransaction(async client => {
+    const existing = await getPlanByIdForAdmin(planId, client);
+    if (!existing) {
+      throw createClientError("Plan tidak ditemukan.", 404, "PLAN_NOT_FOUND");
+    }
+    await assertPlanCodeAvailable(next.code, planId, client);
+    const res = await client.query(
+      `UPDATE plans
+          SET code = $2,
+              name = $3,
+              plan_type = $4,
+              price_idr = $5,
+              credits_per_unit = $6,
+              duration_months = $7,
+              description = $8,
+              is_active = $9,
+              sort_order = $10,
+              updated_at = now()
+        WHERE id = $1
+      RETURNING id, code, name, plan_type, price_idr, credits_per_unit, duration_months,
+                description, is_active, sort_order, created_at, updated_at`,
+      [
+        planId,
+        next.code,
+        next.name,
+        next.planType,
+        next.priceIdr,
+        next.creditsPerUnit,
+        next.durationMonths,
+        next.description,
+        next.isActive,
+        next.sortOrder
+      ]
+    );
+    return mapPlan(res.rows[0]);
+  });
+}
+
+async function setPlanActiveForAdmin(planId, isActive) {
+  ensureDbBilling();
+  const res = await query(
+    `UPDATE plans
+        SET is_active = $2,
+            updated_at = now()
+      WHERE id = $1
+    RETURNING id, code, name, plan_type, price_idr, credits_per_unit, duration_months,
+              description, is_active, sort_order, created_at, updated_at`,
+    [planId, normalizeBoolean(isActive, true)]
+  );
+  if (!res.rows[0]) {
+    throw createClientError("Plan tidak ditemukan.", 404, "PLAN_NOT_FOUND");
+  }
+  return mapPlan(res.rows[0]);
+}
+
 async function getActivePlanByIdOrCode(planIdOrCode, client = null) {
   ensureDbBilling();
   const executor = client || { query };
@@ -254,6 +507,213 @@ async function getCouponUsageCounts(couponId, userId, client = null) {
     global: Number(globalRes.rows[0]?.count || 0),
     user: Number(userRes.rows[0]?.count || 0)
   };
+}
+
+async function listCouponsForAdmin() {
+  ensureDbBilling();
+  const res = await query(
+    `SELECT c.id, c.code, c.name, c.discount_type, c.discount_value, c.max_discount_idr,
+            c.min_order_amount_idr, c.applies_to_plan_id, c.usage_limit,
+            c.usage_limit_per_user, c.starts_at, c.expires_at, c.is_active,
+            c.created_at, c.updated_at, COALESCE(u.used_count, 0)::int AS used_count
+       FROM coupons c
+       LEFT JOIN (
+         SELECT coupon_id, COUNT(*)::int AS used_count
+           FROM coupon_usages
+          GROUP BY coupon_id
+       ) u ON u.coupon_id = c.id
+      ORDER BY c.is_active DESC, c.updated_at DESC, c.code ASC`
+  );
+  return res.rows.map(mapCoupon);
+}
+
+async function getCouponByIdForAdmin(couponId, client = null) {
+  ensureDbBilling();
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT c.id, c.code, c.name, c.discount_type, c.discount_value, c.max_discount_idr,
+            c.min_order_amount_idr, c.applies_to_plan_id, c.usage_limit,
+            c.usage_limit_per_user, c.starts_at, c.expires_at, c.is_active,
+            c.created_at, c.updated_at, COALESCE(u.used_count, 0)::int AS used_count
+       FROM coupons c
+       LEFT JOIN (
+         SELECT coupon_id, COUNT(*)::int AS used_count
+           FROM coupon_usages
+          GROUP BY coupon_id
+       ) u ON u.coupon_id = c.id
+      WHERE c.id = $1
+      LIMIT 1`,
+    [couponId]
+  );
+  return mapCoupon(res.rows[0]);
+}
+
+async function assertCouponCodeAvailable(code, excludeId = null, client = null) {
+  const executor = client || { query };
+  const res = await executor.query(
+    `SELECT id
+       FROM coupons
+      WHERE lower(code) = lower($1)
+        AND ($2::text IS NULL OR id <> $2)
+      LIMIT 1`,
+    [code, excludeId]
+  );
+  if (res.rows[0]) {
+    throw createClientError("Kode kupon sudah digunakan.", 409, "COUPON_CODE_EXISTS");
+  }
+}
+
+async function assertCouponPlanTargetExists(planId, client = null) {
+  if (!planId) return;
+  const plan = await getPlanByIdForAdmin(planId, client);
+  if (!plan) {
+    throw createClientError("Plan tujuan kupon tidak ditemukan.", 404, "COUPON_PLAN_NOT_FOUND");
+  }
+}
+
+function normalizeCouponAdminPayload(payload = {}) {
+  const rawDiscountType = String(payload.discountType || payload.discount_type || payload.type || "percent").trim().toLowerCase();
+  const discountType = rawDiscountType === "amount" ? "fixed_amount" : rawDiscountType;
+  if (!COUPON_DISCOUNT_TYPES.has(discountType)) {
+    throw createClientError("Tipe diskon kupon tidak valid.");
+  }
+
+  const startsAt = normalizeDateTime(payload.startsAt ?? payload.starts_at, { endOfDay: false });
+  const expiresAt = normalizeDateTime(payload.expiresAt ?? payload.expires_at ?? payload.endsAt, { endOfDay: true });
+  if (startsAt && expiresAt && startsAt.getTime() > expiresAt.getTime()) {
+    throw createClientError("Tanggal mulai kupon tidak boleh melewati tanggal berakhir.");
+  }
+
+  const maxDiscountIdr = payload.maxDiscountIdr ?? payload.max_discount_idr;
+  const appliesToPlanId = String(payload.appliesToPlanId ?? payload.applies_to_plan_id ?? "").trim() || null;
+
+  return {
+    code: normalizeCouponCodeForAdmin(payload.code),
+    name: normalizeOptionalText(payload.name, 120),
+    discountType,
+    discountValue: discountType === "free"
+      ? 0
+      : normalizeNonNegativeInteger(payload.discountValue ?? payload.discount_value ?? payload.value, 0),
+    maxDiscountIdr: maxDiscountIdr === null || maxDiscountIdr === undefined || String(maxDiscountIdr).trim() === ""
+      ? null
+      : normalizeNonNegativeInteger(maxDiscountIdr, 0),
+    minOrderAmountIdr: normalizeNonNegativeInteger(payload.minOrderAmountIdr ?? payload.min_order_amount_idr ?? payload.minOrder, 0),
+    appliesToPlanId,
+    usageLimit: normalizePositiveLimit(payload.usageLimit ?? payload.usage_limit),
+    usageLimitPerUser: normalizePositiveLimit(payload.usageLimitPerUser ?? payload.usage_limit_per_user),
+    startsAt,
+    expiresAt,
+    isActive: normalizeBoolean(payload.isActive ?? payload.is_active ?? payload.active, true)
+  };
+}
+
+async function createCouponForAdmin(payload = {}) {
+  ensureDbBilling();
+  const next = normalizeCouponAdminPayload(payload);
+  return withTransaction(async client => {
+    await assertCouponCodeAvailable(next.code, null, client);
+    await assertCouponPlanTargetExists(next.appliesToPlanId, client);
+    const id = createOpaqueId("coupon");
+    const res = await client.query(
+      `INSERT INTO coupons (
+        id, code, name, discount_type, discount_value, max_discount_idr,
+        min_order_amount_idr, applies_to_plan_id, usage_limit,
+        usage_limit_per_user, starts_at, expires_at, is_active
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id, code, name, discount_type, discount_value, max_discount_idr,
+                min_order_amount_idr, applies_to_plan_id, usage_limit,
+                usage_limit_per_user, starts_at, expires_at, is_active,
+                created_at, updated_at, 0::int AS used_count`,
+      [
+        id,
+        next.code,
+        next.name,
+        next.discountType,
+        next.discountValue,
+        next.maxDiscountIdr,
+        next.minOrderAmountIdr,
+        next.appliesToPlanId,
+        next.usageLimit,
+        next.usageLimitPerUser,
+        next.startsAt,
+        next.expiresAt,
+        next.isActive
+      ]
+    );
+    return mapCoupon(res.rows[0]);
+  });
+}
+
+async function updateCouponForAdmin(couponId, payload = {}) {
+  ensureDbBilling();
+  const next = normalizeCouponAdminPayload(payload);
+  return withTransaction(async client => {
+    const existing = await getCouponByIdForAdmin(couponId, client);
+    if (!existing) {
+      throw createClientError("Kupon tidak ditemukan.", 404, "COUPON_NOT_FOUND");
+    }
+    await assertCouponCodeAvailable(next.code, couponId, client);
+    await assertCouponPlanTargetExists(next.appliesToPlanId, client);
+    const res = await client.query(
+      `UPDATE coupons
+          SET code = $2,
+              name = $3,
+              discount_type = $4,
+              discount_value = $5,
+              max_discount_idr = $6,
+              min_order_amount_idr = $7,
+              applies_to_plan_id = $8,
+              usage_limit = $9,
+              usage_limit_per_user = $10,
+              starts_at = $11,
+              expires_at = $12,
+              is_active = $13,
+              updated_at = now()
+        WHERE id = $1
+      RETURNING id, code, name, discount_type, discount_value, max_discount_idr,
+                min_order_amount_idr, applies_to_plan_id, usage_limit,
+                usage_limit_per_user, starts_at, expires_at, is_active,
+                created_at, updated_at,
+                (SELECT COUNT(*)::int FROM coupon_usages WHERE coupon_id = coupons.id) AS used_count`,
+      [
+        couponId,
+        next.code,
+        next.name,
+        next.discountType,
+        next.discountValue,
+        next.maxDiscountIdr,
+        next.minOrderAmountIdr,
+        next.appliesToPlanId,
+        next.usageLimit,
+        next.usageLimitPerUser,
+        next.startsAt,
+        next.expiresAt,
+        next.isActive
+      ]
+    );
+    return mapCoupon(res.rows[0]);
+  });
+}
+
+async function setCouponActiveForAdmin(couponId, isActive) {
+  ensureDbBilling();
+  const res = await query(
+    `UPDATE coupons
+        SET is_active = $2,
+            updated_at = now()
+      WHERE id = $1
+    RETURNING id, code, name, discount_type, discount_value, max_discount_idr,
+              min_order_amount_idr, applies_to_plan_id, usage_limit,
+              usage_limit_per_user, starts_at, expires_at, is_active,
+              created_at, updated_at,
+              (SELECT COUNT(*)::int FROM coupon_usages WHERE coupon_id = coupons.id) AS used_count`,
+    [couponId, normalizeBoolean(isActive, true)]
+  );
+  if (!res.rows[0]) {
+    throw createClientError("Kupon tidak ditemukan.", 404, "COUPON_NOT_FOUND");
+  }
+  return mapCoupon(res.rows[0]);
 }
 
 function calculateDiscount(coupon, subtotal) {
@@ -995,6 +1455,14 @@ module.exports = {
   ORDER_STATUSES,
   CREDIT_SOURCE_PRIORITY,
   listActivePlans,
+  listPlansForAdmin,
+  createPlanForAdmin,
+  updatePlanForAdmin,
+  setPlanActiveForAdmin,
+  listCouponsForAdmin,
+  createCouponForAdmin,
+  updateCouponForAdmin,
+  setCouponActiveForAdmin,
   calculateOrderPricing,
   createOrder,
   cancelOrderForUser,

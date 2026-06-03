@@ -13,6 +13,14 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const { writeAuditLogSafe, getActorFromRequest } = require("../services/audit");
 const {
   listActivePlans,
+  listPlansForAdmin,
+  createPlanForAdmin,
+  updatePlanForAdmin,
+  setPlanActiveForAdmin,
+  listCouponsForAdmin,
+  createCouponForAdmin,
+  updateCouponForAdmin,
+  setCouponActiveForAdmin,
   calculateOrderPricing,
   createOrder,
   cancelOrderForUser,
@@ -101,6 +109,135 @@ function requireAdminUser(req, res) {
 
 router.use(requireAuth);
 router.use(rejectSuspendedMitra);
+
+router.get("/admin/plans", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const plans = await listPlansForAdmin();
+  res.json({ plans });
+}));
+
+router.post("/admin/plans", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const plan = await createPlanForAdmin(req.body || {});
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "billing.plan.created",
+    targetType: "plan",
+    targetId: plan.id,
+    detail: {
+      code: plan.code,
+      name: plan.name,
+      planType: plan.planType,
+      isActive: plan.isActive
+    }
+  });
+  res.status(201).json({ plan });
+}));
+
+router.patch("/admin/plans/:id", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const plan = await updatePlanForAdmin(req.params.id, req.body || {});
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "billing.plan.updated",
+    targetType: "plan",
+    targetId: plan.id,
+    detail: {
+      code: plan.code,
+      name: plan.name,
+      planType: plan.planType,
+      isActive: plan.isActive
+    }
+  });
+  res.json({ plan });
+}));
+
+router.patch("/admin/plans/:id/active", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const plan = await setPlanActiveForAdmin(req.params.id, req.body?.isActive ?? req.body?.is_active);
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: plan.isActive ? "billing.plan.activated" : "billing.plan.deactivated",
+    targetType: "plan",
+    targetId: plan.id,
+    detail: {
+      code: plan.code,
+      name: plan.name,
+      isActive: plan.isActive
+    }
+  });
+  res.json({ plan });
+}));
+
+router.get("/admin/coupons", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const coupons = await listCouponsForAdmin();
+  res.json({ coupons });
+}));
+
+router.post("/admin/coupons", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const coupon = await createCouponForAdmin(req.body || {});
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "billing.coupon.created",
+    targetType: "coupon",
+    targetId: coupon.id,
+    detail: {
+      code: coupon.code,
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue,
+      isActive: coupon.isActive
+    }
+  });
+  res.status(201).json({ coupon });
+}));
+
+router.patch("/admin/coupons/:id", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const coupon = await updateCouponForAdmin(req.params.id, req.body || {});
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: "billing.coupon.updated",
+    targetType: "coupon",
+    targetId: coupon.id,
+    detail: {
+      code: coupon.code,
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue,
+      isActive: coupon.isActive
+    }
+  });
+  res.json({ coupon });
+}));
+
+router.patch("/admin/coupons/:id/active", asyncHandler(async (req, res) => {
+  if (!requireAdminUser(req, res)) return;
+  const coupon = await setCouponActiveForAdmin(req.params.id, req.body?.isActive ?? req.body?.is_active);
+  const actor = getActorFromRequest(req);
+  await writeAuditLogSafe({
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    action: coupon.isActive ? "billing.coupon.activated" : "billing.coupon.deactivated",
+    targetType: "coupon",
+    targetId: coupon.id,
+    detail: {
+      code: coupon.code,
+      isActive: coupon.isActive
+    }
+  });
+  res.json({ coupon });
+}));
 
 router.get("/admin/orders", asyncHandler(async (req, res) => {
   if (!requireAdminUser(req, res)) return;

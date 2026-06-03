@@ -128,6 +128,7 @@
               <div class="admin-toolbar">
                 <button class="admin-tab-btn active" type="button" data-admin-billing-tab="plans">Plan</button>
                 <button class="admin-tab-btn" type="button" data-admin-billing-tab="coupons">Kupon</button>
+                <button class="btn btn-primary btn-compact" id="refreshAdminBillingBtn" type="button">Refresh</button>
               </div>
             </div>
 
@@ -391,11 +392,21 @@
         </div>
         <form class="form form-modal" id="adminPlanForm">
           <input type="hidden" name="id">
+          <label class="field"><span>Kode Plan</span><input name="code" type="text" placeholder="starter_monthly" required></label>
+          <label class="field">
+            <span>Tipe Plan</span>
+            <select name="planType" required>
+              <option value="free">Free</option>
+              <option value="subscription">Subscription</option>
+              <option value="credit_pack">Credit Pack</option>
+            </select>
+          </label>
           <label class="field"><span>Nama Plan</span><input name="name" type="text" required></label>
           <label class="field"><span>Deskripsi</span><input name="description" type="text" required></label>
           <label class="field"><span>Harga</span><input name="price" type="number" min="0" required></label>
           <label class="field"><span>Kredit</span><input name="credits" type="number" min="0" required></label>
-          <label class="field"><span>Masa Berlaku Hari</span><input name="validDays" type="number" min="1" required></label>
+          <label class="field"><span>Masa Berlaku Bulan</span><input name="durationMonths" type="number" min="0" required></label>
+          <label class="field"><span>Urutan</span><input name="sortOrder" type="number" min="0" required></label>
           <label class="admin-checkbox-line"><input name="active" type="checkbox"> Aktif</label>
           <div class="form-footer account-modal-footer">
             <button class="btn btn-ghost" type="button" data-admin-close="adminPlanModalBackdrop">Batal</button>
@@ -418,16 +429,26 @@
         <form class="form form-modal" id="adminCouponForm">
           <input type="hidden" name="id">
           <label class="field"><span>Kode Kupon</span><input name="code" type="text" required></label>
+          <label class="field"><span>Nama Kupon</span><input name="name" type="text" placeholder="Promo launching"></label>
           <label class="field">
             <span>Tipe Diskon</span>
             <select name="type" required>
               <option value="percent">Persen</option>
-              <option value="amount">Nominal</option>
+              <option value="fixed_amount">Nominal</option>
+              <option value="free">Gratis</option>
             </select>
           </label>
           <label class="field"><span>Nilai Diskon</span><input name="value" type="number" min="0" required></label>
+          <label class="field"><span>Maks Diskon</span><input name="maxDiscountIdr" type="number" min="0" placeholder="Kosongkan jika tidak ada"></label>
           <label class="field"><span>Minimum Transaksi</span><input name="minOrder" type="number" min="0"></label>
-          <label class="field"><span>Limit Penggunaan</span><input name="usageLimit" type="number" min="1" required></label>
+          <label class="field"><span>Limit Penggunaan</span><input name="usageLimit" type="number" min="1" placeholder="Kosongkan jika tidak dibatasi"></label>
+          <label class="field"><span>Limit per Akun</span><input name="usageLimitPerUser" type="number" min="1" placeholder="Kosongkan jika tidak dibatasi"></label>
+          <label class="field">
+            <span>Berlaku untuk Plan</span>
+            <select name="appliesToPlanId" id="adminCouponPlanSelect">
+              <option value="">Semua plan</option>
+            </select>
+          </label>
           <label class="field"><span>Mulai</span><input name="startsAt" type="date" required></label>
           <label class="field"><span>Berakhir</span><input name="endsAt" type="date" required></label>
           <label class="admin-checkbox-line"><input name="active" type="checkbox"> Aktif</label>
