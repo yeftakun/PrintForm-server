@@ -24,6 +24,7 @@
   const refreshLinkedClientsBtn = document.getElementById("refreshLinkedClientsBtn");
   const connectClientBtn = document.getElementById("connectClientBtn");
   const downloadClientBtn = document.getElementById("downloadClientBtn");
+  const downloadClientModalBackdrop = document.getElementById("downloadClientModalBackdrop");
 
   const statClientOnline = document.getElementById("statClientOnline");
   const statJobsToday = document.getElementById("statJobsToday");
@@ -3000,15 +3001,11 @@
   }
 
   function showDownloadInfo() {
-    if (window.PrintOrderAlert?.ok) {
-      window.PrintOrderAlert.ok({
-        title: "Download Klien",
-        message: "Paket installer desktop belum tersedia di folder public. Setelah file installer ditambahkan, tombol ini bisa diarahkan ke file tersebut.",
-        variant: "info"
-      });
+    if (downloadClientModalBackdrop) {
+      openModal(downloadClientModalBackdrop);
       return;
     }
-    window.alert("Paket installer desktop belum tersedia.");
+    window.location.href = "https://github.com/yeftakun/PrintForm/releases/download/1.3.0/PrintOrder-Setup-1.3.0.exe";
   }
 
   function showConnectClientInfo() {
@@ -3024,8 +3021,11 @@
   }
 
   function showHelpInfo(action) {
+    if (action === "download") {
+      showDownloadInfo();
+      return;
+    }
     const messages = {
-      download: ["Download aplikasi desktop", "Tambahkan file installer ke folder public agar tombol download dapat diarahkan langsung ke file tersebut."],
       install: ["Panduan instalasi", "Install client desktop, login dengan akun portal, pilih printer, lalu pastikan status client online."],
       troubleshoot: ["Troubleshooting", "Pastikan server aktif, client desktop login, printer terpilih, dan koneksi jaringan stabil."]
     };
@@ -3102,7 +3102,7 @@
       });
     });
 
-    [registerModalBackdrop, forgotPasswordModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, orderDetailModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, forgotPasswordModalBackdrop, downloadClientModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, orderDetailModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);

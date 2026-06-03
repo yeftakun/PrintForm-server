@@ -1503,6 +1503,70 @@ body.portal-dashboard-active .page {
   stroke-linejoin: round;
 }
 
+.download-client-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.download-client-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 12px 14px;
+  border: 1px solid #e6e9ee;
+  border-radius: 12px;
+  background: #fbfcfd;
+  color: #15171c;
+  text-decoration: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.download-client-card:hover {
+  border-color: #b6c4d8;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.09);
+  transform: translateY(-1px);
+}
+
+.windows-logo-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #f2f7ff;
+  color: #0078d4;
+}
+
+.windows-logo-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.download-client-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.download-client-copy strong {
+  color: #15171c;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.download-client-copy small,
+.download-client-size {
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.download-client-size {
+  white-space: nowrap;
+}
+
 .dashboard-user-menu-wrap {
   position: relative;
 }
