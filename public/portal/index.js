@@ -75,6 +75,8 @@
   const ordersTableBody = document.getElementById("ordersTableBody");
   const paymentProofModalBackdrop = document.getElementById("paymentProofModalBackdrop");
   const paymentProofForm = document.getElementById("paymentProofForm");
+  const paymentProofOrderMeta = document.getElementById("paymentProofOrderMeta");
+  const paymentProofInstructionText = document.getElementById("paymentProofInstructionText");
   const paymentProofStatus = document.getElementById("paymentProofStatus");
 
   const storeSettingsForm = document.getElementById("storeSettingsForm");
@@ -296,6 +298,18 @@
   function getDashboardTargetFromHash() {
     const hash = decodeURIComponent(String(window.location.hash || "").replace(/^#/, ""));
     return getDashboardTargetIds().includes(hash) ? hash : "dashboardStats";
+  }
+
+  function getUploadProofOrderIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return String(params.get("uploadProofOrderId") || "").trim();
+  }
+
+  function clearUploadProofOrderIdFromUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("uploadProofOrderId");
+    const nextSearch = url.searchParams.toString();
+    window.history.replaceState(null, "", `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || "#creditSection"}`);
   }
 
   function openDashboardSidebar() {
@@ -1962,10 +1976,36 @@
   }
 
   function openPaymentProofModal(orderId) {
-    activePaymentProofOrderId = orderId;
+    const safeOrderId = String(orderId || "").trim();
+    const order = latestOrders.find(item => item.id === safeOrderId);
+    activePaymentProofOrderId = safeOrderId;
     paymentProofForm.reset();
     setStatus(paymentProofStatus, "");
+    if (paymentProofOrderMeta) {
+      const pieces = order
+        ? [
+          order.plan?.name || order.planId || "Order",
+          formatCurrency(order.totalIdr || 0),
+          getOrderStatusLabel(order.status)
+        ]
+        : [`Order ${safeOrderId || "-"}`];
+      paymentProofOrderMeta.textContent = pieces.filter(Boolean).join(" - ");
+    }
+    if (paymentProofInstructionText) {
+      paymentProofInstructionText.textContent = order?.paymentInstruction
+        || "Transfer sesuai nominal order, lalu upload bukti pembayaran.";
+    }
     openModal(paymentProofModalBackdrop);
+  }
+
+  function openPaymentProofModalFromUrl() {
+    const orderId = getUploadProofOrderIdFromUrl();
+    if (!orderId) {
+      return;
+    }
+    activateDashboardPanel("creditSection", { closeSidebar: true, resetScroll: false });
+    openPaymentProofModal(orderId);
+    clearUploadProofOrderIdFromUrl();
   }
 
   async function cancelOrder(orderId) {
@@ -2305,6 +2345,7 @@
 
     renderAuthedState(user);
     await loadDashboardData();
+    openPaymentProofModalFromUrl();
   }
 
   async function submitLogin(event) {

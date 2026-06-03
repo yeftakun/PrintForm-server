@@ -15,9 +15,6 @@
   const couponCodeInput = document.getElementById("couponCodeInput");
   const checkCouponBtn = document.getElementById("checkCouponBtn");
   const createOrderBtn = document.getElementById("createOrderBtn");
-  const paymentInstructionBox = document.getElementById("paymentInstructionBox");
-  const paymentInstructionText = document.getElementById("paymentInstructionText");
-  const paymentResultActions = document.getElementById("paymentResultActions");
   const paymentStatus = document.getElementById("paymentStatus");
 
   let selectedPlan = null;
@@ -217,19 +214,12 @@
         })
       });
 
-      if (result.order?.paymentInstruction) {
-        paymentInstructionText.textContent = result.order.paymentInstruction;
-        paymentInstructionBox.classList.remove("hidden");
-      } else {
-        paymentInstructionBox.classList.add("hidden");
+      const params = new URLSearchParams();
+      if (result.order?.status === "pending_payment" && result.order?.id) {
+        params.set("uploadProofOrderId", result.order.id);
       }
-      paymentResultActions.classList.remove("hidden");
-      setStatus(
-        result.order?.status === "paid"
-          ? "Order paid otomatis dan kredit sudah ditambahkan."
-          : "Order dibuat. Silakan lakukan pembayaran manual lalu upload bukti dari halaman order.",
-        "success"
-      );
+      const query = params.toString();
+      window.location.href = `${PORTAL_HOME_PATH}${query ? `?${query}` : ""}#creditSection`;
     } catch (err) {
       createOrderBtn.disabled = false;
       setStatus(err.message || "Gagal membuat order.", "error");

@@ -700,6 +700,15 @@
           <button type="button" class="modal-close" data-close="paymentProofModalBackdrop" aria-label="Tutup">×</button>
         </div>
         <form class="form form-modal" id="paymentProofForm">
+          <div class="payment-proof-order-meta" id="paymentProofOrderMeta">Order pembayaran manual.</div>
+          <div class="payment-instruction-box">
+            <span>Rekening tujuan</span>
+            <p>no_rek (bank xxx).</p>
+          </div>
+          <div class="payment-instruction-box">
+            <span>Instruksi pembayaran</span>
+            <p id="paymentProofInstructionText">Transfer sesuai nominal order, lalu upload bukti pembayaran.</p>
+          </div>
           <label class="field">
             <span>File Bukti</span>
             <input type="file" name="proof" accept="image/*,application/pdf" required>

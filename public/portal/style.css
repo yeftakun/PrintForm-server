@@ -2234,6 +2234,16 @@ body.portal-dashboard-active .page {
   line-height: 1.45;
 }
 
+.payment-proof-order-meta {
+  padding: 10px 12px;
+  border: 1px solid #e6e9ee;
+  border-radius: 10px;
+  background: #fbfcfd;
+  color: #303a48;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .store-clients-panel {
   margin-top: 14px;
   padding: 14px;
