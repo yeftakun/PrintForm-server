@@ -1,6 +1,9 @@
 (() => {
   const adminWelcomeText = document.getElementById("adminWelcomeText");
   const adminUserChip = document.getElementById("adminUserChip");
+  const adminUserMenuBtn = document.getElementById("adminUserMenuBtn");
+  const adminUserMenu = document.getElementById("adminUserMenu");
+  const openAdminProfileBtn = document.getElementById("openAdminProfileBtn");
   const adminLogoutBtn = document.getElementById("adminLogoutBtn");
   const adminStatus = document.getElementById("adminStatus");
   const adminNavLinks = Array.from(document.querySelectorAll("[data-admin-target]"));
@@ -77,7 +80,13 @@
   const adminAuditSearchInput = document.getElementById("adminAuditSearchInput");
   const refreshAuditBtn = document.getElementById("refreshAuditBtn");
   const adminAuditList = document.getElementById("adminAuditList");
+  const adminProfileModalBackdrop = document.getElementById("adminProfileModalBackdrop");
+  const adminProfileForm = document.getElementById("adminProfileForm");
+  const adminPasswordForm = document.getElementById("adminPasswordForm");
+  const adminProfileStatus = document.getElementById("adminProfileStatus");
+  const adminPasswordStatus = document.getElementById("adminPasswordStatus");
 
+  let adminCurrentUser = null;
   let adminPaymentOrders = [];
   let adminOverviewSummary = null;
   let adminOverviewLoading = false;
@@ -328,6 +337,38 @@
     backdrop?.setAttribute("aria-hidden", "true");
   }
 
+  function setCurrentAdminUser(user) {
+    adminCurrentUser = user || null;
+    const username = adminCurrentUser?.username || "-";
+    adminWelcomeText.textContent = `Login admin ${username}`;
+    adminUserChip.textContent = adminCurrentUser?.username ? `@${adminCurrentUser.username}` : "Admin";
+  }
+
+  function closeAdminUserMenu() {
+    if (!adminUserMenu || !adminUserMenuBtn) return;
+    adminUserMenu.hidden = true;
+    adminUserMenuBtn.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleAdminUserMenu(forceOpen = null) {
+    if (!adminUserMenu || !adminUserMenuBtn) return;
+    const shouldOpen = forceOpen === null ? adminUserMenu.hidden : Boolean(forceOpen);
+    adminUserMenu.hidden = !shouldOpen;
+    adminUserMenuBtn.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+  }
+
+  function openAdminProfileModal() {
+    closeAdminUserMenu();
+    setInlineStatus(adminProfileStatus, "");
+    setInlineStatus(adminPasswordStatus, "");
+    if (adminProfileForm) {
+      adminProfileForm.elements.namedItem("username").value = adminCurrentUser?.username || "";
+      adminProfileForm.elements.namedItem("email").value = adminCurrentUser?.email || "";
+    }
+    adminPasswordForm?.reset();
+    openModal(adminProfileModalBackdrop);
+  }
+
   function formatCurrency(value) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -471,7 +512,7 @@
         label: "Perlu Tindak",
         value: formatNumber(stats.actionCount),
         tone: Number(stats.actionCount || 0) ? "warning" : "success",
-        caption: "Pembayaran, toko offline, job bermasalah"
+        caption: "Pembayaran dan toko offline"
       }
     ] : (() => {
       const paymentSource = getPaymentSource();
@@ -524,15 +565,6 @@
           detail: store.is_suspend ? "Toko suspended" : "Kredit habis",
           value: store.is_suspend ? "Suspended" : "Kredit",
           target: "adminStores"
-        })),
-      ...jobs
-        .filter(job => ["canceled", "rejected"].includes(job.status))
-        .slice(0, 2)
-        .map(job => ({
-          title: job.id,
-          detail: `${job.store} · ${statusLabel(job.status)}`,
-          value: "Cek",
-          target: "adminJobs"
         }))
     ];
 
@@ -1233,8 +1265,7 @@
         return;
       }
 
-      adminWelcomeText.textContent = `Login admin ${user.username || "-"}`;
-      adminUserChip.textContent = user.username ? `@${user.username}` : "Admin";
+      setCurrentAdminUser(user);
       renderAllUi();
       activatePanel("adminOverview");
       await loadOverviewSummary();
@@ -1246,11 +1277,80 @@
     }
   }
 
+  async function submitAdminProfile(event) {
+    event.preventDefault();
+    const submitButton = adminProfileForm.querySelector('button[type="submit"]');
+    const username = String(adminProfileForm.elements.namedItem("username").value || "").trim();
+    const email = String(adminProfileForm.elements.namedItem("email").value || "").trim();
+    if (!username) {
+      setInlineStatus(adminProfileStatus, "Username wajib diisi.", "error");
+      return;
+    }
+
+    submitButton.disabled = true;
+    setInlineStatus(adminProfileStatus, "Menyimpan profil...");
+    try {
+      const body = await window.PortalAuth.apiJson("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email })
+      });
+      const updatedUser = body.user || null;
+      if (updatedUser) {
+        const state = window.PortalAuth.getState();
+        window.PortalAuth.saveState({ ...state, user: updatedUser });
+        setCurrentAdminUser(updatedUser);
+      }
+      setInlineStatus(adminProfileStatus, "Profil berhasil diperbarui.", "success");
+    } catch (err) {
+      setInlineStatus(adminProfileStatus, err.message || "Gagal memperbarui profil.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  async function submitAdminPassword(event) {
+    event.preventDefault();
+    const submitButton = adminPasswordForm.querySelector('button[type="submit"]');
+    const currentPassword = String(adminPasswordForm.elements.namedItem("currentPassword").value || "");
+    const newPassword = String(adminPasswordForm.elements.namedItem("newPassword").value || "");
+    const newPasswordConfirm = String(adminPasswordForm.elements.namedItem("newPasswordConfirm").value || "");
+
+    if (newPassword.length < 8) {
+      setInlineStatus(adminPasswordStatus, "Password baru minimal 8 karakter.", "error");
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setInlineStatus(adminPasswordStatus, "Konfirmasi password baru tidak sama.", "error");
+      return;
+    }
+
+    submitButton.disabled = true;
+    setInlineStatus(adminPasswordStatus, "Menyimpan password...");
+    try {
+      await window.PortalAuth.apiJson("/api/auth/me/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      adminPasswordForm.reset();
+      setInlineStatus(adminPasswordStatus, "Password berhasil diperbarui.", "success");
+    } catch (err) {
+      setInlineStatus(adminPasswordStatus, err.message || "Gagal mengganti password.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
   adminNavLinks.forEach(link => {
     link.addEventListener("click", () => activatePanel(link.dataset.adminTarget));
   });
 
   document.addEventListener("click", event => {
+    if (!event.target.closest(".admin-account-menu")) {
+      closeAdminUserMenu();
+    }
+
     const jumpButton = event.target.closest("[data-admin-jump]");
     if (jumpButton) {
       activatePanel(jumpButton.dataset.adminJump);
@@ -1309,6 +1409,14 @@
   adminBillingTabButtons.forEach(button => {
     button.addEventListener("click", () => activateBillingTab(button.dataset.adminBillingTab));
   });
+
+  adminUserMenuBtn.addEventListener("click", event => {
+    event.stopPropagation();
+    toggleAdminUserMenu();
+  });
+  openAdminProfileBtn.addEventListener("click", openAdminProfileModal);
+  adminProfileForm.addEventListener("submit", submitAdminProfile);
+  adminPasswordForm.addEventListener("submit", submitAdminPassword);
 
   refreshOverviewBtn.addEventListener("click", () => loadOverviewSummary());
   refreshAdminPaymentsBtn.addEventListener("click", loadAdminPayments);
@@ -1456,7 +1564,8 @@
     adminStoreFilterModalBackdrop,
     adminStoreDetailModalBackdrop,
     adminJobFilterModalBackdrop,
-    adminJobDetailModalBackdrop
+    adminJobDetailModalBackdrop,
+    adminProfileModalBackdrop
   ].forEach(backdrop => {
     backdrop.addEventListener("click", event => {
       if (event.target === backdrop) closeModal(backdrop);

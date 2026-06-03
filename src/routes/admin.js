@@ -164,7 +164,7 @@ function buildStats({ orders, kiosks, clients, jobs }, now = new Date()) {
       active: activeJobs,
       problem: problemJobs
     },
-    actionCount: waitingPayments + offlineStores + problemJobs
+    actionCount: waitingPayments + offlineStores
   };
 }
 
@@ -193,19 +193,7 @@ function buildActionQueue({ orders, kiosks, jobs }) {
         value: "Offline",
         target: "adminStores",
         priority: "medium"
-      })),
-    ...jobs
-      .filter(job => PROBLEM_JOB_STATUSES.has(String(job.status || "").toLowerCase()))
-      .slice(0, 4)
-      .map(job => ({
-        id: `job-${job.id}`,
-        type: "job",
-        title: job.id,
-        detail: `${job.originalName || "File"} · ${job.status}`,
-        value: "Cek",
-        target: "adminJobs",
-        priority: "medium"
-      }))
+    }))
   ].slice(0, 8);
 }
 
@@ -225,11 +213,6 @@ function buildSignals({ stats, errors, generatedAt }) {
       title: "Client online",
       value: `${stats.clients.online}/${stats.clients.total} client online`,
       status: stats.clients.online > 0 || stats.clients.total === 0 ? "Normal" : "Perlu cek"
-    },
-    {
-      title: "Job bermasalah",
-      value: `${stats.jobs.problem} dari ${stats.jobs.total} job`,
-      status: stats.jobs.problem > 0 ? "Perlu cek" : "Normal"
     },
     {
       title: "Data summary",

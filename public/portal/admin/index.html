@@ -17,9 +17,15 @@
           </div>
         </div>
         <div class="admin-topbar-actions">
-          <span class="status-pill online">Sistem aktif</span>
-          <span class="admin-user-chip" id="adminUserChip">Admin</span>
-          <button class="btn btn-ghost btn-compact" id="adminLogoutBtn" type="button">Logout</button>
+          <div class="admin-account-menu">
+            <button class="admin-user-chip" id="adminUserMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span id="adminUserChip">Admin</span>
+            </button>
+            <div class="admin-account-dropdown" id="adminUserMenu" role="menu" hidden>
+              <button type="button" id="openAdminProfileBtn" role="menuitem">Profil</button>
+              <button type="button" id="adminLogoutBtn" role="menuitem">Logout</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -506,6 +512,46 @@
         <div class="admin-detail-grid" id="adminJobDetailBody"></div>
         <div class="form-footer account-modal-footer">
           <button class="btn btn-ghost" type="button" data-admin-close="adminJobDetailModalBackdrop">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="adminProfileModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide admin-profile-modal" role="dialog" aria-modal="true" aria-labelledby="adminProfileModalTitle">
+        <div class="modal-header jobs-modal-header">
+          <div class="modal-copy">
+            <h2 id="adminProfileModalTitle">Profil Admin</h2>
+            <p>Kelola data akun dan password admin yang sedang login.</p>
+          </div>
+          <button type="button" class="modal-close" data-admin-close="adminProfileModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="admin-profile-grid">
+          <form class="form form-modal admin-profile-form" id="adminProfileForm">
+            <div class="admin-profile-form-head">
+              <h3>Update Profil</h3>
+            </div>
+            <label class="field"><span>Username</span><input name="username" type="text" autocomplete="username" required></label>
+            <label class="field"><span>Email</span><input name="email" type="email" autocomplete="email"></label>
+            <div class="form-footer account-modal-footer">
+              <button class="btn btn-ghost" type="button" data-admin-close="adminProfileModalBackdrop">Batal</button>
+              <button class="btn btn-primary" type="submit">Simpan Profil</button>
+            </div>
+            <div class="status" id="adminProfileStatus" role="status"></div>
+          </form>
+
+          <form class="form form-modal admin-profile-form" id="adminPasswordForm">
+            <div class="admin-profile-form-head">
+              <h3>Ganti Password</h3>
+            </div>
+            <label class="field"><span>Password Lama</span><input name="currentPassword" type="password" autocomplete="current-password" required></label>
+            <label class="field"><span>Password Baru</span><input name="newPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+            <label class="field"><span>Ulang Password Baru</span><input name="newPasswordConfirm" type="password" autocomplete="new-password" minlength="8" required></label>
+            <div class="form-footer account-modal-footer">
+              <button class="btn btn-ghost" type="button" data-admin-close="adminProfileModalBackdrop">Batal</button>
+              <button class="btn btn-primary" type="submit">Simpan Password</button>
+            </div>
+            <div class="status" id="adminPasswordStatus" role="status"></div>
+          </form>
         </div>
       </div>
     </div>

@@ -3626,9 +3626,58 @@ body.portal-dashboard-active .page {
 
 .admin-user-chip {
   max-width: 180px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e6ebf1;
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-user-chip:hover,
+.admin-user-chip[aria-expanded="true"] {
+  border-color: #ffd8c8;
+  color: #c64721;
+  background: #fff3ed;
+}
+
+.admin-account-menu {
+  position: relative;
+}
+
+.admin-account-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 15;
+  min-width: 150px;
+  padding: 6px;
+  border: 1px solid #e6ebf1;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.16);
+}
+
+.admin-account-dropdown button {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  font-size: 0.88rem;
+  font-weight: 850;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-account-dropdown button:hover {
+  color: #c64721;
+  background: #fff3ed;
 }
 
 .admin-layout {
@@ -3757,6 +3806,29 @@ body.portal-dashboard-active .page {
 
 .admin-sync-text.error {
   color: #b42318;
+}
+
+.admin-profile-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.admin-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.admin-profile-form {
+  align-content: start;
+  gap: 13px;
+}
+
+.admin-profile-form-head h3 {
+  margin: 0;
+  color: #101828;
+  font-size: 1rem;
+  line-height: 1.2;
 }
 
 .admin-tab-btn {
@@ -4273,6 +4345,21 @@ body.portal-dashboard-active .page {
   .admin-stat-grid,
   .admin-billing-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-account-menu,
+  .admin-user-chip {
+    width: 100%;
+  }
+
+  .admin-account-dropdown {
+    left: 0;
+    right: auto;
+    width: 100%;
   }
 
   .admin-row-actions {
