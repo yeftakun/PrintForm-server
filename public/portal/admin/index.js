@@ -78,8 +78,15 @@
   const adminJobDetailBody = document.getElementById("adminJobDetailBody");
 
   const adminAuditSearchInput = document.getElementById("adminAuditSearchInput");
+  const adminAuditDateInput = document.getElementById("adminAuditDateInput");
   const refreshAuditBtn = document.getElementById("refreshAuditBtn");
   const adminAuditList = document.getElementById("adminAuditList");
+  const adminAuditPageSizeSelect = document.getElementById("adminAuditPageSizeSelect");
+  const adminAuditFirstPageBtn = document.getElementById("adminAuditFirstPageBtn");
+  const adminAuditPrevPageBtn = document.getElementById("adminAuditPrevPageBtn");
+  const adminAuditNextPageBtn = document.getElementById("adminAuditNextPageBtn");
+  const adminAuditLastPageBtn = document.getElementById("adminAuditLastPageBtn");
+  const adminAuditPageText = document.getElementById("adminAuditPageText");
   const adminProfileModalBackdrop = document.getElementById("adminProfileModalBackdrop");
   const adminProfileForm = document.getElementById("adminProfileForm");
   const adminPasswordForm = document.getElementById("adminPasswordForm");
@@ -97,6 +104,11 @@
   let adminJobsLoaded = false;
   let adminJobsLoading = false;
   let adminJobsError = "";
+  let adminAuditRows = [];
+  let adminAuditLoading = false;
+  let adminAuditError = "";
+  let adminAuditTotal = 0;
+  let adminAuditTotalPages = 1;
   let activeReviewOrderId = null;
   let activeStoreId = null;
   const paymentFilterState = {
@@ -120,7 +132,10 @@
     date: ""
   };
   const auditFilterState = {
-    search: ""
+    search: "",
+    date: "",
+    page: 1,
+    perPage: "20"
   };
 
   let plans = [
@@ -1343,18 +1358,94 @@
     `;
   }
 
+  function formatAuditDetail(detail) {
+    if (!detail) return "-";
+    if (typeof detail === "string") return detail;
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return "-";
+    }
+  }
+
+  function renderAuditPagination() {
+    const isAll = auditFilterState.perPage === "all";
+    const currentPage = isAll ? 1 : Number(auditFilterState.page || 1);
+    const totalPages = isAll ? 1 : Math.max(1, Number(adminAuditTotalPages || 1));
+    if (adminAuditPageText) {
+      adminAuditPageText.textContent = isAll
+        ? `Semua (${formatNumber(adminAuditTotal)} aktivitas)`
+        : `Page ${formatNumber(currentPage)} / ${formatNumber(totalPages)} · ${formatNumber(adminAuditTotal)} aktivitas`;
+    }
+    [adminAuditFirstPageBtn, adminAuditPrevPageBtn].forEach(button => {
+      if (button) button.disabled = isAll || currentPage <= 1 || adminAuditLoading;
+    });
+    [adminAuditNextPageBtn, adminAuditLastPageBtn].forEach(button => {
+      if (button) button.disabled = isAll || currentPage >= totalPages || adminAuditLoading;
+    });
+  }
+
   function renderAudit() {
-    const search = auditFilterState.search.trim().toLowerCase();
-    const rows = audits.filter(item => !search || [item.actor, item.action, item.target, item.detail, item.group].join(" ").toLowerCase().includes(search));
-    adminAuditList.innerHTML = rows.length ? rows.map(item => `
+    if (adminAuditLoading && !adminAuditRows.length) {
+      adminAuditList.innerHTML = '<div class="admin-empty">Memuat audit...</div>';
+      renderAuditPagination();
+      return;
+    }
+    if (adminAuditError) {
+      adminAuditList.innerHTML = `<div class="admin-empty">${escapeHtml(adminAuditError)}</div>`;
+      renderAuditPagination();
+      return;
+    }
+    adminAuditList.innerHTML = adminAuditRows.length ? adminAuditRows.map(item => `
       <article class="admin-audit-item">
-        <time>${escapeHtml(item.time)}</time>
+        <time>${escapeHtml(formatDateTime(item.createdAt))}</time>
         <div>
           <strong>${escapeHtml(item.action)}</strong>
-          <span>${escapeHtml(item.group)} · ${escapeHtml(item.actor)} · ${escapeHtml(item.target)} · ${escapeHtml(item.detail)}</span>
+          <span>${escapeHtml(item.actorType || "-")} · ${escapeHtml(item.actorId || "-")} · ${escapeHtml(item.targetType || "-")} · ${escapeHtml(item.targetId || "-")} · ${escapeHtml(formatAuditDetail(item.detail))}</span>
         </div>
       </article>
-    `).join("") : '<div class="admin-empty">Tidak ada aktivitas sesuai pencarian.</div>';
+    `).join("") : '<div class="admin-empty">Tidak ada aktivitas sesuai filter.</div>';
+    renderAuditPagination();
+  }
+
+  async function loadAdminAudit({ silent = false } = {}) {
+    adminAuditLoading = true;
+    adminAuditError = "";
+    if (!silent) setStatus("Memuat audit...");
+    renderAudit();
+    const params = new URLSearchParams();
+    params.set("page", String(auditFilterState.page || 1));
+    params.set("perPage", auditFilterState.perPage || "20");
+    if (auditFilterState.search) params.set("search", auditFilterState.search);
+    if (auditFilterState.date) params.set("date", auditFilterState.date);
+    try {
+      const body = await window.PortalAuth.apiJson(`/api/admin/audit?${params.toString()}`, { method: "GET" });
+      adminAuditRows = Array.isArray(body.logs) ? body.logs : [];
+      adminAuditTotal = Number(body.total || 0);
+      adminAuditTotalPages = Number(body.totalPages || 1);
+      auditFilterState.page = Number(body.page || auditFilterState.page || 1);
+      auditFilterState.perPage = String(body.perPage || auditFilterState.perPage || "20");
+      if (adminAuditPageSizeSelect) adminAuditPageSizeSelect.value = auditFilterState.perPage;
+      adminAuditError = "";
+      renderAudit();
+      if (!silent) setStatus("");
+    } catch (err) {
+      adminAuditRows = [];
+      adminAuditTotal = 0;
+      adminAuditTotalPages = 1;
+      adminAuditError = err.message || "Gagal memuat audit.";
+      renderAudit();
+      if (!silent) setStatus(adminAuditError, "error");
+    } finally {
+      adminAuditLoading = false;
+      renderAuditPagination();
+    }
+  }
+
+  function setAuditPage(page) {
+    const totalPages = Math.max(1, Number(adminAuditTotalPages || 1));
+    auditFilterState.page = Math.min(Math.max(Number(page) || 1, 1), totalPages);
+    loadAdminAudit();
   }
 
   function renderAllUi() {
@@ -1390,7 +1481,8 @@
       await Promise.all([
         loadAdminPayments({ silent: true }),
         loadAdminStores({ silent: true }),
-        loadAdminJobs({ silent: true })
+        loadAdminJobs({ silent: true }),
+        loadAdminAudit({ silent: true })
       ]);
       setStatus("");
     } catch {
@@ -1660,11 +1752,25 @@
 
   adminAuditSearchInput.addEventListener("input", () => {
     auditFilterState.search = adminAuditSearchInput.value || "";
-    renderAudit();
+    auditFilterState.page = 1;
+    loadAdminAudit();
   });
+  adminAuditDateInput.addEventListener("change", () => {
+    auditFilterState.date = adminAuditDateInput.value || "";
+    auditFilterState.page = 1;
+    loadAdminAudit();
+  });
+  adminAuditPageSizeSelect.addEventListener("change", () => {
+    auditFilterState.perPage = adminAuditPageSizeSelect.value || "20";
+    auditFilterState.page = 1;
+    loadAdminAudit();
+  });
+  adminAuditFirstPageBtn.addEventListener("click", () => setAuditPage(1));
+  adminAuditPrevPageBtn.addEventListener("click", () => setAuditPage(Number(auditFilterState.page || 1) - 1));
+  adminAuditNextPageBtn.addEventListener("click", () => setAuditPage(Number(auditFilterState.page || 1) + 1));
+  adminAuditLastPageBtn.addEventListener("click", () => setAuditPage(adminAuditTotalPages));
   refreshAuditBtn.addEventListener("click", () => {
-    renderAudit();
-    setStatus("Audit UI disegarkan.");
+    loadAdminAudit();
   });
 
   document.querySelectorAll("[data-admin-close]").forEach(button => {

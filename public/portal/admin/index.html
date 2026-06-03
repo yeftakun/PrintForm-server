@@ -271,11 +271,30 @@
                 <h1>Aktivitas Terbaru</h1>
               </div>
               <div class="admin-toolbar">
+                <input class="admin-inline-search" id="adminAuditDateInput" type="date" aria-label="Filter hari audit">
                 <input class="admin-inline-search" id="adminAuditSearchInput" type="search" placeholder="Cari actor, action, target...">
                 <button class="btn btn-outline btn-compact" id="refreshAuditBtn" type="button">Refresh</button>
               </div>
             </div>
             <div class="admin-audit-list" id="adminAuditList"></div>
+            <div class="admin-audit-footer">
+              <div class="jobs-page-size">
+                <span>Tampilkan</span>
+                <select id="adminAuditPageSizeSelect">
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="all">Semua</option>
+                </select>
+              </div>
+              <div class="jobs-pagination-actions">
+                <button class="btn btn-ghost btn-compact" id="adminAuditFirstPageBtn" type="button">First</button>
+                <button class="btn btn-ghost btn-compact" id="adminAuditPrevPageBtn" type="button">Prev</button>
+                <span class="admin-page-indicator" id="adminAuditPageText">Page 1 / 1</span>
+                <button class="btn btn-ghost btn-compact" id="adminAuditNextPageBtn" type="button">Next</button>
+                <button class="btn btn-ghost btn-compact" id="adminAuditLastPageBtn" type="button">Last</button>
+              </div>
+            </div>
           </section>
 
           <div class="status admin-status" id="adminStatus" role="status"></div>

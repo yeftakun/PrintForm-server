@@ -2,8 +2,9 @@ const express = require("express");
 const { secureDelete } = require("../utils/secureDelete");
 const { getSessions, saveSessions } = require("../repositories/sessionsRepository");
 const { getClients, updateClientPresence } = require("../repositories/clientsRepository");
-const { getUserByStoreCode } = require("../repositories/usersRepository");
+const { getUserById, getUserByStoreCode } = require("../repositories/usersRepository");
 const { getOperationalState } = require("../utils/storeOperational");
+const { isUserSuspended } = require("../utils/suspension");
 const { getJobs, saveJobs } = require("../repositories/jobsRepository");
 const {
   SESSION_CREATE_CONFIRM_TIMEOUT_MS,
@@ -167,6 +168,14 @@ router.post("/", asyncHandler(async (req, res) => {
       });
       return;
     }
+    if (isUserSuspended(storeUser)) {
+      res.status(409).json({
+        error: "Toko sedang disuspend.",
+        code: "STORE_SUSPENDED",
+        kodeToko
+      });
+      return;
+    }
     const config = storeUser.konfigurasiToko && typeof storeUser.konfigurasiToko === "object"
       ? storeUser.konfigurasiToko
       : {};
@@ -205,6 +214,18 @@ router.post("/", asyncHandler(async (req, res) => {
   if (!clientId && !kioskId) {
     res.status(400).json({ error: "kioskId, kodeToko, or clientId is required" });
     return;
+  }
+
+  if (kioskId) {
+    const kioskUser = await getUserById(kioskId);
+    if (isUserSuspended(kioskUser)) {
+      res.status(409).json({
+        error: "Toko sedang disuspend.",
+        code: "STORE_SUSPENDED",
+        kioskId
+      });
+      return;
+    }
   }
 
   const clients = await getClients();

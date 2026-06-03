@@ -2,7 +2,7 @@ const express = require("express");
 const { requireAuth } = require("../middleware/auth");
 const { getClients } = require("../repositories/clientsRepository");
 const { getJobs } = require("../repositories/jobsRepository");
-const { listRecentAuditLogs } = require("../repositories/auditLogsRepository");
+const { listAuditLogs, listRecentAuditLogs } = require("../repositories/auditLogsRepository");
 const {
   getUserById,
   listMitraUsers,
@@ -649,6 +649,17 @@ router.get("/jobs/:id", asyncHandler(async (req, res) => {
       clientMap: context.clientMap
     })
   });
+}));
+
+router.get("/audit", asyncHandler(async (req, res) => {
+  const result = await listAuditLogs({
+    page: req.query.page,
+    perPage: req.query.perPage,
+    search: req.query.search,
+    date: req.query.date
+  });
+
+  res.json(result);
 }));
 
 module.exports = router;

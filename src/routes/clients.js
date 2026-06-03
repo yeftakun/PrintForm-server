@@ -30,6 +30,7 @@ const {
   normalizeOperationalSchedule,
   summarizeOperationalSchedule
 } = require("../utils/storeOperational");
+const { isUserSuspended } = require("../utils/suspension");
 const {
   getClientReadiness,
   withClientStatus,
@@ -203,6 +204,7 @@ function toPublicStore(user, storeClients = []) {
     : {};
   const operationalState = getOperationalState(config);
   const operationalStatus = operationalState.status;
+  const isSuspended = isUserSuspended(user);
   const isClosed = operationalStatus === "closed";
   return {
     id: user.id,
@@ -212,9 +214,11 @@ function toPublicStore(user, storeClients = []) {
     profilePhotoUrl: getStoreProfilePhotoUrl(user),
     alamat: user.alamat || "Alamat belum diatur",
     jamOperasional: getStoreHours(user),
-    status: isClosed ? "closed" : summary.status,
-    readiness: isClosed ? "closed" : summary.readiness,
-    canStartSession: !isClosed && summary.canStartSession,
+    status: isSuspended ? "suspended" : isClosed ? "closed" : summary.status,
+    readiness: isSuspended ? "suspended" : isClosed ? "closed" : summary.readiness,
+    canStartSession: !isSuspended && !isClosed && summary.canStartSession,
+    isSuspend: isSuspended,
+    is_suspend: isSuspended,
     targetClientId: summary.targetClientId,
     targetClientName: summary.targetClientName,
     clientCount: summary.clientCount,

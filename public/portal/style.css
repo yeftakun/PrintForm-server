@@ -3942,6 +3942,25 @@ body.portal-dashboard-active .page {
   gap: 10px;
 }
 
+.admin-audit-footer {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid #e7ecf2;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #ffffff;
+}
+
+.admin-page-indicator {
+  color: #475467;
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
 .admin-queue-item,
 .admin-signal-item,
 .admin-audit-item {

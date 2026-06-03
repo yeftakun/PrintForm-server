@@ -27,6 +27,7 @@ const {
   normalizeContentScale,
   normalizeNotes
 } = require("../utils/normalize");
+const { isUserSuspended } = require("../utils/suspension");
 const { toPublicJob } = require("../utils/publicMapper");
 const { isSessionActive } = require("../services/status");
 const { cleanupExpiredSessions } = require("../services/cleanup");
@@ -1256,6 +1257,18 @@ router.post("/", uploadDocument, asyncHandler(async (req, res) => {
     await removeUploadedDocument(req);
     res.status(400).json({ error: "Session is not active" });
     return;
+  }
+
+  if (session.ownerUserId) {
+    const ownerUser = await getUserById(session.ownerUserId);
+    if (isUserSuspended(ownerUser)) {
+      await removeUploadedDocument(req);
+      res.status(409).json({
+        error: "Toko sedang disuspend.",
+        code: "STORE_SUSPENDED"
+      });
+      return;
+    }
   }
 
   const accessibleClientIds = await buildAccessibleClientIdSet(req.user);

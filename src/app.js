@@ -4,6 +4,7 @@ const { rootDir, profilePhotosDir } = require("./config");
 const { requestLogger } = require("./middleware/requestLogger");
 const { errorHandler } = require("./middleware/errorHandler");
 const { optionalAuth } = require("./middleware/auth");
+const { rejectSuspendedMitra } = require("./middleware/suspension");
 const healthRouter = require("./routes/health");
 const authRouter = require("./routes/auth");
 const clientsRouter = require("./routes/clients");
@@ -31,9 +32,9 @@ function createApp() {
   app.use("/api/auth", authRouter);
 
   // Customer flow on `/` is guest-first; routes still receive `req.user` when bearer token exists.
-  app.use("/api/clients", optionalAuth, clientsRouter);
-  app.use("/api/sessions", optionalAuth, sessionsRouter);
-  app.use("/api/jobs", optionalAuth, jobsRouter);
+  app.use("/api/clients", optionalAuth, rejectSuspendedMitra, clientsRouter);
+  app.use("/api/sessions", optionalAuth, rejectSuspendedMitra, sessionsRouter);
+  app.use("/api/jobs", optionalAuth, rejectSuspendedMitra, jobsRouter);
   app.use("/api/billing", billingRouter);
   app.use("/api/admin", adminRouter);
 

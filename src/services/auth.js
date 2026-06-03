@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { isUserSuspended } = require("../utils/suspension");
 const {
   AUTH_ACCESS_TOKEN_SECRET,
   AUTH_REFRESH_TOKEN_SECRET,
@@ -31,6 +32,8 @@ function toPublicUser(user) {
     role: user.role || "mitra",
     createdAt: user.createdAt || null,
     hasPin: Boolean(user.pinHash),
+    isSuspend: isUserSuspended(user),
+    is_suspend: isUserSuspended(user),
     alamat: user.alamat || null,
     konfigurasiToko: user.konfigurasiToko || {},
     kodeToko: user.kodeToko || null

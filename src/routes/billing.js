@@ -8,6 +8,7 @@ const {
   PAYMENT_MANUAL_INSTRUCTIONS
 } = require("../config");
 const { requireAuth } = require("../middleware/auth");
+const { rejectSuspendedMitra } = require("../middleware/suspension");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { writeAuditLogSafe, getActorFromRequest } = require("../services/audit");
 const {
@@ -99,6 +100,7 @@ function requireAdminUser(req, res) {
 }
 
 router.use(requireAuth);
+router.use(rejectSuspendedMitra);
 
 router.get("/admin/orders", asyncHandler(async (req, res) => {
   if (!requireAdminUser(req, res)) return;
