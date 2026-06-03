@@ -1801,6 +1801,11 @@
   paymentFilterState.date = todayInputValue();
   storeFilterState.suspend = "all";
   jobFilterState.date = todayInputValue();
+  window.PortalAuth.startSessionWatcher({
+    idleTimeoutMs: 10 * 60 * 1000,
+    loginPath: "/portal/",
+    scope: "admin"
+  });
   activateBillingTab("plans");
   renderAllUi();
   loadAdminPortal();

@@ -181,5 +181,11 @@
   passwordForm.addEventListener("submit", onPasswordSubmit);
   pinForm.addEventListener("submit", onPinSubmit);
 
+  window.PortalAuth.startSessionWatcher({
+    idleTimeoutMs: 2 * 60 * 60 * 1000,
+    loginPath: "/portal/",
+    scope: "mitra"
+  });
+
   loadCurrentUser();
 })();

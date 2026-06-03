@@ -249,6 +249,12 @@
     }
   });
 
+  window.PortalAuth.startSessionWatcher({
+    idleTimeoutMs: 2 * 60 * 60 * 1000,
+    loginPath: "/portal/",
+    scope: "mitra"
+  });
+
   loadPaymentPage().catch(err => {
     setStatus(err.message || "Gagal memuat payment page.", "error");
     createOrderBtn.disabled = true;

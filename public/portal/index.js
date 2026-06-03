@@ -2897,6 +2897,11 @@
   initializeDateStates();
   bindModalHandlers();
   bindActionHandlers();
+  window.PortalAuth.startSessionWatcher({
+    idleTimeoutMs: 2 * 60 * 60 * 1000,
+    loginPath: "/portal/",
+    scope: "mitra"
+  });
   renderAuthState();
   setInterval(() => {
     updateOperationalUi({ autoCloseOutsideHours: true });
