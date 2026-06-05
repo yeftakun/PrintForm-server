@@ -870,11 +870,14 @@
   }
 
   function getPlanUnitPriceText(plan) {
-    const code = String(plan?.code || "").toLowerCase();
-    const name = String(plan?.name || "").toLowerCase();
-    if (code.includes("starter") || name === "starter") return "± Rp13 / tugas";
-    if (code.includes("pro") || name === "pro") return "± Rp8 / tugas";
-    return "";
+    const planType = String(plan?.planType || "").toLowerCase();
+    const priceIdr = Number(plan?.priceIdr || 0);
+    const creditsPerUnit = Number(plan?.creditsPerUnit || 0);
+    if (planType !== "subscription" || priceIdr <= 0 || creditsPerUnit <= 0) {
+      return "";
+    }
+
+    return `± ${formatCurrency(priceIdr / creditsPerUnit)} / tugas`;
   }
 
   function isProPlan(plan) {
