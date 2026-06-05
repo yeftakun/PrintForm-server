@@ -3,3 +3,5 @@ node_modules/
 temp/
 # storage/
 uploads/
+.env.backup
+export_file.vps.sql
