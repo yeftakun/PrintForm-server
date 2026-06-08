@@ -2715,6 +2715,27 @@ th {
   position: relative;
 }
 
+.session-file-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.session-upload-form .field .session-format-badge {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid rgba(39, 126, 79, 0.28);
+  border-radius: 8px;
+  background: #edf8f1;
+  color: #287348;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .session-upload-form input,
 .session-upload-form select,
 .session-upload-form textarea {
@@ -2757,6 +2778,14 @@ th {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session-file-hint {
+  margin: -2px 0 0;
+  color: #6f655d;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .session-file-input {

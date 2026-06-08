@@ -129,11 +129,15 @@
 
             <form id="uploadForm" class="session-upload-form">
               <label class="field session-file-field">
-                <span>Dokumen</span>
+                <span class="session-file-label">
+                  <span>Dokumen</span>
+                  <span class="session-format-badge">Direkomendasikan PDF</span>
+                </span>
                 <div class="session-file-picker">
                   <button id="chooseDocumentBtn" class="session-file-button" type="button">Pilih Dokumen</button>
                   <span id="selectedDocumentName" class="session-file-name">Belum ada dokumen</span>
                 </div>
+                <p class="session-file-hint">PDF menjaga format, ukuran halaman, dan hasil cetak lebih konsisten.</p>
                 <input class="session-file-input" type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
               </label>
 
