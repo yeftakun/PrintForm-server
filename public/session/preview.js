@@ -54,6 +54,17 @@ const PAPER_DIMENSIONS_MM = {
   KWARTO: [216, 279],
   AMPLOP: [110, 220]
 };
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set([".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".ppt", ".pptx"]);
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+]);
+const UNSUPPORTED_DOCUMENT_MESSAGE = "Format dokumen tidak didukung. Gunakan PDF, Word, PowerPoint, JPG, JPEG, atau PNG.";
 
 const previewState = {
   fileName: "",
@@ -217,6 +228,29 @@ function canonicalPaperSize(value) {
 function getPaperSizeLabel(value) {
   const canonical = canonicalPaperSize(value);
   return PAPER_SIZE_LABELS[canonical] || String(value || "-");
+}
+
+function getFileExtension(file) {
+  const name = String(file?.name || "");
+  const dotIndex = name.lastIndexOf(".");
+  return dotIndex >= 0 ? name.slice(dotIndex).toLowerCase() : "";
+}
+
+function isAllowedDocumentFile(file) {
+  const extension = getFileExtension(file);
+  const mimeType = String(file?.type || "").trim().toLowerCase();
+  return Boolean(
+    (extension && ALLOWED_DOCUMENT_EXTENSIONS.has(extension))
+    || (mimeType && ALLOWED_DOCUMENT_MIME_TYPES.has(mimeType))
+  );
+}
+
+function normalizePreviewContentScale(value) {
+  const scale = Number.parseInt(value, 10);
+  if (!Number.isFinite(scale)) {
+    return 100;
+  }
+  return Math.max(10, Math.min(500, scale));
 }
 
 function getConfiguredPaperSizes() {
@@ -471,8 +505,7 @@ function updatePageRangeInput(totalPages) {
 }
 
 function isOfficeDocument(file) {
-  const name = String(file?.name || "");
-  const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+  const ext = getFileExtension(file);
   return ext === ".doc" || ext === ".docx" || ext === ".ppt" || ext === ".pptx";
 }
 
@@ -870,27 +903,6 @@ async function renderVisualPreview(file) {
         container.appendChild(wrapper);
         pagesContainer.appendChild(container);
 
-      } else if (file.type === "text/plain") {
-        updatePageRangeInput(1);
-        colorAnalysisState = {
-          ...colorAnalysisState,
-          status: "ready",
-          pages: [{ page: 1, mode: "bw", colorRatio: 0 }]
-        };
-        updateColorAnalysisEstimate();
-        const text = await file.text();
-        const pagesContainer = createPreviewPagesContainer(visualArea);
-        const container = document.createElement('div');
-        container.className = `preview-page-container`;
-        
-        const wrapper = document.createElement('div');
-        wrapper.className = 'preview-content-wrapper';
-        
-        const pre = document.createElement('pre');
-        pre.textContent = text.slice(0, 5000) + (text.length > 5000 ? "\n...(terpotong)" : "");
-        wrapper.appendChild(pre);
-        container.appendChild(wrapper);
-        pagesContainer.appendChild(container);
       } else {
         updatePageRangeInput(1);
         resetColorAnalysis("unknown");
@@ -931,7 +943,7 @@ async function renderVisualPreview(file) {
      // Content Scale logic
      const wrapper = container.querySelector('.preview-content-wrapper');
      if (wrapper) {
-         const scaleVal = (previewState.contentScale || 100) / 100;
+         const scaleVal = normalizePreviewContentScale(previewState.contentScale) / 100;
          wrapper.style.transform = `scale(${scaleVal})`;
          wrapper.style.transformOrigin = "center center";
          wrapper.style.width = "100%";
@@ -998,7 +1010,7 @@ export function resetPreviewState() {
   previewState.colorMode = uploadColorModeInput?.value || "color";
   previewState.orientation = uploadOrientationInput?.value || "portrait";
   previewState.pageRange = uploadPageRangeInput?.value || "";
-  previewState.contentScale = Number(uploadContentScaleInput?.value || 100);
+  previewState.contentScale = normalizePreviewContentScale(uploadContentScaleInput?.value);
   previewState.hasFile = false;
   previewConversionSeq += 1;
   previewConvertedFile = null;
@@ -1022,7 +1034,7 @@ function updatePreviewStateFromForm() {
   previewState.colorMode = uploadColorModeInput?.value || "color";
   previewState.orientation = uploadOrientationInput?.value || "portrait";
   previewState.pageRange = uploadPageRangeInput?.value || "";
-  previewState.contentScale = Number(uploadContentScaleInput?.value || 100);
+  previewState.contentScale = normalizePreviewContentScale(uploadContentScaleInput?.value);
   updateColorAnalysisEstimate();
   renderPreviewState();
 }
@@ -1051,6 +1063,14 @@ function handleFileSelection() {
   const selectedFile = uploadFileInput?.files?.[0] || null;
   if (!selectedFile) {
     resetPreviewState();
+    return;
+  }
+
+  if (!isAllowedDocumentFile(selectedFile)) {
+    uploadFileInput.value = "";
+    resetPreviewState();
+    previewConversionError = UNSUPPORTED_DOCUMENT_MESSAGE;
+    renderPreviewState();
     return;
   }
 

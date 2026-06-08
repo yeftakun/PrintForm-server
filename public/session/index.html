@@ -94,7 +94,9 @@
                   </div>
                 </div>
                 <div class="session-summary-item session-id-item">
-                  <span class="session-item-icon" aria-hidden="true">A3</span>
+                  <span class="session-item-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3 8 21"></path><path d="m16 3-2 18"></path></svg>
+                  </span>
                   <div>
                     <span>Sesi ID</span>
                     <strong id="sessionIdText">-</strong>
@@ -132,7 +134,7 @@
                   <button id="chooseDocumentBtn" class="session-file-button" type="button">Pilih Dokumen</button>
                   <span id="selectedDocumentName" class="session-file-name">Belum ada dokumen</span>
                 </div>
-                <input class="session-file-input" type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
+                <input class="session-file-input" type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.ppt,.pptx,application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required>
               </label>
 
               <div class="session-form-grid">
@@ -163,13 +165,7 @@
 
                 <label class="field">
                   <span>Skala (%)</span>
-                  <select name="contentScale" id="contentScale">
-                    <option value="100" selected>100%</option>
-                    <option value="90">90%</option>
-                    <option value="80">80%</option>
-                    <option value="70">70%</option>
-                    <option value="50">50%</option>
-                  </select>
+                  <input type="number" name="contentScale" id="contentScale" min="10" max="500" step="1" value="100" inputmode="numeric" required>
                 </label>
 
                 <label class="field">
