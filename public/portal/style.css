@@ -127,6 +127,10 @@ textarea {
   justify-content: center;
 }
 
+.auth-shell.is-authed .hero-about-link {
+  align-self: center;
+}
+
 .auth-shell.is-authed .trust-card {
   text-align: left;
 }
@@ -231,6 +235,20 @@ textarea {
   border-left: 2px solid var(--accent);
   border-bottom: 2px solid var(--accent);
   transform: translateY(-1px) rotate(-45deg);
+}
+
+.hero-about-link {
+  align-self: flex-start;
+  margin-top: 16px;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.hero-about-link:hover,
+.hero-about-link:focus-visible {
+  text-decoration: underline;
 }
 
 .trust-card {
@@ -530,6 +548,17 @@ textarea {
   width: 16px;
   height: 16px;
   margin-top: 2px;
+}
+
+.terms-note a {
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.terms-note a:hover,
+.terms-note a:focus-visible {
+  text-decoration: underline;
 }
 
 .top-actions {
@@ -1224,6 +1253,12 @@ textarea {
   .feature-row,
   .trust-card {
     display: none;
+  }
+
+  .hero-about-link {
+    align-self: center;
+    margin-top: 10px;
+    font-size: 0.78rem;
   }
 
   .login-panel {

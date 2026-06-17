@@ -1766,6 +1766,23 @@ th {
   line-height: 1.45;
 }
 
+.home-about-link {
+  margin: -12px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.home-about-link a {
+  color: #b84624;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.home-about-link a:hover,
+.home-about-link a:focus-visible {
+  text-decoration: underline;
+}
+
 .home-portal-cta {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2160,6 +2177,26 @@ th {
 
 .home-form-status {
   min-height: 18px;
+}
+
+.home-legal-note {
+  max-width: 430px;
+  margin: -4px auto 0;
+  color: #80766e;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.home-legal-note a {
+  color: #b84624;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.home-legal-note a:hover,
+.home-legal-note a:focus-visible {
+  text-decoration: underline;
 }
 
 .home-info-note {
@@ -4228,6 +4265,11 @@ th {
     color: #5f5750;
   }
 
+  .home-about-link {
+    margin: -6px 0 6px 94px;
+    font-size: 0.86rem;
+  }
+
   .home-portal-cta {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -4504,6 +4546,13 @@ th {
     min-height: 18px;
   }
 
+  .home-legal-note {
+    max-width: none;
+    margin-top: 0;
+    font-size: 0.78rem;
+    line-height: 1.34;
+  }
+
   .home-info-note {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr);
@@ -4578,6 +4627,11 @@ th {
     margin: -8px 0 4px clamp(70px, 18vw, 86px);
     font-size: 0.94rem;
     line-height: 1.3;
+  }
+
+  .home-about-link {
+    margin: -2px 0 4px clamp(70px, 18vw, 86px);
+    font-size: 0.76rem;
   }
 
   .home-mobile-intro-card {
@@ -4750,6 +4804,11 @@ th {
     min-height: 0;
   }
 
+  .home-legal-note {
+    font-size: 0.66rem;
+    line-height: 1.22;
+  }
+
   .home-info-note {
     grid-template-columns: 40px minmax(0, 1fr);
     gap: 12px;
@@ -4917,6 +4976,12 @@ th {
     margin: -4px 0 4px clamp(48px, 13vw, 62px);
     font-size: 0.72rem;
     line-height: 1.18;
+  }
+
+  .home-about-link {
+    margin: -2px 0 3px clamp(48px, 13vw, 62px);
+    font-size: 0.62rem;
+    line-height: 1.1;
   }
 
   .home-mobile-intro-card {
@@ -5130,6 +5195,12 @@ th {
     font-size: 1rem;
   }
 
+  .home-legal-note {
+    margin-top: -2px;
+    font-size: 0.56rem;
+    line-height: 1.16;
+  }
+
   .home-info-note {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr);
@@ -5187,6 +5258,11 @@ th {
   .home-copy {
     margin-left: 48px;
     font-size: 0.66rem;
+  }
+
+  .home-about-link {
+    margin-left: 48px;
+    font-size: 0.58rem;
   }
 
   .home-mobile-intro-card {

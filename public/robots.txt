@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /portal/
+Disallow: /mitra/reset-password
+
+Sitemap: https://printorder.web.id/sitemap.xml
