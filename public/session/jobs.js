@@ -4,6 +4,8 @@ import { getPreviewSubmission, resetPreviewState } from "./preview.js";
 
 const uploadForm = document.getElementById("uploadForm");
 const uploadStatus = document.getElementById("uploadStatus");
+const sessionConsentCheckbox = document.getElementById("sessionConsentCheckbox");
+const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
 const jobsBody = document.getElementById("jobsBody");
 const jobsStatus = document.getElementById("jobsStatus");
 const refreshBtn = document.getElementById("refreshBtn");
@@ -399,8 +401,25 @@ export async function loadJobs() {
 }
 
 function bindUploadForm() {
+  function updateConsentState() {
+    if (uploadSubmitBtn && sessionConsentCheckbox) {
+      uploadSubmitBtn.disabled = !sessionConsentCheckbox.checked;
+    }
+  }
+
+  sessionConsentCheckbox?.addEventListener("change", updateConsentState);
+  updateConsentState();
+
   uploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+
+    if (sessionConsentCheckbox && !sessionConsentCheckbox.checked) {
+      uploadStatus.textContent = "Anda perlu menyetujui Syarat dan Ketentuan serta Kebijakan Privasi sebelum mengirim dokumen.";
+      uploadStatus.className = "status error";
+      notify("warning", "Persetujuan Diperlukan", "Centang persetujuan sebelum mengirim dokumen.");
+      return;
+    }
+
     uploadStatus.textContent = "Mengirim...";
     uploadStatus.className = "status";
     notify("info", "Mengirim Tugas", "Tugas cetak sedang dikirim ke toko.");
@@ -455,6 +474,7 @@ function bindUploadForm() {
       uploadStatus.className = "status success";
       notify("success", "Tugas Dikirim", "Tugas cetak berhasil dikirim.");
       uploadForm.reset();
+      updateConsentState();
       resetPreviewState();
       await loadJobs();
     } catch (err) {

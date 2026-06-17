@@ -191,7 +191,17 @@
               <div class="session-hidden-controls">
               </div>
 
-              <button class="session-submit-btn" type="submit">
+              <label class="session-consent-note">
+                <input id="sessionConsentCheckbox" type="checkbox" name="termsConsent" required>
+                <span>
+                  Saya menyetujui <a href="/terms/" target="_blank" rel="noopener">Syarat dan Ketentuan</a>
+                  serta <a href="/privacy-policy/" target="_blank" rel="noopener">Kebijakan Privasi</a>
+                  PrintOrder, dan memahami bahwa dokumen saya akan diproses sementara untuk kebutuhan
+                  pencetakan oleh mitra percetakan yang saya pilih.
+                </span>
+              </label>
+
+              <button id="uploadSubmitBtn" class="session-submit-btn" type="submit" disabled>
                 <span aria-hidden="true">↗</span>
                 Kirim Tugas
               </button>
