@@ -24,7 +24,17 @@
   const refreshLinkedClientsBtn = document.getElementById("refreshLinkedClientsBtn");
   const connectClientBtn = document.getElementById("connectClientBtn");
   const downloadClientBtn = document.getElementById("downloadClientBtn");
+  const downloadClientBtnLabel = document.getElementById("downloadClientBtnLabel");
   const downloadClientModalBackdrop = document.getElementById("downloadClientModalBackdrop");
+  const otherInstallersBtn = document.getElementById("otherInstallersBtn");
+  const downloadClientOtherVersionsBtn = document.getElementById("downloadClientOtherVersionsBtn");
+  const otherInstallersModalBackdrop = document.getElementById("otherInstallersModalBackdrop");
+  const otherInstallersList = document.getElementById("otherInstallersList");
+  const downloadClientPrimaryLink = document.getElementById("downloadClientPrimaryLink");
+  const downloadClientPrimaryTitle = document.getElementById("downloadClientPrimaryTitle");
+  const downloadClientPrimaryNotes = document.getElementById("downloadClientPrimaryNotes");
+  const downloadClientPrimarySize = document.getElementById("downloadClientPrimarySize");
+  const downloadClientStatus = document.getElementById("downloadClientStatus");
 
   const statClientOnline = document.getElementById("statClientOnline");
   const statJobsToday = document.getElementById("statJobsToday");
@@ -216,6 +226,13 @@
 
   let latestClients = [];
   let latestJobs = [];
+  let installerCatalog = {
+    current: null,
+    installers: [],
+    otherInstallers: []
+  };
+  let installerCatalogLoaded = false;
+  let installerCatalogLoading = false;
   let latestPlans = [];
   let latestOrders = [];
   let latestCreditBalance = null;
@@ -2736,6 +2753,7 @@
     dashboardShell?.classList.remove("hidden");
     fillDashboardForms(user);
     activateDashboardPanel(getDashboardTargetFromHash(), { closeSidebar: false, resetScroll: false });
+    loadInstallerCatalog({ silent: true });
     setStatus(heroStatus, "");
     heroText.textContent = "Akun sudah aktif.";
   }
@@ -2744,6 +2762,10 @@
     currentUser = null;
     latestClients = [];
     latestJobs = [];
+    installerCatalog = { current: null, installers: [], otherInstallers: [] };
+    installerCatalogLoaded = false;
+    installerCatalogLoading = false;
+    renderInstallerCatalog();
     document.body.classList.remove("portal-dashboard-active");
     closeDashboardSidebar();
     dashboardShell?.classList.add("hidden");
@@ -3003,12 +3025,115 @@
     });
   }
 
+  function renderInstallerCatalog() {
+    const current = installerCatalog.current;
+    if (downloadClientBtnLabel) {
+      downloadClientBtnLabel.textContent = current?.version ? `Klien Desktop v${current.version}` : "Klien Desktop";
+    }
+
+    if (downloadClientPrimaryLink) {
+      if (current?.downloadUrl) {
+        downloadClientPrimaryLink.href = current.downloadUrl;
+        downloadClientPrimaryLink.classList.remove("is-disabled");
+        downloadClientPrimaryLink.setAttribute("aria-disabled", "false");
+      } else {
+        downloadClientPrimaryLink.removeAttribute("href");
+        downloadClientPrimaryLink.classList.add("is-disabled");
+        downloadClientPrimaryLink.setAttribute("aria-disabled", "true");
+      }
+    }
+
+    if (downloadClientPrimaryTitle) {
+      downloadClientPrimaryTitle.textContent = current?.label || "Installer belum tersedia";
+    }
+    if (downloadClientPrimaryNotes) {
+      downloadClientPrimaryNotes.textContent = current?.notes || "Windows installer";
+    }
+    if (downloadClientPrimarySize) {
+      downloadClientPrimarySize.textContent = current?.fileSizeLabel || "-";
+    }
+
+    const others = Array.isArray(installerCatalog.otherInstallers)
+      ? installerCatalog.otherInstallers
+      : [];
+    if (otherInstallersList) {
+      if (installerCatalogLoading && !installerCatalogLoaded) {
+        otherInstallersList.innerHTML = '<p class="muted-cell">Memuat installer...</p>';
+      } else if (!others.length) {
+        otherInstallersList.innerHTML = '<p class="muted-cell">Belum ada versi lain yang tersedia.</p>';
+      } else {
+        otherInstallersList.innerHTML = others.map(installer => `
+          <a class="download-client-card" href="${escapeHtml(installer.downloadUrl)}">
+            <span class="windows-logo-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M3 5.2 10.8 4v7.5H3V5.2Z"></path>
+                <path d="M12 3.8 21 2.5v9H12V3.8Z"></path>
+                <path d="M3 12.7h7.8v7.4L3 18.9v-6.2Z"></path>
+                <path d="M12 12.7h9v8.8l-9-1.3v-7.5Z"></path>
+              </svg>
+            </span>
+            <span class="download-client-copy">
+              <strong>${escapeHtml(installer.label || `PrintOrder Installer v${installer.version}`)}</strong>
+              <small>${escapeHtml(installer.notes || "Windows installer")}</small>
+            </span>
+            <span class="download-client-size">${escapeHtml(installer.fileSizeLabel || `v${installer.version}`)}</span>
+          </a>
+        `).join("");
+      }
+    }
+
+    if (otherInstallersBtn) {
+      otherInstallersBtn.hidden = false;
+    }
+    if (downloadClientOtherVersionsBtn) {
+      downloadClientOtherVersionsBtn.hidden = false;
+    }
+  }
+
+  async function loadInstallerCatalog({ silent = false } = {}) {
+    if (installerCatalogLoading) {
+      return installerCatalog;
+    }
+    installerCatalogLoading = true;
+    if (!silent) {
+      setStatus(downloadClientStatus, "Memuat installer...");
+    }
+    renderInstallerCatalog();
+    try {
+      const body = await window.PortalAuth.apiJson("/api/installers", { method: "GET" });
+      installerCatalog = {
+        current: body.current || null,
+        installers: Array.isArray(body.installers) ? body.installers : [],
+        otherInstallers: Array.isArray(body.otherInstallers) ? body.otherInstallers : []
+      };
+      installerCatalogLoaded = true;
+      setStatus(downloadClientStatus, "");
+    } catch (err) {
+      installerCatalogLoaded = true;
+      setStatus(downloadClientStatus, err.message || "Gagal memuat installer.", "error");
+    } finally {
+      installerCatalogLoading = false;
+      renderInstallerCatalog();
+    }
+    return installerCatalog;
+  }
+
   function showDownloadInfo() {
+    loadInstallerCatalog({ silent: true });
     if (downloadClientModalBackdrop) {
       openModal(downloadClientModalBackdrop);
       return;
     }
-    window.location.href = "https://github.com/yeftakun/PrintForm/releases/download/1.3.0/PrintOrder-Setup-1.3.0.exe";
+    if (installerCatalog.current?.downloadUrl) {
+      window.location.href = installerCatalog.current.downloadUrl;
+    }
+  }
+
+  function showOtherInstallers() {
+    loadInstallerCatalog({ silent: true });
+    if (otherInstallersModalBackdrop) {
+      openModal(otherInstallersModalBackdrop);
+    }
   }
 
   function showConnectClientInfo() {
@@ -3105,7 +3230,8 @@
       });
     });
 
-    [registerModalBackdrop, forgotPasswordModalBackdrop, downloadClientModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, orderDetailModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+    [registerModalBackdrop, forgotPasswordModalBackdrop, downloadClientModalBackdrop, otherInstallersModalBackdrop, allJobsModalBackdrop, jobsReportDownloadModalBackdrop, fundEstimateModalBackdrop, jobsFilterModalBackdrop, ordersModalBackdrop, orderDetailModalBackdrop, paymentProofModalBackdrop, operationalHoursModalBackdrop, profilePhotoCropModalBackdrop, profileModalBackdrop, passwordModalBackdrop, pinModalBackdrop].forEach(modal => {
+      if (!modal) return;
       modal.addEventListener("click", event => {
         if (event.target === modal) {
           closeModal(modal);
@@ -3404,6 +3530,14 @@
     });
     connectClientBtn.addEventListener("click", showConnectClientInfo);
     downloadClientBtn.addEventListener("click", showDownloadInfo);
+    otherInstallersBtn?.addEventListener("click", showOtherInstallers);
+    downloadClientOtherVersionsBtn?.addEventListener("click", showOtherInstallers);
+    downloadClientPrimaryLink?.addEventListener("click", event => {
+      if (!installerCatalog.current?.downloadUrl) {
+        event.preventDefault();
+        setStatus(downloadClientStatus, "Installer belum tersedia.", "error");
+      }
+    });
 
     linkedClientsBody.addEventListener("click", event => {
       const target = event.target;

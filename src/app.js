@@ -14,6 +14,7 @@ const sessionsRouter = require("./routes/sessions");
 const jobsRouter = require("./routes/jobs");
 const billingRouter = require("./routes/billing");
 const adminRouter = require("./routes/admin");
+const installersRouter = require("./routes/installers");
 
 const storePagePath = path.join(rootDir, "public", "store", "index.html");
 const storeMetaStart = "<!-- store-meta:start -->";
@@ -167,6 +168,7 @@ function createApp() {
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
+  app.use("/api/installers", installersRouter);
 
   // Customer flow on `/` is guest-first; routes still receive `req.user` when bearer token exists.
   app.use("/api/clients", optionalAuth, rejectSuspendedMitra, clientsRouter);

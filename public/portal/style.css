@@ -1528,6 +1528,18 @@ body.portal-dashboard-active .page {
   gap: 8px;
 }
 
+.dashboard-download-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dashboard-other-installers-link {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 .dashboard-download-client svg {
   width: 17px;
   height: 17px;
@@ -1561,6 +1573,17 @@ body.portal-dashboard-active .page {
   border-color: #b6c4d8;
   box-shadow: 0 12px 26px rgba(15, 23, 42, 0.09);
   transform: translateY(-1px);
+}
+
+.download-client-card.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.download-client-card.is-disabled:hover {
+  border-color: #e6e9ee;
+  box-shadow: none;
+  transform: none;
 }
 
 .windows-logo-icon {
@@ -1600,6 +1623,27 @@ body.portal-dashboard-active .page {
 
 .download-client-size {
   white-space: nowrap;
+}
+
+.download-client-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.download-client-footer .status {
+  margin: 0;
+}
+
+.other-installers-list {
+  display: grid;
+  gap: 10px;
+}
+
+.other-installers-list .download-client-card {
+  min-height: 68px;
 }
 
 .dashboard-user-menu-wrap {

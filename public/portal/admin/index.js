@@ -56,6 +56,13 @@
   const adminCouponPlanSelect = document.getElementById("adminCouponPlanSelect");
   const adminPlanStatus = document.getElementById("adminPlanStatus");
   const adminCouponStatus = document.getElementById("adminCouponStatus");
+  const adminInstallersTable = document.getElementById("adminInstallersTable");
+  const refreshAdminInstallersBtn = document.getElementById("refreshAdminInstallersBtn");
+  const openInstallerModalBtn = document.getElementById("openInstallerModalBtn");
+  const adminInstallerModalBackdrop = document.getElementById("adminInstallerModalBackdrop");
+  const adminInstallerForm = document.getElementById("adminInstallerForm");
+  const adminInstallerStatus = document.getElementById("adminInstallerStatus");
+  const adminInstallerFormStatus = document.getElementById("adminInstallerFormStatus");
 
   const adminStoresTable = document.getElementById("adminStoresTable");
   const adminStoreSearchInput = document.getElementById("adminStoreSearchInput");
@@ -133,6 +140,10 @@
   let adminBillingLoaded = false;
   let adminBillingLoading = false;
   let adminBillingError = "";
+  let adminInstallers = [];
+  let adminInstallersLoaded = false;
+  let adminInstallersLoading = false;
+  let adminInstallersError = "";
   let adminJobsLoaded = false;
   let adminJobsLoading = false;
   let adminJobsError = "";
@@ -549,6 +560,9 @@
     adminNavLinks.forEach(link => {
       link.classList.toggle("active", link.dataset.adminTarget === targetId);
     });
+    if (targetId === "adminInstallers" && !adminInstallersLoaded) {
+      loadAdminInstallers();
+    }
   }
 
   function activateBillingTab(tab) {
@@ -1306,6 +1320,146 @@
       setInlineStatus(adminCouponStatus, err.message || "Gagal menyimpan kupon.", "error");
     } finally {
       submitButton.disabled = false;
+    }
+  }
+
+  function renderInstallers() {
+    if (!adminInstallersTable) return;
+    if (adminInstallersLoading && !adminInstallersLoaded) {
+      adminInstallersTable.innerHTML = '<tr><td colspan="7" class="muted-cell">Memuat installer...</td></tr>';
+      return;
+    }
+    if (adminInstallersError) {
+      adminInstallersTable.innerHTML = `<tr><td colspan="7" class="muted-cell">${escapeHtml(adminInstallersError)}</td></tr>`;
+      return;
+    }
+    if (!adminInstallers.length) {
+      adminInstallersTable.innerHTML = '<tr><td colspan="7" class="muted-cell">Belum ada installer.</td></tr>';
+      return;
+    }
+
+    adminInstallersTable.innerHTML = adminInstallers.map(installer => `
+      <tr>
+        <td><strong>${escapeHtml(installer.version)}</strong><span>${escapeHtml(installer.label || "-")}</span></td>
+        <td><a href="${escapeHtml(installer.downloadUrl)}" target="_blank" rel="noopener">Buka link</a><span>${escapeHtml(installer.notes || "-")}</span></td>
+        <td>${escapeHtml(installer.fileSizeLabel || "-")}</td>
+        <td><span class="status-pill ${installer.isActive ? "online" : "offline"}">${installer.isActive ? "Aktif" : "Nonaktif"}</span></td>
+        <td><span class="status-pill ${installer.isPrimary ? "online" : ""}">${installer.isPrimary ? "Utama" : "-"}</span></td>
+        <td>${escapeHtml(formatDateTime(installer.updatedAt || installer.createdAt))}</td>
+        <td>
+          <div class="admin-row-actions">
+            <button class="btn btn-outline btn-compact" type="button" data-edit-installer-id="${escapeHtml(installer.id)}">Edit</button>
+            <button class="btn btn-ghost btn-compact" type="button" data-toggle-installer-active-id="${escapeHtml(installer.id)}">${installer.isActive ? "Nonaktifkan" : "Aktifkan"}</button>
+            <button class="btn btn-ghost btn-compact" type="button" data-primary-installer-id="${escapeHtml(installer.id)}" ${installer.isPrimary ? "disabled" : ""}>Jadikan Utama</button>
+          </div>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  async function loadAdminInstallers({ silent = false } = {}) {
+    adminInstallersLoading = true;
+    adminInstallersError = "";
+    if (!silent) {
+      setInlineStatus(adminInstallerStatus, "Memuat installer...");
+    }
+    renderInstallers();
+    try {
+      const body = await window.PortalAuth.apiJson("/api/admin/installers", { method: "GET" });
+      adminInstallers = Array.isArray(body.installers) ? body.installers : [];
+      adminInstallersLoaded = true;
+      adminInstallersError = "";
+      setInlineStatus(adminInstallerStatus, "");
+    } catch (err) {
+      adminInstallers = [];
+      adminInstallersLoaded = true;
+      adminInstallersError = err.message || "Gagal memuat installer.";
+      setInlineStatus(adminInstallerStatus, adminInstallersError, "error");
+    } finally {
+      adminInstallersLoading = false;
+      renderInstallers();
+    }
+  }
+
+  function openInstallerModal(installerId = "") {
+    const installer = adminInstallers.find(item => item.id === installerId);
+    adminInstallerForm.reset();
+    adminInstallerForm.elements.namedItem("id").value = installer?.id || "";
+    adminInstallerForm.elements.namedItem("version").value = installer?.version || "";
+    adminInstallerForm.elements.namedItem("downloadUrl").value = installer?.downloadUrl || "";
+    adminInstallerForm.elements.namedItem("label").value = installer?.label || "";
+    adminInstallerForm.elements.namedItem("fileSizeLabel").value = installer?.fileSizeLabel || "";
+    adminInstallerForm.elements.namedItem("notes").value = installer?.notes || "Windows installer";
+    adminInstallerForm.elements.namedItem("active").checked = installer ? installer.isActive : true;
+    adminInstallerForm.elements.namedItem("primary").checked = installer ? installer.isPrimary : adminInstallers.length === 0;
+    document.getElementById("adminInstallerModalTitle").textContent = installer ? "Edit Installer" : "Tambah Installer";
+    setInlineStatus(adminInstallerFormStatus, "");
+    openModal(adminInstallerModalBackdrop);
+  }
+
+  function buildInstallerPayload() {
+    return {
+      version: adminInstallerForm.elements.namedItem("version").value.trim(),
+      downloadUrl: adminInstallerForm.elements.namedItem("downloadUrl").value.trim(),
+      label: adminInstallerForm.elements.namedItem("label").value.trim(),
+      fileSizeLabel: adminInstallerForm.elements.namedItem("fileSizeLabel").value.trim(),
+      notes: adminInstallerForm.elements.namedItem("notes").value.trim(),
+      isActive: adminInstallerForm.elements.namedItem("active").checked,
+      isPrimary: adminInstallerForm.elements.namedItem("primary").checked
+    };
+  }
+
+  async function submitInstallerForm(event) {
+    event.preventDefault();
+    const submitButton = adminInstallerForm.querySelector('button[type="submit"]');
+    const id = adminInstallerForm.elements.namedItem("id").value;
+    submitButton.disabled = true;
+    setInlineStatus(adminInstallerFormStatus, "Menyimpan installer...");
+    try {
+      await window.PortalAuth.apiJson(id ? `/api/admin/installers/${encodeURIComponent(id)}` : "/api/admin/installers", {
+        method: id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildInstallerPayload())
+      });
+      await loadAdminInstallers({ silent: true });
+      setInlineStatus(adminInstallerFormStatus, "Installer berhasil disimpan.", "success");
+      setTimeout(() => closeModal(adminInstallerModalBackdrop), 450);
+    } catch (err) {
+      setInlineStatus(adminInstallerFormStatus, err.message || "Gagal menyimpan installer.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  async function toggleInstallerActive(installerId) {
+    const installer = adminInstallers.find(item => item.id === installerId);
+    if (!installer) return;
+    setInlineStatus(adminInstallerStatus, installer.isActive ? "Menonaktifkan installer..." : "Mengaktifkan installer...");
+    try {
+      await window.PortalAuth.apiJson(`/api/admin/installers/${encodeURIComponent(installerId)}/active`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !installer.isActive })
+      });
+      await loadAdminInstallers({ silent: true });
+      setInlineStatus(adminInstallerStatus, installer.isActive ? "Installer dinonaktifkan." : "Installer diaktifkan.", "success");
+    } catch (err) {
+      setInlineStatus(adminInstallerStatus, err.message || "Gagal mengubah status installer.", "error");
+    }
+  }
+
+  async function assignPrimaryInstaller(installerId) {
+    setInlineStatus(adminInstallerStatus, "Mengatur installer utama...");
+    try {
+      await window.PortalAuth.apiJson(`/api/admin/installers/${encodeURIComponent(installerId)}/primary`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      await loadAdminInstallers({ silent: true });
+      setInlineStatus(adminInstallerStatus, "Installer utama diperbarui.", "success");
+    } catch (err) {
+      setInlineStatus(adminInstallerStatus, err.message || "Gagal mengatur installer utama.", "error");
     }
   }
 
@@ -2121,6 +2275,25 @@
   openCouponModalBtn.addEventListener("click", () => openCouponModal());
   adminPlanForm.addEventListener("submit", submitPlanForm);
   adminCouponForm.addEventListener("submit", submitCouponForm);
+  openInstallerModalBtn?.addEventListener("click", () => openInstallerModal());
+  refreshAdminInstallersBtn?.addEventListener("click", () => loadAdminInstallers());
+  adminInstallerForm?.addEventListener("submit", submitInstallerForm);
+  adminInstallersTable?.addEventListener("click", event => {
+    const editButton = event.target instanceof Element ? event.target.closest("[data-edit-installer-id]") : null;
+    if (editButton) {
+      openInstallerModal(editButton.getAttribute("data-edit-installer-id"));
+      return;
+    }
+    const activeButton = event.target instanceof Element ? event.target.closest("[data-toggle-installer-active-id]") : null;
+    if (activeButton) {
+      toggleInstallerActive(activeButton.getAttribute("data-toggle-installer-active-id"));
+      return;
+    }
+    const primaryButton = event.target instanceof Element ? event.target.closest("[data-primary-installer-id]") : null;
+    if (primaryButton) {
+      assignPrimaryInstaller(primaryButton.getAttribute("data-primary-installer-id"));
+    }
+  });
 
   openStoreFilterBtn.addEventListener("click", () => {
     syncStoreFilterInputs();

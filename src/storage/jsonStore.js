@@ -5,7 +5,8 @@ const {
   jobsFile,
   clientsFile,
   pingsFile,
-  sessionsFile
+  sessionsFile,
+  installersFile
 } = require("../config");
 
 async function ensureStorage() {
@@ -14,6 +15,7 @@ async function ensureStorage() {
   await ensureFile(clientsFile, []);
   await ensureFile(pingsFile, {});
   await ensureFile(sessionsFile, []);
+  await ensureFile(installersFile, []);
 }
 
 async function ensureFile(filePath, fallback) {
@@ -62,6 +64,9 @@ const writePings = pings => writeJson(pingsFile, pings);
 const readSessions = () => readJson(sessionsFile, []);
 const writeSessions = sessions => writeJson(sessionsFile, sessions);
 
+const readInstallers = () => readJson(installersFile, []);
+const writeInstallers = installers => writeJson(installersFile, installers);
+
 module.exports = {
   ensureStorage,
   readJson,
@@ -73,5 +78,7 @@ module.exports = {
   readPings,
   writePings,
   readSessions,
-  writeSessions
+  writeSessions,
+  readInstallers,
+  writeInstallers
 };

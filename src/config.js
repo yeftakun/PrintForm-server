@@ -42,6 +42,7 @@ const jobsFile = path.join(storageDir, "jobs.json");
 const clientsFile = path.join(storageDir, "clients.json");
 const pingsFile = path.join(storageDir, "pings.json");
 const sessionsFile = path.join(storageDir, "sessions.json");
+const installersFile = path.join(storageDir, "installers.json");
 
 const CLIENT_TTL_MS = Number(process.env.CLIENT_TTL_MS) || 2 * 60 * 1000;
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS) || 30 * 1000;
@@ -138,6 +139,7 @@ module.exports = {
   clientsFile,
   pingsFile,
   sessionsFile,
+  installersFile,
   useDb,
   databaseUrl,
   CLIENT_TTL_MS,

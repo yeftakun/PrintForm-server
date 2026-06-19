@@ -13,6 +13,13 @@ const { writeAuditLogSafe } = require("../services/audit");
 const { getClientReadiness, withClientStatus } = require("../services/status");
 const { summarizeOperationalSchedule } = require("../utils/storeOperational");
 const { asyncHandler } = require("../utils/asyncHandler");
+const {
+  listInstallers,
+  createInstaller,
+  updateInstaller,
+  setInstallerActive,
+  setPrimaryInstaller
+} = require("../repositories/installersRepository");
 
 const router = express.Router();
 
@@ -796,6 +803,80 @@ router.get("/audit", asyncHandler(async (req, res) => {
   });
 
   res.json(result);
+}));
+
+router.get("/installers", asyncHandler(async (req, res) => {
+  const installers = await listInstallers();
+  res.json({ installers });
+}));
+
+router.post("/installers", asyncHandler(async (req, res) => {
+  const installer = await createInstaller(req.body || {});
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "admin.installer.created",
+    targetType: "installer",
+    targetId: installer.id,
+    detail: {
+      version: installer.version,
+      downloadUrl: installer.downloadUrl,
+      isActive: installer.isActive,
+      isPrimary: installer.isPrimary
+    }
+  });
+  res.status(201).json({ installer });
+}));
+
+router.patch("/installers/:id", asyncHandler(async (req, res) => {
+  const installer = await updateInstaller(req.params.id, req.body || {});
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "admin.installer.updated",
+    targetType: "installer",
+    targetId: installer.id,
+    detail: {
+      version: installer.version,
+      downloadUrl: installer.downloadUrl,
+      isActive: installer.isActive,
+      isPrimary: installer.isPrimary
+    }
+  });
+  res.json({ installer });
+}));
+
+router.patch("/installers/:id/active", asyncHandler(async (req, res) => {
+  const installer = await setInstallerActive(req.params.id, req.body?.isActive ?? req.body?.is_active);
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: installer.isActive ? "admin.installer.activated" : "admin.installer.deactivated",
+    targetType: "installer",
+    targetId: installer.id,
+    detail: {
+      version: installer.version,
+      isActive: installer.isActive,
+      isPrimary: installer.isPrimary
+    }
+  });
+  res.json({ installer });
+}));
+
+router.patch("/installers/:id/primary", asyncHandler(async (req, res) => {
+  const installer = await setPrimaryInstaller(req.params.id);
+  await writeAuditLogSafe({
+    actorType: "user",
+    actorId: req.user.id,
+    action: "admin.installer.assigned_primary",
+    targetType: "installer",
+    targetId: installer.id,
+    detail: {
+      version: installer.version,
+      downloadUrl: installer.downloadUrl
+    }
+  });
+  res.json({ installer });
 }));
 
 module.exports = router;

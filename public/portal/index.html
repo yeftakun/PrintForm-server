@@ -192,14 +192,17 @@
           <span class="store-override-badge hidden" id="storeOverrideBadge">Toko buka di luar waktu operasional</span>
 
           <div class="dashboard-actions">
-            <button class="btn btn-ghost btn-compact dashboard-download-client" id="downloadClientBtn" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v11"></path>
-                <path d="m7 9 5 5 5-5"></path>
-                <path d="M5 21h14"></path>
-              </svg>
-              <span>Klien Desktop</span>
-            </button>
+            <div class="dashboard-download-group">
+              <button class="btn btn-ghost btn-compact dashboard-download-client" id="downloadClientBtn" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v11"></path>
+                  <path d="m7 9 5 5 5-5"></path>
+                  <path d="M5 21h14"></path>
+                </svg>
+                <span id="downloadClientBtnLabel">Klien Desktop</span>
+              </button>
+              <!-- <button class="text-button dashboard-other-installers-link" id="otherInstallersBtn" type="button">Versi lain</button> -->
+            </div>
             <div class="dashboard-user-menu-wrap">
               <button class="dashboard-user-button" id="dashboardUserMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false">
                 <img id="dashboardProfilePhoto" alt="" src="">
@@ -545,7 +548,7 @@
           </div>
           <button type="button" class="modal-close" data-close="downloadClientModalBackdrop" aria-label="Tutup">×</button>
         </div>
-        <a class="download-client-card" href="https://github.com/yeftakun/PrintForm/releases/download/1.3.1/PrintOrder-Setup-1.3.1.exe">
+        <a class="download-client-card" id="downloadClientPrimaryLink" href="https://github.com/yeftakun/PrintForm/releases/download/1.3.1/PrintOrder-Setup-1.3.1.exe">
           <span class="windows-logo-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M3 5.2 10.8 4v7.5H3V5.2Z"></path>
@@ -555,11 +558,30 @@
             </svg>
           </span>
           <span class="download-client-copy">
-            <strong>PrintOrder Installer v1.3.1</strong>
-            <small>Windows installer</small>
+            <strong id="downloadClientPrimaryTitle">PrintOrder Installer v1.3.1</strong>
+            <small id="downloadClientPrimaryNotes">Windows installer</small>
           </span>
-          <span class="download-client-size">56MB</span>
+          <span class="download-client-size" id="downloadClientPrimarySize">56MB</span>
         </a>
+        <div class="download-client-footer">
+          <button class="text-button" id="downloadClientOtherVersionsBtn" type="button">Versi lain</button>
+          <div class="status" id="downloadClientStatus" role="status"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="otherInstallersModalBackdrop" aria-hidden="true">
+      <div class="modal modal-wide download-client-modal" role="dialog" aria-modal="true" aria-labelledby="otherInstallersModalTitle">
+        <div class="modal-header">
+          <div class="modal-copy">
+            <h2 id="otherInstallersModalTitle">Installer Lain</h2>
+            <p>Versi installer sebelumnya untuk kebutuhan kompatibilitas.</p>
+          </div>
+          <button type="button" class="modal-close" data-close="otherInstallersModalBackdrop" aria-label="Tutup">×</button>
+        </div>
+        <div class="other-installers-list" id="otherInstallersList">
+          <p class="muted-cell">Memuat installer...</p>
+        </div>
       </div>
     </div>
 
