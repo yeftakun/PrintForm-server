@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bantuan PrintOrder</title>
+    <meta name="description" content="Pusat bantuan PrintOrder untuk mitra dan pelanggan.">
+    <meta name="author" content="PrintOrder">
+    <meta name="robots" content="index, follow">
+    <link rel="icon" href="../assets/favicon.ico" sizes="any">
+    <link rel="canonical" href="https://printorder.web.id/help/">
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #fff8f0;
+        --surface: rgba(255, 255, 255, 0.9);
+        --surface-solid: #ffffff;
+        --ink: #070b10;
+        --body: #303a48;
+        --muted: #6f7785;
+        --line: #d8dde5;
+        --line-soft: rgba(216, 221, 229, 0.72);
+        --accent: #df451f;
+        --accent-dark: #cf3918;
+        --accent-soft: #fff1eb;
+        --blue: #1f7de1;
+        --blue-soft: #edf6ff;
+        --shadow: 0 24px 64px rgba(74, 51, 34, 0.16), 0 8px 20px rgba(74, 51, 34, 0.07);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+        color: var(--ink);
+        background:
+          radial-gradient(840px 460px at 12% 18%, rgba(255, 255, 255, 0.98), transparent 64%),
+          radial-gradient(640px 360px at 92% 86%, rgba(226, 76, 30, 0.08), transparent 68%),
+          linear-gradient(145deg, #fffaf5 0%, #fff4e8 46%, #fffaf7 100%);
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      }
+
+      a,
+      button {
+        font: inherit;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .help-page {
+        width: min(100%, 1240px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: clamp(20px, 4vw, 46px);
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 24px;
+      }
+
+      .help-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--ink);
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .brand-logo {
+        width: 44px;
+        height: 44px;
+        object-fit: contain;
+      }
+
+      .brand-text {
+        font-size: 1.1rem;
+        letter-spacing: 0;
+      }
+
+      .top-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .top-link {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--body);
+        font-size: 0.92rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .top-link:hover {
+        border-color: rgba(223, 69, 31, 0.34);
+        color: var(--accent);
+      }
+
+      .help-shell {
+        min-height: min(78vh, 760px);
+        display: grid;
+        grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+        border: 1px solid rgba(210, 202, 194, 0.82);
+        border-radius: 22px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 252, 248, 0.86)),
+          var(--surface);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .help-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 28px 22px;
+        border-right: 1px solid var(--line-soft);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 246, 238, 0.7)),
+          rgba(255, 255, 255, 0.58);
+      }
+
+      .sidebar-heading {
+        display: grid;
+        gap: 8px;
+      }
+
+      .kicker {
+        width: fit-content;
+        margin: 0;
+        padding: 7px 11px;
+        border: 1px solid rgba(223, 69, 31, 0.18);
+        border-radius: 999px;
+        color: var(--accent);
+        background: var(--accent-soft);
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 3vw, 2.45rem);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .section-nav {
+        display: grid;
+        gap: 8px;
+      }
+
+      .section-button {
+        width: 100%;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--body);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .section-button:hover {
+        background: rgba(255, 255, 255, 0.72);
+        border-color: var(--line-soft);
+      }
+
+      .section-button.is-active {
+        background: var(--surface-solid);
+        border-color: rgba(223, 69, 31, 0.22);
+        box-shadow: 0 12px 24px rgba(74, 51, 34, 0.08);
+        color: var(--ink);
+      }
+
+      .section-icon {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .section-button.is-active .section-icon {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .section-icon svg {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .section-label {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .section-label strong {
+        font-size: 1.0rem;
+        line-height: 0.9;
+      }
+
+      .section-label span {
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.0;
+      }
+
+      .help-content {
+        min-width: 0;
+        padding: clamp(24px, 4vw, 42px);
+        display: grid;
+      }
+
+      .help-panel {
+        min-height: 100%;
+        display: none;
+        grid-template-rows: auto 1fr;
+        gap: 28px;
+      }
+
+      .help-panel.is-active {
+        display: grid;
+      }
+
+      .panel-heading {
+        display: grid;
+        gap: 10px;
+      }
+
+      .panel-label {
+        margin: 0;
+        color: var(--accent);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .panel-heading h2 {
+        margin: 0;
+        font-size: clamp(1.2rem, 2vw, 1.8rem);
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .empty-content {
+        min-height: 360px;
+        border: 1px dashed rgba(111, 119, 133, 0.35);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.88)),
+          repeating-linear-gradient(0deg, transparent 0 36px, rgba(216, 221, 229, 0.32) 37px);
+      }
+
+      @media (max-width: 860px) {
+        .help-shell {
+          min-height: auto;
+          grid-template-columns: 1fr;
+        }
+
+        .help-sidebar {
+          border-right: 0;
+          border-bottom: 1px solid var(--line-soft);
+        }
+
+        .section-nav {
+          display: flex;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scroll-snap-type: x mandatory;
+        }
+
+        .section-button {
+          min-width: 190px;
+          scroll-snap-align: start;
+        }
+
+        .help-content {
+          min-height: 520px;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .help-page {
+          padding: 16px;
+          gap: 16px;
+        }
+
+        .help-topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .top-actions {
+          width: 100%;
+          flex-wrap: wrap;
+        }
+
+        .top-link {
+          flex: 1 1 140px;
+        }
+
+        .help-shell {
+          border-radius: 16px;
+        }
+
+        .help-sidebar {
+          padding: 22px 18px;
+        }
+
+        .help-content {
+          padding: 24px 18px;
+          min-height: 440px;
+        }
+
+        .empty-content {
+          min-height: 280px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="help-page">
+      <header class="help-topbar">
+        <a class="brand" href="/">
+          <img class="brand-logo" src="../assets/logo-removebg-preview.png" alt="Logo PrintOrder">
+          <span class="brand-text">PrintOrder</span>
+        </a>
+
+        <nav class="top-actions" aria-label="Navigasi utama">
+          <a class="top-link" href="/portal/">Portal Mitra</a>
+          <a class="top-link" href="/">Halaman Utama</a>
+        </nav>
+      </header>
+
+      <section class="help-shell" aria-labelledby="helpTitle">
+        <aside class="help-sidebar" aria-label="Section bantuan">
+          <div class="sidebar-heading">
+            <p class="kicker">Bantuan</p>
+            <h2 id="helpTitle">Pusat Bantuan</h2>
+          </div>
+
+          <nav class="section-nav" aria-label="Daftar section bantuan">
+            <button class="section-button is-active" type="button" data-help-section="home" aria-controls="helpPanelHome" aria-current="page">
+              <span class="section-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>
+              </span>
+              <span class="section-label">
+                <strong>Home</strong>
+                <span>Awal bantuan</span>
+              </span>
+            </button>
+
+            <button class="section-button" type="button" data-help-section="setup-mitra" aria-controls="helpPanelSetupMitra">
+              <span class="section-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 21v-7"></path><path d="M4 10V3"></path><path d="M12 21v-9"></path><path d="M12 8V3"></path><path d="M20 21v-5"></path><path d="M20 12V3"></path><path d="M2 14h4"></path><path d="M10 8h4"></path><path d="M18 16h4"></path></svg>
+              </span>
+              <span class="section-label">
+                <strong>Setup Mitra</strong>
+                <span>Pengaturan toko</span>
+              </span>
+            </button>
+
+            <button class="section-button" type="button" data-help-section="pelanggan" aria-controls="helpPanelPelanggan">
+              <span class="section-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="10" cy="7" r="4"></circle><path d="M21 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              </span>
+              <span class="section-label">
+                <strong>Pelanggan</strong>
+                <span>Alur pengguna</span>
+              </span>
+            </button>
+          </nav>
+        </aside>
+
+        <div class="help-content">
+          <section class="help-panel is-active" id="helpPanelHome" data-help-panel="home" aria-labelledby="helpHomeTitle">
+            <div class="panel-heading">
+              <p class="panel-label">Section</p>
+              <h2 id="helpHomeTitle">Home</h2>
+            </div>
+            <div class="empty-content" aria-label="Area konten Home"></div>
+          </section>
+
+          <section class="help-panel" id="helpPanelSetupMitra" data-help-panel="setup-mitra" aria-labelledby="helpSetupMitraTitle">
+            <div class="panel-heading">
+              <p class="panel-label">Section</p>
+              <h2 id="helpSetupMitraTitle">Setup Mitra</h2>
+            </div>
+            <div class="empty-content" aria-label="Area konten Setup Mitra"></div>
+          </section>
+
+          <section class="help-panel" id="helpPanelPelanggan" data-help-panel="pelanggan" aria-labelledby="helpPelangganTitle">
+            <div class="panel-heading">
+              <p class="panel-label">Section</p>
+              <h2 id="helpPelangganTitle">Pelanggan</h2>
+            </div>
+            <div class="empty-content" aria-label="Area konten Pelanggan"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const buttons = Array.from(document.querySelectorAll("[data-help-section]"));
+        const panels = Array.from(document.querySelectorAll("[data-help-panel]"));
+        const knownSections = new Set(buttons.map(button => button.dataset.helpSection));
+
+        function activateSection(section, { updateHash = true } = {}) {
+          const nextSection = knownSections.has(section) ? section : "home";
+
+          buttons.forEach(button => {
+            const isActive = button.dataset.helpSection === nextSection;
+            button.classList.toggle("is-active", isActive);
+            if (isActive) {
+              button.setAttribute("aria-current", "page");
+            } else {
+              button.removeAttribute("aria-current");
+            }
+          });
+
+          panels.forEach(panel => {
+            panel.classList.toggle("is-active", panel.dataset.helpPanel === nextSection);
+          });
+
+          if (updateHash) {
+            window.history.replaceState(null, "", `#${nextSection}`);
+          }
+        }
+
+        buttons.forEach(button => {
+          button.addEventListener("click", () => {
+            activateSection(button.dataset.helpSection);
+          });
+        });
+
+        window.addEventListener("hashchange", () => {
+          activateSection(window.location.hash.slice(1), { updateHash: false });
+        });
+
+        activateSection(window.location.hash.slice(1), { updateHash: false });
+      })();
+    </script>
+  </body>
+</html>
