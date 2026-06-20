@@ -1848,6 +1848,7 @@ body.portal-dashboard-active .page {
 .dashboard-sidebar a {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 36px;
   padding: 0 12px;
   border-radius: 9px;
@@ -1855,6 +1856,25 @@ body.portal-dashboard-active .page {
   font-size: 0.84rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.dashboard-nav-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: #7a8493;
+}
+
+.dashboard-nav-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .dashboard-sidebar a:hover,
@@ -1869,6 +1889,12 @@ body.portal-dashboard-active .page {
   border-color: #ffd8c8;
   color: var(--accent);
   background: #fff3ed;
+}
+
+.dashboard-sidebar a:hover .dashboard-nav-icon,
+.dashboard-sidebar a:focus-visible .dashboard-nav-icon,
+.dashboard-sidebar a.is-active .dashboard-nav-icon {
+  color: currentColor;
 }
 
 .dashboard-main {
