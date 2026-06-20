@@ -2866,19 +2866,17 @@
 
   async function submitForgotPassword(event) {
     event.preventDefault();
+
+    setSubmitButtonLoading(forgotPasswordForm, true, "Mengirim...");
     setStatus(forgotPasswordStatus, "Mengirim tautan reset...");
 
-    const submitButton = forgotPasswordForm.querySelector('button[type="submit"]');
     const formData = new FormData(forgotPasswordForm);
     const email = String(formData.get("email") || "").trim();
 
     const turnstileToken = getTurnstileTokenOrFocus("forgotPassword", forgotPasswordStatus);
     if (turnstileToken === null) {
+      setSubmitButtonLoading(forgotPasswordForm, false);
       return;
-    }
-
-    if (submitButton) {
-      submitButton.disabled = true;
     }
 
     try {
@@ -2889,19 +2887,21 @@
       }, { retry: false });
 
       forgotPasswordForm.reset();
+      resetTurnstileWidget("forgotPassword");
       setStatus(forgotPasswordStatus, "Jika email terdaftar, tautan reset password telah dikirim.", "success");
+
+      // Tidak di-enable lagi agar tidak spam resend.
     } catch (err) {
       setStatus(forgotPasswordStatus, err.message || "Gagal mengirim tautan reset password.", "error");
-    } finally {
       resetTurnstileWidget("forgotPassword");
-      if (submitButton) {
-        submitButton.disabled = false;
-      }
+      setSubmitButtonLoading(forgotPasswordForm, false);
     }
   }
 
   async function submitRegister(event) {
     event.preventDefault();
+
+    const submitButton = setSubmitButtonLoading(registerForm, true, "Membuat akun...");
     setStatus(registerStatus, "Membuat akun...");
 
     const formData = new FormData(registerForm);
@@ -2913,11 +2913,13 @@
     if (password !== passwordConfirm) {
       setStatus(registerStatus, "Konfirmasi password tidak sama.", "error");
       registerForm.elements.passwordConfirm?.focus();
+      setSubmitButtonLoading(registerForm, false);
       return;
     }
 
     const turnstileToken = getTurnstileTokenOrFocus("register", registerStatus);
     if (turnstileToken === null) {
+      setSubmitButtonLoading(registerForm, false);
       return;
     }
 
@@ -2944,6 +2946,7 @@
     } catch (err) {
       setStatus(registerStatus, err.message || "Daftar gagal.", "error");
       resetTurnstileWidget("register");
+      setSubmitButtonLoading(registerForm, false);
     }
   }
 
@@ -3238,12 +3241,17 @@
 
   function bindModalHandlers() {
     openRegisterBtn.addEventListener("click", () => {
+      registerForm.reset();
+      setSubmitButtonLoading(registerForm, false);
+      resetTurnstileWidget("register");
       setStatus(registerStatus, "");
       openModal(registerModalBackdrop);
     });
 
     openForgotPasswordBtn.addEventListener("click", () => {
       forgotPasswordForm.reset();
+      setSubmitButtonLoading(forgotPasswordForm, false);
+      resetTurnstileWidget("forgotPassword");
       setStatus(forgotPasswordStatus, "");
       openModal(forgotPasswordModalBackdrop);
       forgotPasswordForm.elements.email?.focus();
@@ -3725,6 +3733,22 @@ function getTurnstileTokenOrFocus(name, statusEl) {
   }
 
   return token;
+}
+
+function setSubmitButtonLoading(form, isLoading, loadingText = "Memproses...") {
+  const button = form?.querySelector('button[type="submit"]');
+  if (!button) {
+    return null;
+  }
+
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent;
+  }
+
+  button.disabled = Boolean(isLoading);
+  button.textContent = isLoading ? loadingText : button.dataset.originalText;
+
+  return button;
 }
 
   initializeDateStates();
