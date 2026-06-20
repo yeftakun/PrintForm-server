@@ -15,6 +15,8 @@
   const dashboardUserChip = document.getElementById("dashboardUserChip");
   const dashboardStoreCode = document.getElementById("dashboardStoreCode");
   const dashboardLastSync = document.getElementById("dashboardLastSync");
+  const dashboardStoreStatusBadge = document.getElementById("dashboardStoreStatusBadge");
+  const dashboardStoreStatusText = document.getElementById("dashboardStoreStatusText");
   const storeOverrideBadge = document.getElementById("storeOverrideBadge");
 
   const heroText = document.getElementById("heroText");
@@ -1518,8 +1520,28 @@
     };
   }
 
+  function renderStoreStatusBadge(state) {
+    if (!dashboardStoreStatusBadge || !dashboardStoreStatusText) {
+      return;
+    }
+
+    const status = state?.effectiveStatus === "open"
+      ? "open"
+      : state?.effectiveStatus === "closed"
+        ? "closed"
+        : "unknown";
+    const label = status === "open" ? "Buka" : status === "closed" ? "Tutup" : "-";
+
+    dashboardStoreStatusText.textContent = label;
+    dashboardStoreStatusBadge.classList.toggle("is-open", status === "open");
+    dashboardStoreStatusBadge.classList.toggle("is-closed", status === "closed");
+    dashboardStoreStatusBadge.classList.toggle("is-unknown", status === "unknown");
+    dashboardStoreStatusBadge.setAttribute("aria-label", `Status toko: ${label}`);
+  }
+
   function updateOperationalUi({ autoCloseOutsideHours = false } = {}) {
     if (!storeSettingsForm?.elements?.storeStatus) {
+      renderStoreStatusBadge(null);
       return;
     }
 
@@ -1538,6 +1560,7 @@
 
     storeOperationalSummary.textContent = summarizeOperationalSchedule(currentOperationalSchedule);
     const state = getOperationalFormState();
+    renderStoreStatusBadge(state);
     storeOverrideBadge?.classList.toggle("hidden", !state.isForcedOpenOutsideHours);
   }
 
@@ -2772,6 +2795,7 @@
     authShell?.classList.remove("hidden");
     setLinkedClientsEmpty("Silakan login untuk melihat daftar client.");
     setStatus(linkedClientsStatus, "");
+    renderStoreStatusBadge(null);
     heroText.textContent = "Silakan login atau daftar untuk membuka pengaturan akun.";
   }
 

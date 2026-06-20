@@ -1516,6 +1516,52 @@ body.portal-dashboard-active .page {
   font-weight: 800;
 }
 
+.store-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  color: #344054;
+  background: #f9fafb;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.store-status-badge strong {
+  font-weight: 800;
+}
+
+.store-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+
+.store-status-badge.is-open {
+  border-color: #abefc6;
+  color: #067647;
+  background: #ecfdf3;
+}
+
+.store-status-badge.is-open .store-status-dot {
+  background: #17b26a;
+}
+
+.store-status-badge.is-closed {
+  border-color: #fecdca;
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.store-status-badge.is-closed .store-status-dot {
+  background: #f04438;
+}
+
 .dashboard-actions,
 .section-actions {
   display: flex;
@@ -1552,6 +1598,10 @@ body.portal-dashboard-active .page {
 
 .download-client-modal {
   width: min(560px, calc(100vw - 32px));
+}
+
+.download-client-modal .modal-header {
+  margin-bottom: 18px;
 }
 
 .download-client-card {
@@ -3235,6 +3285,14 @@ body.portal-dashboard-active .page {
   }
 
   .store-override-badge {
+    width: 100%;
+    min-height: 28px;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+
+  .store-status-badge {
     width: 100%;
     min-height: 28px;
     justify-content: center;
