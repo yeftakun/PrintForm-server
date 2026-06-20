@@ -3614,22 +3614,7 @@
     logoutBtn.addEventListener("click", onLogout);
   }
 
-  initializeDateStates();
-  bindModalHandlers();
-  bindActionHandlers();
-  loadTurnstileConfig();
-  window.PortalAuth.startSessionWatcher({
-    idleTimeoutMs: 2 * 60 * 60 * 1000,
-    loginPath: "/portal/",
-    scope: "mitra"
-  });
-  renderAuthState();
-  setInterval(() => {
-    updateOperationalUi({ autoCloseOutsideHours: true });
-  }, 60000);
-})();
-
-function waitForTurnstileApi() {
+  function waitForTurnstileApi() {
   if (window.turnstile?.render) {
     return Promise.resolve();
   }
@@ -3741,3 +3726,18 @@ function getTurnstileTokenOrFocus(name, statusEl) {
 
   return token;
 }
+
+  initializeDateStates();
+  bindModalHandlers();
+  bindActionHandlers();
+  loadTurnstileConfig();
+  window.PortalAuth.startSessionWatcher({
+    idleTimeoutMs: 2 * 60 * 60 * 1000,
+    loginPath: "/portal/",
+    scope: "mitra"
+  });
+  renderAuthState();
+  setInterval(() => {
+    updateOperationalUi({ autoCloseOutsideHours: true });
+  }, 60000);
+})();
