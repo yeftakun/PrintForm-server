@@ -1,6 +1,6 @@
 # Dokumentasi API Internal PrintOrder
 
-Dokumen ini berisi ringkasan endpoint API internal pada server PrintOrder. Dokumentasi ini tidak ditujukan sebagai dokumentasi API publik, melainkan sebagai catatan teknis komunikasi antara aplikasi web, portal mitra, portal admin, server, dan aplikasi klien desktop.
+Ringkasan endpoint API internal pada server PrintOrder. Dokumentasi ini tidak ditujukan sebagai dokumentasi API publik, melainkan sebagai catatan teknis komunikasi antara aplikasi web, portal mitra, portal admin, server, dan aplikasi klien desktop.
 
 ## Informasi Umum
 
