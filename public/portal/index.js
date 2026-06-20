@@ -2835,6 +2835,8 @@
 
   async function submitLogin(event) {
     event.preventDefault();
+
+    setSubmitButtonLoading(loginForm, true, "Memverifikasi...");
     setStatus(loginStatus, "Memverifikasi akun...");
 
     const formData = new FormData(loginForm);
@@ -2861,6 +2863,7 @@
       await renderAuthState();
     } catch (err) {
       setStatus(loginStatus, err.message || "Login gagal.", "error");
+      setSubmitButtonLoading(loginForm, false);
     }
   }
 
@@ -2901,7 +2904,7 @@
   async function submitRegister(event) {
     event.preventDefault();
 
-    const submitButton = setSubmitButtonLoading(registerForm, true, "Membuat akun...");
+    setSubmitButtonLoading(registerForm, true, "Membuat akun...");
     setStatus(registerStatus, "Membuat akun...");
 
     const formData = new FormData(registerForm);
@@ -3686,7 +3689,7 @@ function renderTurnstileWidget(name) {
   }
 
   const container = getTurnstileContainer(name);
-  if (!container || turnstileState.widgets[name]) {
+  if (!container || turnstileState.widgets[name] !== null) {
     return;
   }
 
@@ -3710,7 +3713,12 @@ function resetTurnstileWidget(name) {
   turnstileState.tokens[name] = "";
 
   const widgetId = turnstileState.widgets[name];
-  if (turnstileState.enabled && widgetId && window.turnstile?.reset) {
+  if (
+    turnstileState.enabled
+    && widgetId !== null
+    && widgetId !== undefined
+    && window.turnstile?.reset
+  ) {
     window.turnstile.reset(widgetId);
   }
 }
