@@ -100,6 +100,51 @@
         gap: 10px;
       }
 
+      .sidebar-toggle,
+      .sidebar-close {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--body);
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .sidebar-toggle {
+        min-height: 40px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 0 14px;
+        font-size: 0.92rem;
+      }
+
+      .sidebar-toggle svg {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .sidebar-close {
+        display: none;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        font-size: 1.25rem;
+        line-height: 1;
+      }
+
+      .sidebar-toggle:hover,
+      .sidebar-close:hover {
+        border-color: rgba(223, 69, 31, 0.34);
+        color: var(--accent);
+      }
+
       .top-link {
         min-height: 40px;
         display: inline-flex;
@@ -134,6 +179,7 @@
       }
 
       .help-sidebar {
+        position: relative;
         display: flex;
         flex-direction: column;
         gap: 24px;
@@ -147,6 +193,13 @@
       .sidebar-heading {
         display: grid;
         gap: 8px;
+      }
+
+      .sidebar-heading h2 {
+        margin: 0;
+        font-size: clamp(1.45rem, 2.4vw, 2rem);
+        line-height: 1.1;
+        letter-spacing: 0;
       }
 
       .kicker {
@@ -234,13 +287,15 @@
 
       .section-label strong {
         font-size: 1.0rem;
-        line-height: 0.9;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
       }
 
       .section-label span {
         color: var(--muted);
         font-size: 0.8rem;
-        line-height: 1.0;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
       }
 
       .help-content {
@@ -293,6 +348,7 @@
         color: var(--body);
         font-size: 1rem;
         line-height: 1.7;
+        overflow-wrap: anywhere;
       }
 
       .article-section {
@@ -355,6 +411,25 @@
         font-style: italic;
       }
 
+      .video-embed {
+        width: 100%;
+        max-width: 720px;
+        aspect-ratio: 16 / 9;
+        margin-top: 12px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #000000;
+        box-shadow: 0 16px 34px rgba(74, 51, 34, 0.12);
+      }
+
+      .video-embed iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+
       .scroll-top-button {
         position: fixed;
         right: 24px;
@@ -396,43 +471,144 @@
         stroke-linejoin: round;
       }
 
+      .mobile-sidebar-backdrop {
+        display: none;
+      }
+
       @media (max-width: 860px) {
+        body.help-sidebar-open {
+          overflow: hidden;
+        }
+
+        .help-topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .sidebar-toggle {
+          display: inline-flex;
+          grid-column: 1 / -1;
+          width: 100%;
+          min-height: 44px;
+          border-color: var(--accent);
+          background: var(--accent);
+          color: #ffffff;
+          box-shadow: 0 12px 24px rgba(223, 69, 31, 0.18);
+        }
+
+        .sidebar-toggle:hover {
+          border-color: var(--accent-dark);
+          background: var(--accent-dark);
+          color: #ffffff;
+        }
+
+        .mobile-sidebar-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 40;
+          display: block;
+          background: rgba(7, 11, 16, 0.42);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 180ms ease;
+        }
+
+        body.help-sidebar-open .mobile-sidebar-backdrop {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
         .help-shell {
           min-height: auto;
           grid-template-columns: 1fr;
+          border-radius: 18px;
+          overflow: visible;
         }
 
         .help-sidebar {
-          border-right: 0;
-          border-bottom: 1px solid var(--line-soft);
+          position: fixed;
+          inset: 0 auto 0 0;
+          z-index: 50;
+          width: min(84vw, 320px);
+          height: 100vh;
+          height: 100dvh;
+          gap: 18px;
+          padding: 24px;
+          border-right: 1px solid var(--line-soft);
+          border-bottom: 0;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 241, 0.98)),
+            #ffffff;
+          box-shadow: 16px 0 42px rgba(7, 11, 16, 0.18);
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          transform: translateX(-105%);
+          transition: transform 180ms ease;
+        }
+
+        body.help-sidebar-open .help-sidebar {
+          transform: translateX(0);
+        }
+
+        .sidebar-close {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          display: grid;
+        }
+
+        .sidebar-heading {
+          padding-right: 46px;
         }
 
         .section-nav {
-          display: flex;
-          overflow-x: auto;
-          padding-bottom: 2px;
-          scroll-snap-type: x mandatory;
+          display: grid;
+          gap: 8px;
+          overflow: visible;
+          padding-bottom: 0;
+          scroll-snap-type: none;
         }
 
         .section-button {
-          min-width: 190px;
-          scroll-snap-align: start;
+          min-width: 0;
+          min-height: 50px;
+          align-items: flex-start;
+          scroll-snap-align: unset;
+        }
+
+        .top-actions {
+          width: 100%;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .top-link {
+          min-width: 0;
         }
 
         .help-content {
-          min-height: 520px;
+          min-height: 0;
+          padding: 28px 24px;
         }
       }
 
       @media (max-width: 620px) {
         .help-page {
-          padding: 16px;
+          padding: 12px;
           gap: 16px;
         }
 
         .help-topbar {
           align-items: flex-start;
           flex-direction: column;
+          gap: 12px;
+        }
+
+        .brand-logo {
+          width: 38px;
+          height: 38px;
         }
 
         .top-actions {
@@ -440,8 +616,15 @@
           flex-wrap: wrap;
         }
 
+        .sidebar-toggle {
+          flex: 1 1 100%;
+          min-height: 40px;
+        }
+
         .top-link {
           flex: 1 1 140px;
+          min-height: 38px;
+          padding: 0 12px;
         }
 
         .help-shell {
@@ -449,16 +632,51 @@
         }
 
         .help-sidebar {
-          padding: 22px 18px;
+          padding: 20px 16px;
+        }
+
+        .section-button {
+          min-width: 0;
+          min-height: 46px;
+          gap: 10px;
+          padding: 8px;
+        }
+
+        .section-icon {
+          width: 32px;
+          height: 32px;
         }
 
         .help-content {
-          padding: 24px 18px;
-          min-height: 440px;
+          min-height: 0;
+          padding: 22px 16px 24px;
+        }
+
+        .help-panel {
+          gap: 22px;
+        }
+
+        .help-article {
+          font-size: 0.95rem;
+          line-height: 1.65;
+        }
+
+        .help-article ol,
+        .help-article ul {
+          padding-left: 1.2rem;
+        }
+
+        .article-section {
+          margin-top: 26px;
         }
 
         .empty-content {
           min-height: 280px;
+        }
+
+        .video-embed {
+          border-radius: 8px;
+          box-shadow: none;
         }
 
         .scroll-top-button {
@@ -480,13 +698,19 @@
         </a>
 
         <nav class="top-actions" aria-label="Navigasi utama">
+          <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-controls="helpSidebar" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg>
+            <span>Buka Menu Bantuan</span>
+          </button>
           <a class="top-link" href="/portal/">Portal Mitra</a>
           <a class="top-link" href="/">Halaman Utama</a>
         </nav>
       </header>
 
       <section class="help-shell" aria-labelledby="helpTitle">
-        <aside class="help-sidebar" aria-label="Section bantuan">
+        <aside class="help-sidebar" id="helpSidebar" aria-label="Section bantuan">
+          <button class="sidebar-close" type="button" data-sidebar-close aria-label="Tutup menu bantuan">x</button>
+
           <div class="sidebar-heading">
             <p class="kicker">Bantuan</p>
             <h2 id="helpTitle">Pusat Bantuan</h2>
@@ -597,7 +821,9 @@
 
               <section class="article-section" aria-labelledby="setupVideoTitle">
                 <h3 id="setupVideoTitle">Video Tutorial Mitra</h3>
-                <div class="video-placeholder">Video tutorial mitra akan ditambahkan di sini.</div>
+                <div class="video-embed">
+                  <iframe src="https://www.youtube.com/embed/Qk8xzUNYhmg?si=iBQvOj8O3TEWoTxm" title="Video tutorial setup mitra PrintOrder" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>
+                </div>
               </section>
             </article>
           </section>
@@ -750,13 +976,17 @@
 
               <section class="article-section" aria-labelledby="videoPelangganTitle">
                 <h3 id="videoPelangganTitle">Video Tutorial Pelanggan</h3>
-                <div class="video-placeholder">Video tutorial pelanggan akan ditambahkan di sini.</div>
+                <div class="video-embed">
+                  <iframe src="https://www.youtube.com/embed/b2ZLRblgJfc?si=e6jCiL8dREtkE_Gu" title="Video tutorial Pelanggan PrintOrder" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>
+                </div>
               </section>
             </article>
           </section>
         </div>
       </section>
     </main>
+
+    <div class="mobile-sidebar-backdrop" data-sidebar-close aria-hidden="true"></div>
 
     <button class="scroll-top-button" type="button" aria-label="Kembali ke atas">
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -770,6 +1000,27 @@
         const panels = Array.from(document.querySelectorAll("[data-help-panel]"));
         const knownSections = new Set(buttons.map(button => button.dataset.helpSection));
         const scrollTopButton = document.querySelector(".scroll-top-button");
+        const sidebarToggle = document.querySelector("[data-sidebar-toggle]");
+        const sidebarCloseControls = Array.from(document.querySelectorAll("[data-sidebar-close]"));
+        const sidebarCloseButton = document.querySelector(".sidebar-close");
+        const mobileSidebarQuery = window.matchMedia("(max-width: 860px)");
+
+        function setSidebarOpen(isOpen) {
+          document.body.classList.toggle("help-sidebar-open", isOpen);
+          sidebarToggle?.setAttribute("aria-expanded", String(isOpen));
+
+          if (isOpen) {
+            sidebarCloseButton?.focus({ preventScroll: true });
+          }
+        }
+
+        function closeSidebar() {
+          setSidebarOpen(false);
+        }
+
+        function toggleSidebar() {
+          setSidebarOpen(!document.body.classList.contains("help-sidebar-open"));
+        }
 
         function activateSection(section, { updateHash = true } = {}) {
           const nextSection = knownSections.has(section) ? section : "home";
@@ -800,14 +1051,41 @@
         buttons.forEach(button => {
           button.addEventListener("click", () => {
             activateSection(button.dataset.helpSection);
+            if (mobileSidebarQuery.matches) {
+              closeSidebar();
+            }
           });
+        });
+
+        sidebarToggle?.addEventListener("click", toggleSidebar);
+
+        sidebarCloseControls.forEach(control => {
+          control.addEventListener("click", closeSidebar);
         });
 
         scrollTopButton?.addEventListener("click", () => {
           window.scrollTo({ top: 0, behavior: "smooth" });
         });
 
+        window.addEventListener("keydown", event => {
+          if (event.key === "Escape") {
+            closeSidebar();
+          }
+        });
+
         window.addEventListener("scroll", syncScrollTopButton, { passive: true });
+
+        const handleSidebarBreakpointChange = event => {
+          if (!event.matches) {
+            closeSidebar();
+          }
+        };
+
+        if (typeof mobileSidebarQuery.addEventListener === "function") {
+          mobileSidebarQuery.addEventListener("change", handleSidebarBreakpointChange);
+        } else if (typeof mobileSidebarQuery.addListener === "function") {
+          mobileSidebarQuery.addListener(handleSidebarBreakpointChange);
+        }
 
         window.addEventListener("hashchange", () => {
           activateSection(window.location.hash.slice(1), { updateHash: false });
