@@ -3,13 +3,16 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const multer = require("multer");
+const { requireTurnstile } = require("../middleware/turnstile");
 const {
   AUTH_ALLOW_PUBLIC_REGISTER,
   AUTH_ACCESS_TOKEN_TTL,
   APP_BASE_URL,
   PASSWORD_RESET_TOKEN_TTL_MINUTES,
   PROFILE_PHOTO_MAX_BYTES,
-  profilePhotosDir
+  profilePhotosDir,
+  TURNSTILE_ENABLED,
+  TURNSTILE_SITE_KEY
 } = require("../config");
 const {
   countUsers,
@@ -330,7 +333,14 @@ function toPublicTokenBundle(tokenBundle) {
 
 router.use(optionalAuth);
 
-router.post("/forgot-password", forgotPasswordRateLimiter, asyncHandler(async (req, res) => {
+router.get("/turnstile-config", (req, res) => {
+  res.json({
+    enabled: Boolean(TURNSTILE_ENABLED && TURNSTILE_SITE_KEY),
+    siteKey: TURNSTILE_ENABLED ? TURNSTILE_SITE_KEY : ""
+  });
+});
+
+router.post("/forgot-password", forgotPasswordRateLimiter, requireTurnstile, asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.body?.email);
 
   if (email) {
@@ -455,7 +465,7 @@ router.post("/reset-password", asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/register", asyncHandler(async (req, res) => {
+router.post("/register", requireTurnstile, asyncHandler(async (req, res) => {
   if (!AUTH_ALLOW_PUBLIC_REGISTER && !req.user) {
     res.status(403).json({ error: "Public register is disabled" });
     return;

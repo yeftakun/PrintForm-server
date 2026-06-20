@@ -4891,3 +4891,14 @@ body.portal-dashboard-active .page {
     min-height: 280px;
   }
 }
+
+.turnstile-slot {
+  display: flex;
+  justify-content: center;
+  margin: 0.75rem 0;
+  min-height: 65px;
+}
+
+.turnstile-slot.is-hidden {
+  display: none;
+}

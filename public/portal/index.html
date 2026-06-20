@@ -34,6 +34,7 @@
     <link rel="stylesheet" href="/portal/style.css">
     <link rel="stylesheet" href="/shared/alerts.css">
     <link rel="stylesheet" href="/shared/customer-help.css">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
   </head>
   <body>
     <main class="page">
@@ -1022,6 +1023,11 @@
               </button>
             </span>
           </label>
+          <div
+            class="turnstile-slot"
+            id="registerTurnstile"
+            data-turnstile-form="register"
+          ></div>
           <button class="btn btn-primary btn-register" type="submit">Daftar</button>
           <p class="modal-switch">
             Sudah punya akun?
@@ -1058,6 +1064,11 @@
               >
             </span>
           </label>
+          <div
+            class="turnstile-slot"
+            id="forgotPasswordTurnstile"
+            data-turnstile-form="forgot-password"
+          ></div>
           <div class="form-footer account-modal-footer">
             <button class="btn btn-primary" type="submit">Kirim Tautan Reset</button>
             <button class="btn btn-ghost" type="button" data-close="forgotPasswordModalBackdrop">Batal</button>

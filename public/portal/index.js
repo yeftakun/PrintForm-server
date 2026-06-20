@@ -155,6 +155,8 @@
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
   const forgotPasswordForm = document.getElementById("forgotPasswordForm");
+  const registerTurnstile = document.getElementById("registerTurnstile");
+  const forgotPasswordTurnstile = document.getElementById("forgotPasswordTurnstile");
   const accountProfileForm = document.getElementById("accountProfileForm");
   const accountPasswordForm = document.getElementById("accountPasswordForm");
   const accountPinForm = document.getElementById("accountPinForm");
@@ -213,6 +215,20 @@
     AMPLOP: { label: "Amplop", size: "110 x 220 mm" }
   };
   let currentUser = null;
+
+  const turnstileState = {
+    enabled: false,
+    siteKey: "",
+    scriptReady: false,
+    widgets: {
+      register: null,
+      forgotPassword: null
+    },
+    tokens: {
+      register: "",
+      forgotPassword: ""
+    }
+  };
 
   function getUserRole(user) {
     return String(user?.role || "").trim().toLowerCase();
@@ -2856,6 +2872,11 @@
     const formData = new FormData(forgotPasswordForm);
     const email = String(formData.get("email") || "").trim();
 
+    const turnstileToken = getTurnstileTokenOrFocus("forgotPassword", forgotPasswordStatus);
+    if (turnstileToken === null) {
+      return;
+    }
+
     if (submitButton) {
       submitButton.disabled = true;
     }
@@ -2864,7 +2885,7 @@
       await window.PortalAuth.apiJson("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, turnstileToken })
       }, { retry: false });
 
       forgotPasswordForm.reset();
@@ -2872,6 +2893,7 @@
     } catch (err) {
       setStatus(forgotPasswordStatus, err.message || "Gagal mengirim tautan reset password.", "error");
     } finally {
+      resetTurnstileWidget("forgotPassword");
       if (submitButton) {
         submitButton.disabled = false;
       }
@@ -2894,11 +2916,16 @@
       return;
     }
 
+    const turnstileToken = getTurnstileTokenOrFocus("register", registerStatus);
+    if (turnstileToken === null) {
+      return;
+    }
+
     try {
       const body = await window.PortalAuth.apiJson("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password })
+        body: JSON.stringify({ username, email, password, turnstileToken })
       }, { retry: false });
 
       window.PortalAuth.saveState({
@@ -2912,9 +2939,11 @@
       setStatus(registerStatus, "Akun berhasil dibuat.", "success");
       closeModal(registerModalBackdrop);
       registerForm.reset();
+      resetTurnstileWidget("register");
       await renderAuthState();
     } catch (err) {
       setStatus(registerStatus, err.message || "Daftar gagal.", "error");
+      resetTurnstileWidget("register");
     }
   }
 
@@ -3588,6 +3617,7 @@
   initializeDateStates();
   bindModalHandlers();
   bindActionHandlers();
+  loadTurnstileConfig();
   window.PortalAuth.startSessionWatcher({
     idleTimeoutMs: 2 * 60 * 60 * 1000,
     loginPath: "/portal/",
@@ -3598,3 +3628,116 @@
     updateOperationalUi({ autoCloseOutsideHours: true });
   }, 60000);
 })();
+
+function waitForTurnstileApi() {
+  if (window.turnstile?.render) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (window.turnstile?.render) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+
+      if (Date.now() - startedAt > 8000) {
+        clearInterval(timer);
+        reject(new Error("Widget verifikasi gagal dimuat. Periksa koneksi internet Anda."));
+      }
+    }, 100);
+  });
+}
+
+async function loadTurnstileConfig() {
+  try {
+    const body = await window.PortalAuth.apiJson("/api/auth/turnstile-config", {
+      method: "GET"
+    }, { retry: false });
+
+    turnstileState.enabled = Boolean(body.enabled && body.siteKey);
+    turnstileState.siteKey = body.siteKey || "";
+
+    [registerTurnstile, forgotPasswordTurnstile].forEach(slot => {
+      if (!slot) return;
+      slot.classList.toggle("is-hidden", !turnstileState.enabled);
+    });
+
+    if (turnstileState.enabled) {
+      await waitForTurnstileApi();
+      turnstileState.scriptReady = true;
+      renderTurnstileWidget("register");
+      renderTurnstileWidget("forgotPassword");
+    }
+  } catch (err) {
+    turnstileState.enabled = false;
+    [registerTurnstile, forgotPasswordTurnstile].forEach(slot => {
+      if (!slot) return;
+      slot.classList.add("is-hidden");
+    });
+    console.warn("Turnstile config load failed:", err?.message || err);
+  }
+}
+
+function getTurnstileContainer(name) {
+  if (name === "register") return registerTurnstile;
+  if (name === "forgotPassword") return forgotPasswordTurnstile;
+  return null;
+}
+
+function renderTurnstileWidget(name) {
+  if (!turnstileState.enabled || !turnstileState.siteKey || !window.turnstile?.render) {
+    return;
+  }
+
+  const container = getTurnstileContainer(name);
+  if (!container || turnstileState.widgets[name]) {
+    return;
+  }
+
+  turnstileState.widgets[name] = window.turnstile.render(container, {
+    sitekey: turnstileState.siteKey,
+    theme: "light",
+    action: name === "register" ? "register" : "forgot_password",
+    callback: token => {
+      turnstileState.tokens[name] = token || "";
+    },
+    "expired-callback": () => {
+      turnstileState.tokens[name] = "";
+    },
+    "error-callback": () => {
+      turnstileState.tokens[name] = "";
+    }
+  });
+}
+
+function resetTurnstileWidget(name) {
+  turnstileState.tokens[name] = "";
+
+  const widgetId = turnstileState.widgets[name];
+  if (turnstileState.enabled && widgetId && window.turnstile?.reset) {
+    window.turnstile.reset(widgetId);
+  }
+}
+
+function getTurnstileTokenOrFocus(name, statusEl) {
+  if (!turnstileState.enabled) {
+    return "";
+  }
+
+  renderTurnstileWidget(name);
+
+  const token = turnstileState.tokens[name];
+  if (!token) {
+    setStatus(statusEl, "Selesaikan verifikasi keamanan terlebih dahulu.", "error");
+
+    const container = getTurnstileContainer(name);
+    container?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    return null;
+  }
+
+  return token;
+}
