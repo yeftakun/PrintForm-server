@@ -3683,6 +3683,21 @@ function getTurnstileContainer(name) {
   return null;
 }
 
+function setAuthSubmitAvailability(name) {
+  if (!turnstileState.enabled) {
+    return;
+  }
+
+  const form = name === "register" ? registerForm : forgotPasswordForm;
+  const button = form?.querySelector('button[type="submit"]');
+  if (!button) {
+    return;
+  }
+
+  const hasToken = Boolean(turnstileState.tokens[name]);
+  button.disabled = !hasToken;
+}
+
 function renderTurnstileWidget(name) {
   if (!turnstileState.enabled || !turnstileState.siteKey || !window.turnstile?.render) {
     return;
@@ -3693,18 +3708,23 @@ function renderTurnstileWidget(name) {
     return;
   }
 
+  setAuthSubmitAvailability(name);
+
   turnstileState.widgets[name] = window.turnstile.render(container, {
     sitekey: turnstileState.siteKey,
     theme: "light",
     action: name === "register" ? "register" : "forgot_password",
     callback: token => {
       turnstileState.tokens[name] = token || "";
+      setAuthSubmitAvailability(name);
     },
     "expired-callback": () => {
       turnstileState.tokens[name] = "";
+      setAuthSubmitAvailability(name);
     },
     "error-callback": () => {
       turnstileState.tokens[name] = "";
+      setAuthSubmitAvailability(name);
     }
   });
 }
@@ -3721,6 +3741,7 @@ function resetTurnstileWidget(name) {
   ) {
     window.turnstile.reset(widgetId);
   }
+  setAuthSubmitAvailability(name);
 }
 
 function getTurnstileTokenOrFocus(name, statusEl) {
